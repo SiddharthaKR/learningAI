@@ -228,7 +228,7 @@ export function SettingsDialogBody({
 		async (
 			section: "general" | "agent" | "models" | "appearance" | "graph" | "compaction",
 			body: object,
-		) => {
+		): Promise<string | null> => {
 			setError(null);
 			const res = await fetch(`/api/settings/${section}`, {
 				method: "PUT",
@@ -239,8 +239,9 @@ export function SettingsDialogBody({
 				const detail = (await res.json().catch(() => ({}))) as {
 					error?: string;
 				};
-				setError(`${section}: ${detail.error ?? res.status}`);
-				return;
+				const message = `${section}: ${detail.error ?? res.status}`;
+				setError(message);
+				return message;
 			}
 			// Server truth, never the request body (fix wave, owner repro):
 			// the models section clamps pinned thinking levels on write
@@ -257,6 +258,7 @@ export function SettingsDialogBody({
 			notifySettingsSaved(section);
 			if (section === "appearance")
 				onAppearanceChange(body as AppearanceSettings);
+			return null;
 		},
 		[onAppearanceChange],
 	);
@@ -390,9 +392,7 @@ export function SettingsDialogBody({
 										models={record.models}
 										graph={record.graph}
 										compaction={record.compaction}
-										onModelsChange={(next: ModelsSettings) =>
-											void write("models", next)
-										}
+							onModelsChange={(next: ModelsSettings) => write("models", next)}
 										onSectionChange={(next: AgentSettings) =>
 											void write("agent", next)
 										}

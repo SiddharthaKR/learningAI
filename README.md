@@ -48,7 +48,14 @@ Future teaching sessions can read the graph instead of starting from scratch. Pr
 - **Windows (x64):** run the installer. It is currently unsigned; Windows may show an “unknown publisher” or SmartScreen warning.
 - **Linux (x64):** make the AppImage executable and open it, or install the Debian/Ubuntu `.deb`.
 
-Add your provider API key and choose your models, then start a session with what you want to understand. LearnHarness supports 30+ provider options, including OpenAI, Anthropic, Google, DeepSeek, and OpenRouter. Optional dictation and web search use separate service keys.
+Add a provider API key or use local Ollama, then choose your models and start a session with what you want to understand. LearnHarness supports 30+ cloud providers, including OpenAI, Anthropic, Google, DeepSeek, and OpenRouter. Optional dictation and web search use separate service keys.
+
+### Local models and custom endpoints
+
+- **Ollama:** install and run Ollama on this PC. LearnHarness checks its default local API at `http://localhost:11434` and lists models already installed there. For example, you can install [Gemma 4 in Ollama](https://ollama.com/library/gemma4) and then select it in Settings → Agent → Models. No API key is needed.
+- **vLLM and other OpenAI-compatible servers:** open Settings → Agent → Models and save one API base URL ending in `/v1` (for example, `http://localhost:8000/v1`). No API key is sent. LearnHarness discovers model IDs through `/models`; if discovery is unavailable, add model IDs manually. Mark a manually added model as Vision only when it accepts image input.
+
+Choose models that support tool calling for teaching, practice, and agent tasks. Image input models can be assigned to the Vision slot.
 
 All three platforms support in-app updates.
 

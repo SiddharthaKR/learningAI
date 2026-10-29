@@ -67,19 +67,20 @@ export interface ModelCatalogResponse {
 	 *  granularity; effectiveSettings().models verbatim, NULL per unset
 	 *  tier. */
 	slots: SlotPins;
-	/** Providers with a PRESENT key, and which env var gates each — the
-	 *  model slots wave's federation surface (2026-09-20): the picker lists
-	 *  models from these providers' pi-ai catalogs only. Keyless providers
-	 *  are simply absent (the Keys page is the discovery surface, same
-	 *  discipline as the search engines). */
+	/** Configured providers and their readiness. Keyless local/custom rows
+	 *  have no `envVar`; `available` is their latest discovery result. */
 	providers: CatalogProvider[];
 }
 
 /** One row of the providers surface. */
 export interface CatalogProvider {
 	id: string;
-	/** The env var whose presence federates this provider in. */
-	envVar: string;
+	/** The env var whose presence federates this keyed provider in. */
+	envVar?: string;
 	/** Whether that var is currently present (env or auth file). */
 	keyPresent: boolean;
+	/** Latest discovery result for a keyless provider. */
+	available?: boolean;
+	/** Actionable discovery failure for a keyless provider. */
+	error?: string;
 }

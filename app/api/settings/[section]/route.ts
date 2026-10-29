@@ -40,6 +40,7 @@ import {
 	readSettingsRecord,
 	validateChatSettings,
 	validateModelsSettings,
+	configureModelProviders,
 	writeSettingsRecord,
 	type SettingsBodyResult,
 } from "@/src/server";
@@ -77,6 +78,8 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 	// catalog gate the chat section gets — a slot must name a real
 	// provider+model and a thinking level it supports.
 	if (section === "models") {
+		const prior = readSettingsRecord() ?? { version: 1 };
+		configureModelProviders({ ...prior, models: parsed.settings as ModelsSettings });
 		const verdict = validateModelsSettings(parsed.settings as ModelsSettings);
 		if (!verdict.ok) {
 			return Response.json({ error: verdict.error, supported: verdict.supported }, { status: 400 });

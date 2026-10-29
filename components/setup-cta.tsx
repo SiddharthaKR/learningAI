@@ -42,10 +42,10 @@ export function hasProviderKey(
 export function useZeroKeys(): boolean {
 	const [zeroKeys, setZeroKeys] = useState(false);
 	const read = useCallback(() => {
-		fetch("/api/keys")
+		fetch("/api/models")
 			.then((r) => r.json())
-			.then((body: { keys?: AuthKeyStatus[]; providers?: ProviderKeyInfo[] }) => {
-				setZeroKeys(!hasProviderKey(body.keys ?? [], body.providers));
+			.then((body: { providers?: { keyPresent?: boolean; available?: boolean }[] }) => {
+				setZeroKeys(!(body.providers ?? []).some((provider) => provider.keyPresent || provider.available));
 			})
 			.catch(() => {});
 	}, []);
@@ -85,7 +85,9 @@ export function ZeroKeysPill({ onOpen, inline = false }: { onOpen: () => void; i
 export function strongKeyless(catalog: ModelCatalogResponse | undefined): boolean {
 	const strong = catalog?.slots.strong;
 	if (!strong) return false;
-	return !catalog.providers.some((p) => p.id === strong.model.provider && p.keyPresent);
+	const provider = catalog.providers.find((p) => p.id === strong.model.provider);
+	if (strong.model.provider === "ollama" || strong.model.provider === "custom-openai") return !provider?.available;
+	return !provider?.keyPresent;
 }
 
 /** The strong-slot keyless truth for the PRE-SEND guard (home / /chat/new):

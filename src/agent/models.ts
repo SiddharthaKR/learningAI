@@ -8,9 +8,11 @@ import {
 	type StreamFunction,
 } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
+import type { MutableModels } from "@earendil-works/pi-ai";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type ModelRole } from "../../config.ts";
-import { DEFAULT_THINKING_ORDER } from "../core/settings.ts";
+import { DEFAULT_THINKING_ORDER, type UserSettings } from "../core/settings.ts";
+import { localProviders, type LocalProviderSnapshot } from "./local-providers.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
 
 /** App identity is immutable and shared by Models and every native Agent.
@@ -44,6 +46,7 @@ export interface PiEngine {
 export type { ThinkingLevel };
 
 let collection: ReturnType<typeof createModels> | undefined;
+let lastLocalSnapshot: LocalProviderSnapshot | undefined;
 
 /** The process-wide pi-ai Models collection — EVERY builtin provider's
  *  catalog (model slots wave, 2026-09-20): engines and the picker resolve
@@ -59,6 +62,20 @@ export function piModels() {
 		for (const provider of builtinProviders()) collection.setProvider(provider);
 	}
 	return collection;
+}
+
+/** Register the user's no-key endpoints in the same catalog the builtin
+ * providers use. The latest successful discovery is retained in-process;
+ * saved model pins remain resolvable when an endpoint is temporarily down. */
+export function configureLocalProviders(settings: UserSettings | undefined, snapshot?: LocalProviderSnapshot): void {
+	if (snapshot) lastLocalSnapshot = snapshot;
+	const models: MutableModels = piModels();
+	const providers = localProviders(settings, lastLocalSnapshot);
+	const configured = new Set(providers.map((provider) => provider.id));
+	for (const provider of providers) models.setProvider(provider);
+	for (const id of ["ollama", "custom-openai"]) {
+		if (!configured.has(id)) models.deleteProvider(id);
+	}
 }
 
 /** OpenRouter API key (BYOK); tests never read this — they inject engines. */

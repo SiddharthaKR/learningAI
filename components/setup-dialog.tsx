@@ -60,7 +60,7 @@ const SLOT_ORDER: readonly ModelSlotName[] = ["strong", "cheap", "vision"];
 /** The GET /api/models response fields the flow consumes. */
 interface ModelsBody {
 	models: ModelCatalogEntry[];
-	providers: { id: string; keyPresent: boolean }[];
+	providers: { id: string; keyPresent: boolean; available?: boolean; error?: string }[];
 	/** The three tiers' RESOLVED pins (BYOK: NULL per unset tier) — the
 	 *  PREFILL + "needed" marks (owner, 2026-09-22): pinned tiers open
 	 *  with their pick, unpinned tiers carry the mark. */
@@ -70,10 +70,10 @@ interface ModelsBody {
 /** Pure: which stage the flow opens at — no keyed provider = keys first
  *  (owner's dependency ordering). Exported for tests. */
 export function setupStage(
-	providers: { id: string; keyPresent: boolean }[] | null,
+	providers: { id: string; keyPresent: boolean; available?: boolean }[] | null,
 ): "keys" | "pickers" {
 	if (providers === null) return "keys"; // fetch failed → the honest fallback
-	return providers.some((p) => p.keyPresent) ? "pickers" : "keys";
+	return providers.some((p) => p.keyPresent || p.available) ? "pickers" : "keys";
 }
 
 /** Prefill (owner, BYOK wave 2026-09-22): each pinned tier opens with its
@@ -147,7 +147,7 @@ export function SetupKeysBody({
 }) {
 	return (
 		<div className="flex flex-col gap-3 px-6 py-5" data-testid="setup-stage-keys">
-			<p className="text-sm text-foreground">Add a provider key.</p>
+			<p className="text-sm text-foreground">Start Ollama, configure a custom endpoint in Settings, or add a provider key.</p>
 			<p className="text-xs text-muted-foreground">
 				Choose your AI provider and paste its API key. You’ll pick your models next.
 			</p>
@@ -378,6 +378,18 @@ export function SetupDialog({
 				...(level ? { thinkingLevel: level } : {}),
 			};
 		}
+		const settingsRes = await fetch("/api/settings").catch(() => null);
+		if (!settingsRes?.ok) {
+			setSaving(false);
+			setError("Could not read your saved endpoint settings. Please retry.");
+			return;
+		}
+		const settingsBody = (await settingsRes.json().catch(() => ({}))) as {
+			settings?: { models?: ModelsSettings } | null;
+		};
+		if (settingsBody.settings?.models?.customEndpoint) {
+			models.customEndpoint = settingsBody.settings.models.customEndpoint;
+		}
 		const res = await fetch("/api/settings/models", {
 			method: "PUT",
 			headers: { "content-type": "application/json" },
@@ -428,7 +440,11 @@ export function SetupDialog({
 								Model catalog could not be loaded. Check the connection and retry.
 							</p>
 						) : (
-							<SetupKeysBody
+							<>
+								{body?.providers.filter((provider) => provider.error).map((provider) => (
+									<p key={provider.id} role="status" className="mb-3 text-xs text-muted-foreground">{provider.error}</p>
+								))}
+								<SetupKeysBody
 								providers={keyProviders}
 								provider={keyProvider}
 								value={keyValue}
@@ -444,7 +460,8 @@ export function SetupDialog({
 								}}
 								onValue={setKeyValue}
 								onSave={() => void saveKey()}
-							/>
+								/>
+							</>
 						)}
 					</div>
 				) : (
@@ -452,6 +469,13 @@ export function SetupDialog({
 						<p className="text-xs text-muted-foreground">
 							Pick the model for each tier. All three are required before chats can start.
 						</p>
+						{body?.providers.filter((provider) => provider.error).map((provider) => (
+							<p key={provider.id} role="status" className="text-xs text-muted-foreground">{provider.error}</p>
+						))}
+						{body?.providers.some((provider) => provider.id === "ollama" && provider.available) &&
+							!body.models.some((model) => model.provider === "ollama") && (
+								<p role="status" className="text-xs text-muted-foreground">Ollama is running but has no installed models. Pull a model with Ollama, then reopen model setup.</p>
+							)}
 						{SLOT_ORDER.map((slot) => {
 							const entry = picked[slot];
 							const level = levels[slot];
@@ -520,7 +544,7 @@ export function SetupDialog({
 															}));
 															setOpenMenu(null);
 														}}
-														footer={catalog && catalog.length === 0 ? "No image-capable models. Add a provider key with access to a vision model." : undefined}
+										footer={catalog && catalog.length === 0 ? "No image-capable models. Check Ollama or configure a Vision model." : undefined}
 													/>
 												</MenuShell>
 											)}

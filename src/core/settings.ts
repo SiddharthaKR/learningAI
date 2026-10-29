@@ -195,6 +195,23 @@ export interface ModelSlot {
 	thinkingLevel?: ThinkingLevel;
 }
 
+/** One model ID added by the custom OpenAI-compatible endpoint when the
+ * endpoint's `/models` response omits it or does not expose capability
+ * details. */
+export interface CustomEndpointModel {
+	id: string;
+	/** User-confirmed capability for otherwise opaque endpoints. */
+	vision?: boolean;
+}
+
+/** One user-configured OpenAI-compatible endpoint. Secrets are deliberately
+ * absent: the current endpoint contract does not configure API keys. */
+export interface CustomEndpointSettings {
+	/** OpenAI API base, including `/v1`. */
+	baseUrl?: string;
+	manualModels?: CustomEndpointModel[];
+}
+
 /** The `models` settings section (owner decision 2026-09-20: a dedicated
  *  section — slots are engine-level choices, not one session's). All slots
  *  optional: an absent slot means every role of its tier runs whatever the
@@ -203,6 +220,7 @@ export interface ModelsSettings {
 	strong?: ModelSlot;
 	cheap?: ModelSlot;
 	vision?: ModelSlot;
+	customEndpoint?: CustomEndpointSettings;
 }
 
 /** First-run gate (model-slots wave, owner 2026-09-20): the app refuses
@@ -484,6 +502,37 @@ function sanitizeModels(raw: Record<string, unknown>): ModelsSettings {
 	for (const slot of MODEL_SLOTS) {
 		const cleaned = sanitizeRoleOverride(raw[slot]);
 		if (cleaned) out[slot] = cleaned;
+	}
+	if (raw.customEndpoint !== null && typeof raw.customEndpoint === "object" && !Array.isArray(raw.customEndpoint)) {
+		const endpoint = raw.customEndpoint as Record<string, unknown>;
+		const customEndpoint: CustomEndpointSettings = {};
+		if (typeof endpoint.baseUrl === "string") {
+			try {
+				const url = new URL(endpoint.baseUrl);
+				const path = url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
+				if ((url.protocol === "http:" || url.protocol === "https:") && path.endsWith("/v1")) {
+					const href = url.toString();
+					customEndpoint.baseUrl = href.endsWith("/") ? href.slice(0, -1) : href;
+				}
+			} catch {
+				// Invalid URLs are dropped on read; the write parser rejects them.
+			}
+		}
+		if (Array.isArray(endpoint.manualModels)) {
+			const seen = new Set<string>();
+			const manualModels: CustomEndpointModel[] = [];
+			for (const candidate of endpoint.manualModels) {
+				if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+				const model = candidate as Record<string, unknown>;
+				if (typeof model.id !== "string" || !model.id.trim()) continue;
+				const id = model.id.trim();
+				if (seen.has(id)) continue;
+				seen.add(id);
+				manualModels.push({ id, ...(typeof model.vision === "boolean" ? { vision: model.vision } : {}) });
+			}
+			if (manualModels.length) customEndpoint.manualModels = manualModels;
+		}
+		if (customEndpoint.baseUrl || customEndpoint.manualModels?.length) out.customEndpoint = customEndpoint;
 	}
 	return out;
 }

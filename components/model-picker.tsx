@@ -396,7 +396,7 @@ export function ModelControl({ chatId }: { chatId?: string }) {
 						onPick={pickModel}
 						footer={
 							catalog && catalog.models.length === 0
-								? "No models — add a provider key in Keys"
+								? "No models — check Ollama, Keys, or Custom endpoint"
 								: chatId
 									? "This session's model"
 									: "Strong tier — the default for new sessions"

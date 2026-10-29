@@ -66,6 +66,7 @@ import {
 	type ModelCatalogEntry,
 	type ModelSlotName,
 	type ModelsSettings,
+	type CustomEndpointModel,
 } from "@/src/core";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { prettyModel } from "@/components/usage-format";
@@ -102,6 +103,7 @@ interface SegmentInfo {
 /** The GET /api/models response fields this section consumes. */
 interface ModelsBody {
 	models: ModelCatalogEntry[];
+	providers?: { id: string; available?: boolean; error?: string }[];
 	/** The three tiers' RESOLVED pins (BYOK: NULL per unset tier — no
 	 *  factory floor) — machinery only (the thinking list fallback); the
 	 *  rows' displays read the record override, never a phantom pin. */
@@ -310,11 +312,18 @@ export function AgentSection({
 	/** Writes the composed WHOLE agent section (replace-PUT discipline). */
 	onSectionChange: (next: AgentSettings) => void;
 	/** Writes the composed models section (slots — replace-PUT discipline). */
-	onModelsChange: (next: ModelsSettings) => void;
+	onModelsChange: (next: ModelsSettings) => Promise<string | null> | void;
 	/** Writes the whole compaction section (replace-PUT discipline). */
 	onCompactionChange: (next: CompactionSettings) => void;
 }) {
 	const [catalog, setCatalog] = useState<ModelCatalogEntry[] | null>(null);
+	const [endpointUrl, setEndpointUrl] = useState(models?.customEndpoint?.baseUrl ?? "");
+	const [manualModels, setManualModels] = useState<CustomEndpointModel[]>(models?.customEndpoint?.manualModels ?? []);
+	const [manualModelDraft, setManualModelDraft] = useState("");
+	const [endpointSaving, setEndpointSaving] = useState(false);
+	const [endpointError, setEndpointError] = useState<string | null>(null);
+	const [endpointSaved, setEndpointSaved] = useState(false);
+	const [providerStatus, setProviderStatus] = useState<ModelsBody["providers"]>(undefined);
 	/** The three tiers' resolved pins — GET /api/models `slots`. The rows'
 	 *  Default hints and thinking lists resolve from it. */
 	const [slots, setSlots] = useState<ModelsBody["slots"] | null>(null);
@@ -363,9 +372,50 @@ export function AgentSection({
 			.then((body: ModelsBody) => {
 				setCatalog(body.models);
 				setSlots(body.slots);
+				setProviderStatus(body.providers);
 			})
 			.catch(() => setCatalog(null));
 	}, []);
+
+	useEffect(() => {
+		setEndpointUrl(models?.customEndpoint?.baseUrl ?? "");
+		setManualModels(models?.customEndpoint?.manualModels ?? []);
+	}, [models?.customEndpoint]);
+
+	async function saveCustomEndpoint() {
+		if (endpointSaving) return;
+		setEndpointSaving(true);
+		setEndpointError(null);
+		setEndpointSaved(false);
+		const next: ModelsSettings = { ...models };
+		const customEndpoint = {
+			...(endpointUrl.trim() ? { baseUrl: endpointUrl.trim() } : {}),
+			...(manualModels.length ? { manualModels } : {}),
+		};
+		if (customEndpoint.baseUrl || customEndpoint.manualModels?.length) next.customEndpoint = customEndpoint;
+		else delete next.customEndpoint;
+		try {
+			const error = await onModelsChange(next);
+			if (typeof error === "string") {
+				setEndpointError(error);
+				return;
+			}
+			setEndpointSaved(true);
+			readModels();
+		} catch (error) {
+			setEndpointError(error instanceof Error ? error.message : "Could not save endpoint settings.");
+		} finally {
+			setEndpointSaving(false);
+		}
+	}
+
+	function addManualModel() {
+		const id = manualModelDraft.trim();
+		if (!id || manualModels.some((model) => model.id === id)) return;
+		setManualModels((current) => [...current, { id }]);
+		setManualModelDraft("");
+		setEndpointSaved(false);
+	}
 
 	useSettingsSaved((section) => {
 		if (section === "models") readModels();
@@ -695,7 +745,7 @@ export function AgentSection({
 											}}
 											footer={
 												catalog && catalog.length === 0
-													? "No models — add a provider key in Keys"
+									? "No models — check Ollama, Keys, or Custom endpoint"
 													: "Runs every agent of this tier"
 											}
 										/>
@@ -724,6 +774,78 @@ export function AgentSection({
 						</SettingsRow>
 					);
 				})}
+			</SettingsGroup>
+
+			<SettingsGroup label="Custom endpoint" testid="group-custom-endpoint">
+				<p className="text-xs text-muted-foreground/70">
+					OpenAI-compatible server such as vLLM. Enter the API base ending in /v1. No API key is sent.
+				</p>
+				<SettingsRow label="API base URL" hint="Example: http://localhost:8000/v1" testid="custom-endpoint-url-row">
+					<input
+						type="url"
+						aria-label="Custom endpoint API base URL"
+						data-testid="custom-endpoint-url"
+						value={endpointUrl}
+						onChange={(event) => {
+							setEndpointUrl(event.target.value);
+							setEndpointSaved(false);
+						}}
+						placeholder="http://localhost:8000/v1"
+						className="lh-input w-64 rounded-lg border bg-background px-2 py-1.5 font-mono text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+					/>
+				</SettingsRow>
+				<SettingsRow label="Add model ID" hint="Used when the endpoint does not list a model" testid="custom-endpoint-model-add-row">
+					<span className="flex items-center gap-2">
+						<input
+							type="text"
+							aria-label="Custom endpoint model ID"
+							data-testid="custom-endpoint-model-id"
+							value={manualModelDraft}
+							onChange={(event) => setManualModelDraft(event.target.value)}
+							placeholder="model-name"
+							className="lh-input w-44 rounded-lg border bg-background px-2 py-1.5 font-mono text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+							onKeyDown={(event) => {
+								if (event.key === "Enter") {
+									event.preventDefault();
+									addManualModel();
+								}
+							}}
+						/>
+						<button type="button" onClick={addManualModel} disabled={!manualModelDraft.trim()} className="text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40">Add</button>
+					</span>
+				</SettingsRow>
+				{manualModels.map((model) => (
+					<div key={model.id} className="flex items-center justify-between gap-3 rounded-sm border border-border/60 px-2 py-1.5" data-testid={`custom-endpoint-model-${model.id}`}>
+						<code className="min-w-0 flex-1 truncate text-xs">{model.id}</code>
+						<label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+							<input
+								type="checkbox"
+								aria-label={`${model.id} accepts images`}
+								checked={model.vision ?? false}
+								onChange={(event) => {
+									setManualModels((current) => current.map((item) => item.id === model.id ? { ...item, vision: event.target.checked } : item));
+									setEndpointSaved(false);
+								}}
+							/>
+							Vision
+						</label>
+						<button type="button" aria-label={`Remove ${model.id}`} onClick={() => {
+							setManualModels((current) => current.filter((item) => item.id !== model.id));
+							setEndpointSaved(false);
+						}} className="shrink-0 text-xs text-muted-foreground hover:text-red-500">Remove</button>
+					</div>
+				))}
+				<div className="flex items-center justify-between gap-3">
+					<button type="button" onClick={() => void saveCustomEndpoint()} disabled={endpointSaving} data-testid="custom-endpoint-save" className="rounded-md border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-muted disabled:opacity-50">
+						{endpointSaving ? "Saving…" : "Save endpoint"}
+					</button>
+					{endpointSaved && <span role="status" className="text-xs text-muted-foreground">Saved</span>}
+					{providerStatus?.find((provider) => provider.id === "ollama")?.available && <span className="text-xs text-muted-foreground">Ollama is available</span>}
+				</div>
+				{endpointError && <p role="alert" data-testid="custom-endpoint-error" className="text-xs text-red-500">{endpointError}</p>}
+				{providerStatus?.find((provider) => provider.id === "custom-openai")?.error && !endpointError && (
+					<p role="status" className="text-xs text-muted-foreground">{providerStatus.find((provider) => provider.id === "custom-openai")?.error}</p>
+				)}
 			</SettingsGroup>
 
 			<SettingsGroup label="Tools" testid="group-tools">

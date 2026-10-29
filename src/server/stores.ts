@@ -11,6 +11,7 @@ import { graphStore } from "../store/graph.ts";
 import { jobStore } from "../store/jobs.ts";
 import { settingsStore } from "../store/settings.ts";
 import { resolveSettings, type EffectiveSettings } from "../core/settings-resolution.ts";
+import { configureLocalProviders } from "../agent/models.ts";
 /** The wired adapters. Satisfies core/graph.ts's GraphDeps structurally. */
 export const stores = {
 	chatStore,
@@ -30,5 +31,7 @@ export type Stores = typeof stores;
  * no caching layer (stale toggles after a settings PUT would be worse).
  */
 export function effectiveSettings(): EffectiveSettings {
-	return resolveSettings(settingsStore.readSettings());
+	const record = settingsStore.readSettings();
+	configureLocalProviders(record ?? undefined);
+	return resolveSettings(record);
 }

@@ -1,4 +1,6 @@
-import { modelCatalog } from "@/src/server";
+import { modelCatalog, refreshLocalProviders } from "@/src/server";
+
+export const dynamic = "force-dynamic";
 
 /**
  * The model picker's data (model-control wave): pi-ai's configured-provider
@@ -7,5 +9,6 @@ import { modelCatalog } from "@/src/server";
  * catalog: no network, stable within a pi-ai version.
  */
 export async function GET() {
+	await refreshLocalProviders();
 	return Response.json(modelCatalog());
 }

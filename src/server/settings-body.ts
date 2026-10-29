@@ -18,6 +18,8 @@ import type {
 	AppearanceSettings,
 	BackgroundModelRole,
 	CompactionSettings,
+	CustomEndpointModel,
+	CustomEndpointSettings,
 	GeneralSettings,
 	GraphSettings,
 	ModelsSettings,
@@ -329,6 +331,12 @@ export function parseModelsSettingsBody(body: unknown): SettingsBodyResult<Model
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
 	const settings: ModelsSettings = {};
 	for (const key of Object.keys(raw)) {
+		if (key === "customEndpoint") {
+			const parsed = parseCustomEndpointSettings(raw.customEndpoint);
+			if (!parsed.ok) return { ok: false, error: parsed.error };
+			if (parsed.settings.baseUrl || parsed.settings.manualModels?.length) settings.customEndpoint = parsed.settings;
+			continue;
+		}
 		const known = MODEL_SLOTS as readonly string[];
 		if (!known.includes(key)) {
 			return { ok: false, error: `unknown slot "${key}" (supported: ${known.join(", ")})` };
@@ -343,6 +351,63 @@ export function parseModelsSettingsBody(body: unknown): SettingsBodyResult<Model
 			return { ok: false, error: `slot "${key}" must set a model (thinkingLevel alone cannot run — absent slot = unset)` };
 		}
 		settings[key as (typeof MODEL_SLOTS)[number]] = parsed.override;
+	}
+	return { ok: true, settings };
+}
+
+function parseCustomEndpointSettings(value: unknown): SettingsBodyResult<CustomEndpointSettings> {
+	const raw = asRecord(value);
+	if (!raw) return { ok: false, error: "customEndpoint must be an object" };
+	for (const key of Object.keys(raw)) {
+		if (key !== "baseUrl" && key !== "manualModels") {
+			return { ok: false, error: `unknown customEndpoint field "${key}"` };
+		}
+	}
+	const settings: CustomEndpointSettings = {};
+	if (raw.baseUrl !== undefined) {
+		if (typeof raw.baseUrl !== "string") return { ok: false, error: "customEndpoint.baseUrl must be a string" };
+		const baseUrl = raw.baseUrl.trim();
+		if (baseUrl) {
+			let url: URL;
+			try {
+				url = new URL(baseUrl);
+			} catch {
+				return { ok: false, error: "customEndpoint.baseUrl must be a valid HTTP or HTTPS API base ending in /v1" };
+			}
+			const pathname = url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
+			if (
+				(url.protocol !== "http:" && url.protocol !== "https:") ||
+				!pathname.endsWith("/v1") ||
+				url.username || url.password || url.search || url.hash
+			) {
+				return { ok: false, error: "customEndpoint.baseUrl must be a valid HTTP or HTTPS API base ending in /v1" };
+			}
+			settings.baseUrl = url.toString().replace(/\/$/u, "");
+		}
+	}
+	if (raw.manualModels !== undefined) {
+		if (!Array.isArray(raw.manualModels)) return { ok: false, error: "customEndpoint.manualModels must be an array" };
+		const seen = new Set<string>();
+		const manualModels: CustomEndpointModel[] = [];
+		for (const [index, candidate] of raw.manualModels.entries()) {
+			const model = asRecord(candidate);
+			if (!model || typeof model.id !== "string" || !model.id.trim()) {
+				return { ok: false, error: `customEndpoint.manualModels[${index}].id must be a non-empty string` };
+			}
+			for (const key of Object.keys(model)) {
+				if (key !== "id" && key !== "vision") {
+					return { ok: false, error: `unknown customEndpoint.manualModels[${index}] field "${key}"` };
+				}
+			}
+			if (model.vision !== undefined && typeof model.vision !== "boolean") {
+				return { ok: false, error: `customEndpoint.manualModels[${index}].vision must be a boolean` };
+			}
+			const id = model.id.trim();
+			if (seen.has(id)) continue;
+			seen.add(id);
+			manualModels.push({ id, ...(typeof model.vision === "boolean" ? { vision: model.vision } : {}) });
+		}
+		if (manualModels.length) settings.manualModels = manualModels;
 	}
 	return { ok: true, settings };
 }

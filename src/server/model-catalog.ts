@@ -19,7 +19,8 @@
 
 import { clampThinkingLevel, getSupportedThinkingLevels, type Api, type Model } from "@earendil-works/pi-ai";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { piModels } from "../agent/models.ts";
+import { configureLocalProviders, piModels } from "../agent/models.ts";
+import type { DiscoveredLocalModel, LocalProviderSnapshot } from "../agent/local-providers.ts";
 import { settingsStore } from "../store/settings.ts";
 import { effectiveSettings } from "./stores.ts";
 import { keyValue } from "./keys.ts";
@@ -34,7 +35,114 @@ import type {
 } from "../core/contracts/models.ts";
 import type { EffectiveModelSpec, EffectiveSlot } from "../core/settings-resolution.ts";
 import { AUTH_PROVIDER_KEYS } from "../core/auth-keys.ts";
-import { BACKGROUND_MODEL_ROLES, MODEL_SLOTS, type BackgroundModelRole, type ModelSlotName, type ModelsSettings } from "../core/settings.ts";
+import { BACKGROUND_MODEL_ROLES, MODEL_SLOTS, type BackgroundModelRole, type ModelSlotName, type ModelsSettings, type UserSettings } from "../core/settings.ts";
+
+let localProviderReadiness = {
+	ollamaAvailable: false,
+	customEndpointAvailable: false,
+	errors: {} as Partial<Record<"ollama" | "custom-openai", string>>,
+};
+
+/** Keep settings writes on the same registered model collection before the
+ * route's provider-qualified catalog validation runs. */
+export function configureModelProviders(settings: UserSettings): void {
+	configureLocalProviders(settings);
+}
+
+async function fetchJson(url: string, init?: RequestInit, fetchFn: typeof fetch = fetch): Promise<unknown> {
+	const response = await fetchFn(url, {
+		...init,
+		signal: AbortSignal.timeout(5000),
+		headers: { "content-type": "application/json", ...init?.headers },
+	});
+	if (!response.ok) throw new Error(`HTTP ${response.status}`);
+	return response.json();
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+	return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function ollamaContextWindow(info: Record<string, unknown>): number | undefined {
+	for (const [key, value] of Object.entries(info)) {
+		if (key.endsWith(".context_length") && typeof value === "number" && value > 0) return value;
+	}
+	return undefined;
+}
+
+async function discoverOllama(fetchFn: typeof fetch): Promise<DiscoveredLocalModel[]> {
+	const tags = record(await fetchJson("http://localhost:11434/api/tags", undefined, fetchFn));
+	const listed = Array.isArray(tags?.models) ? tags.models : [];
+	return Promise.all(listed.map(async (entry): Promise<DiscoveredLocalModel> => {
+		const tag = record(entry);
+		const id = typeof tag?.model === "string" ? tag.model : typeof tag?.name === "string" ? tag.name : "";
+		if (!id) return { id: "" };
+		try {
+			const shown = record(await fetchJson("http://localhost:11434/api/show", {
+				method: "POST",
+				body: JSON.stringify({ model: id }),
+			}, fetchFn));
+			const capabilities = Array.isArray(shown?.capabilities) ? shown.capabilities.filter((item): item is string => typeof item === "string") : [];
+			const modelInfo = record(shown?.model_info) ?? {};
+			return {
+				id,
+				name: id,
+				contextWindow: ollamaContextWindow(modelInfo),
+				vision: capabilities.includes("vision"),
+				reasoning: capabilities.includes("thinking"),
+				tools: capabilities.includes("tools"),
+			};
+		} catch {
+			return { id, name: id };
+		}
+	})).then((models) => models.filter((model) => model.id));
+}
+
+function customModelFromApi(value: unknown): DiscoveredLocalModel | null {
+	const model = record(value);
+	if (typeof model?.id !== "string" || !model.id.trim()) return null;
+	const input = Array.isArray(model.input) ? model.input : Array.isArray(model.input_modalities) ? model.input_modalities : [];
+	const numeric = (key: string) => typeof model[key] === "number" && (model[key] as number) > 0 ? model[key] as number : undefined;
+	return {
+		id: model.id,
+		name: typeof model.name === "string" ? model.name : model.id,
+		contextWindow: numeric("contextWindow") ?? numeric("context_length"),
+		maxTokens: numeric("maxTokens") ?? numeric("max_tokens"),
+		...(input.includes("image") || model.vision === true || model.supports_vision === true ? { vision: true } : {}),
+		...(model.reasoning === true || model.supports_reasoning === true ? { reasoning: true } : {}),
+		...(model.tools === true || model.supports_tools === true ? { tools: true } : {}),
+	};
+}
+
+/** Refresh local model metadata. Each endpoint fails independently, so a
+ * stopped Ollama instance never hides a configured cloud/custom provider. */
+export async function refreshLocalProviders(
+	settings = settingsStore.readSettings() ?? undefined,
+	fetchFn: typeof fetch = fetch,
+): Promise<typeof localProviderReadiness> {
+	const snapshot: LocalProviderSnapshot = { customEndpointBaseUrl: settings?.models?.customEndpoint?.baseUrl };
+	const readiness: typeof localProviderReadiness = { ollamaAvailable: false, customEndpointAvailable: false, errors: {} };
+	try {
+		snapshot.ollama = await discoverOllama(fetchFn);
+		readiness.ollamaAvailable = true;
+	} catch (error) {
+		readiness.errors.ollama = `Ollama is unavailable at http://localhost:11434 (${error instanceof Error ? error.message : "connection failed"}).`;
+	}
+	const baseUrl = settings?.models?.customEndpoint?.baseUrl;
+	if (baseUrl) {
+		try {
+			const body = record(await fetchJson(`${baseUrl}/models`, undefined, fetchFn));
+			const data = Array.isArray(body?.data) ? body.data : [];
+		snapshot.customEndpoint = data.map(customModelFromApi).filter((model): model is DiscoveredLocalModel => model !== null);
+			readiness.customEndpointAvailable = true;
+		} catch (error) {
+			readiness.errors["custom-openai"] = `Custom endpoint is unavailable (${error instanceof Error ? error.message : "connection failed"}).`;
+		}
+	}
+	configureLocalProviders(settings, snapshot);
+	localProviderReadiness = readiness;
+	return readiness;
+}
 
 /** The picker's client-safe model entry (contract: core/contracts/models.ts). */
 export type ModelDto = ModelCatalogEntry;
@@ -121,18 +229,31 @@ export function catalogSlots(): SlotPins {
  *  with keyPresent read env-wins through the keys seam, fresh per call —
  *  saving a key immediately federates the provider into the picker. */
 export function catalogProviders(): CatalogProvider[] {
-	return AUTH_PROVIDER_KEYS.map((p) => ({
+	const keyed = AUTH_PROVIDER_KEYS.map((p) => ({
 		id: p.id,
 		envVar: p.envVar,
 		keyPresent: keyValue(p.envVar) !== undefined,
-	})).sort((a, b) => a.id.localeCompare(b.id));
+	}));
+	const settings = settingsStore.readSettings();
+	const local: CatalogProvider[] = [
+		{ id: "ollama", keyPresent: false, available: localProviderReadiness.ollamaAvailable, error: localProviderReadiness.errors.ollama },
+	];
+	if (settings?.models?.customEndpoint?.baseUrl) {
+		local.push({
+			id: "custom-openai",
+			keyPresent: false,
+			available: localProviderReadiness.customEndpointAvailable,
+			error: localProviderReadiness.errors["custom-openai"],
+		});
+	}
+	return [...keyed, ...local].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /** The providers whose key is present — the picker federates exactly
  *  these (a keyless provider's models are unreachable by design; the
  *  Keys page is the discovery surface, same discipline as search). */
 function keyedProviderIds(): Set<string> {
-	return new Set(catalogProviders().filter((p) => p.keyPresent).map((p) => p.id));
+	return new Set(catalogProviders().filter((p) => p.keyPresent || p.id === "ollama" || p.id === "custom-openai").map((p) => p.id));
 }
 
 /** Project one catalog model to the client DTO. */
