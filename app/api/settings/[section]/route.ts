@@ -52,6 +52,7 @@ type AnySectionParser = (body: unknown) => SettingsBodyResult<unknown>;
 
 export async function PUT(request: Request, ctx: { params: Promise<{ section: string }> }) {
 	const { section } = await ctx.params;
+	if (section === "models") return Response.json({ error: "Models are managed by the server environment" }, { status: 403 });
 	const parser = (SETTINGS_SECTIONS as Record<string, AnySectionParser>)[section];
 	if (!parser) {
 		return Response.json(
@@ -60,6 +61,8 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 		);
 	}
 	const body = await request.json().catch(() => null);
+	if (section === "chat" && body && typeof body === "object" && "model" in body) return Response.json({ error: "Models are managed by the server environment" }, { status: 403 });
+	if (section === "agent" && body && typeof body === "object" && "models" in body) return Response.json({ error: "Models are managed by the server environment" }, { status: 403 });
 	const parsed = parser(body);
 	if (!parsed.ok) {
 		return Response.json({ error: parsed.error }, { status: 400 });
@@ -132,3 +135,4 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 	writeSettingsRecord(next);
 	return Response.json({ settings: next });
 }
+

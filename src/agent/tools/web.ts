@@ -8,15 +8,14 @@ export type { WebSearchResult };
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
+import { restrictedWebGet, type RestrictedFetchDeps } from "./restricted-web-fetch.ts";
 
 /**
  * Server-side web tools for the researcher sub-agent — a minimal port of the
  * pi extensions (~/.pi/agent/extensions/web-search + web-fetch):
  *
  *   web_search(query, count?) → {title, url, snippet}[]   (injected search port)
- *   web_fetch(url)            → readable markdown text     (Readability + Turndown,
- *                                                          Jina Reader fallback for
- *                                                          JS-rendered pages)
+ *   web_fetch(url)            ? readable markdown text via a validated proxy fetch
  *
  * SEARCH REWIRING (search port wave, 2026-09-20): the Google CSE backend is
  * retired — web_search now runs on the injected search port (core/search.ts).
@@ -36,10 +35,6 @@ import TurndownService from "turndown";
 
 // ── web_fetch ────────────────────────────────────────────────────────────────
 
-const USER_AGENT =
-	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
-const FETCH_TIMEOUT_MS = 30_000;
-const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 /** Keep the researcher's context sane — long pages truncate with a marker. */
 const MAX_CONTENT_CHARS = 40_000;
 const MIN_USEFUL_CONTENT = 200;
@@ -51,26 +46,6 @@ function truncate(text: string): string {
 	return `${text.slice(0, MAX_CONTENT_CHARS)}\n\n[Truncated at ${MAX_CONTENT_CHARS} characters]`;
 }
 
-/** Jina Reader fallback for JS-rendered pages (no deps — plain fetch). */
-async function fetchViaJina(url: string): Promise<string | null> {
-	try {
-		const res = await fetch(`https://r.jina.ai/${url}`, {
-			headers: { Accept: "text/markdown", "X-No-Cache": "true" },
-			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-		});
-		if (!res.ok) return null;
-		const content = await res.text();
-		const marker = "Markdown Content:";
-		const start = content.indexOf(marker);
-		if (start < 0) return null;
-		const markdown = content.slice(start + marker.length).trim();
-		if (markdown.length < MIN_USEFUL_CONTENT || markdown.startsWith("Loading...")) return null;
-		return markdown;
-	} catch {
-		return null;
-	}
-}
-
 function htmlToMarkdown(html: string): { title: string; content: string } | null {
 	const { document } = parseHTML(html);
 	const article = new Readability(document as unknown as Document).parse();
@@ -80,52 +55,25 @@ function htmlToMarkdown(html: string): { title: string; content: string } | null
 	return { title: article.title ?? "", content: markdown };
 }
 
-async function fetchAndExtract(url: string): Promise<string> {
-	const resp = await fetch(url, {
-		headers: {
-			"User-Agent": USER_AGENT,
-			Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-			"Accept-Language": "en-US,en;q=0.9",
-		},
-		signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-	});
-	if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-
-	// Final URL after redirects + status — the researcher's only way to
-	// tell a real page from a 200-served error body (owner-reported
-	// "ill-formed request" case: the SITE answered, we just relayed it).
-	const sourceLine = `Source: ${resp.url || url} (HTTP ${resp.status})`;
-
-	const contentType = resp.headers.get("content-type") ?? "";
-	if (contentType.includes("application/pdf")) {
-		// Pointer, not dead-end (researcher PDF wave, 2026-10-07): the
-		// researcher's web_fetch_pdf tool downloads + triages PDFs.
-		return `web_fetch: this URL is a PDF document — call web_fetch_pdf on it to download and read it.`;
+async function fetchAndExtract(url: string, deps: RestrictedFetchDeps): Promise<string> {
+	const resp = await restrictedWebGet(url, deps);
+	const sourceLine = `Source: ${resp.url} (HTTP ${resp.status})`;
+	if (resp.contentType === "application/pdf") {
+		return "web_fetch: this URL is a PDF document; call web_fetch_pdf on it to download and read it.";
 	}
-	if (/image\/|audio\/|video\/|zip|octet-stream/.test(contentType)) {
-		throw new Error(`Unsupported content type: ${contentType.split(";")[0]}`);
-	}
-	const length = Number(resp.headers.get("content-length") ?? 0);
-	if (length > MAX_RESPONSE_BYTES) throw new Error("Response too large");
-
-	const text = await resp.text();
-	if (!contentType.includes("html")) return `${sourceLine}\n\n${truncate(text)}`; // plain text / markdown / code
-
+	const text = new TextDecoder().decode(resp.bytes);
+	if (resp.contentType === "text/plain") return `${sourceLine}\n\n${truncate(text)}`;
 	const extracted = htmlToMarkdown(text);
 	if (extracted) {
 		const header = extracted.title ? `# ${extracted.title}\n\n${sourceLine}\n\n---\n\n` : `${sourceLine}\n\n---\n\n`;
 		return header + truncate(extracted.content);
 	}
-	// Readability failed — likely JS-rendered. Try Jina Reader.
-	const jina = await fetchViaJina(url);
-	if (jina) return truncate(jina);
-	throw new Error("Could not extract readable content (the page may be JavaScript-rendered)");
+	throw new Error("Could not extract readable HTML content");
 }
-
-// ── tool registry ────────────────────────────────────────────────────────────
 
 const webSearchInput = Type.Object({
 	query: Type.String({ description: "The search query (a normal search string, phrases included)" }),
+	reason: Type.String({ description: "Why this search is needed for the current task" }),
 	count: Type.Optional(
 		Type.Integer({ minimum: 1, maximum: 10, description: "Number of results (default 5, max 10)" }),
 	),
@@ -133,9 +81,12 @@ const webSearchInput = Type.Object({
 
 const webFetchInput = Type.Object({
 	url: Type.String({ description: "The URL to fetch" }),
+	reason: Type.String({ description: "Why this page is needed for the current task" }),
 });
 
-export function createWebTools(search: () => SearchProvider | null): Record<string, AgentTool<any>> {
+export type WebApproval = (tool: "web_search" | "web_fetch", value: string, reason: string) => Promise<string | null>;
+
+export function createWebTools(search: () => SearchProvider | null, fetchDeps: RestrictedFetchDeps = {}, approve?: WebApproval): Record<string, AgentTool<any>> {
 	return {
 		web_search: {
 			name: "web_search",
@@ -143,7 +94,7 @@ export function createWebTools(search: () => SearchProvider | null): Record<stri
 			description: "Search the web. One search per call — use one call per search angle. " +
 				"Returns an array of results with title, url, and snippet.",
 			parameters: webSearchInput,
-			execute: serverExecute("web_search", webSearchInput, async ({ query, count }): Promise<WebSearchResult[] | string> => {
+			execute: serverExecute("web_search", webSearchInput, async ({ query, count, reason }): Promise<WebSearchResult[] | string> => {
 				const provider = search();
 				if (!provider) {
 					return (
@@ -164,24 +115,15 @@ export function createWebTools(search: () => SearchProvider | null): Record<stri
 			label: "web_fetch",
 			description:
 				"Fetch a web page and extract its readable content as markdown (Readability). " +
-				"Handles HTML pages and plain text; JS-rendered pages fall back to a reader service.",
+				"Handles HTML and plain text; PDF links point to web_fetch_pdf.",
 			parameters: webFetchInput,
-			execute: serverExecute("web_fetch", webFetchInput, async ({ url }): Promise<string> => {
+			execute: serverExecute("web_fetch", webFetchInput, async ({ url, reason }): Promise<string> => {
 				try {
-					const parsed = new URL(url);
-					// URL.protocol carries a TRAILING COLON ("https:", WHATWG) — the
-					// colon-less comparison born from the py-harness port (urlparse's
-					// scheme has NO colon) rejected every valid URL ever fetched
-					// (owner-reported via OpenRouter logs, 2026-10-07).
-					if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
-						throw new Error("Only http(s) URLs are supported");
-				} catch {
-					return `web_fetch failed: invalid URL "${url}"`;
-				}
-				try {
-					return await fetchAndExtract(url);
+					if (approve && await approve("web_fetch", url, reason) === null) return "user denied";
+					return await fetchAndExtract(url, fetchDeps);
 				} catch (err) {
-					return `web_fetch failed for ${url}: ${err instanceof Error ? err.message : String(err)}`;
+					const host = (() => { try { return new URL(url).hostname; } catch { return "invalid URL"; } })();
+					return `web_fetch failed for ${host}: ${err instanceof Error ? err.message : String(err)}`;
 				}
 			}),
 		},
@@ -192,3 +134,4 @@ export function createWebTools(search: () => SearchProvider | null): Record<stri
  *  always injects the real seam — an absent seam reads as unavailable,
  *  never a crash and never a silent alternative engine). */
 export const webTools = createWebTools(() => null);
+

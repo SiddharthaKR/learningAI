@@ -19,6 +19,12 @@ import type { JobStore } from "../src/core/ports.ts";
 import type { JobRecord } from "../src/core/contracts.ts";
 import type { SearchHit, SearchProvider } from "../src/core/search.ts";
 
+const fetchDeps = {
+  fetch: ((url: string, init: RequestInit) => globalThis.fetch(url, init)) as typeof globalThis.fetch,
+  lookup: (async () => [{ address: "93.184.216.34", family: 4 }]) as any,
+  env: { HTTPS_PROXY: "http://proxy.example:8080", HTTP_PROXY: "http://proxy.example:8080" },
+};
+
 function stubProvider(hits: SearchHit[] = [{ title: "t", url: "https://e.com/", snippet: "s" }]): SearchProvider {
 	return {
 		id: "tavily",
@@ -30,8 +36,8 @@ function stubProvider(hits: SearchHit[] = [{ title: "t", url: "https://e.com/", 
 
 describe("web_search on the injected port (web.ts)", () => {
 	it("null provider → the honest unavailability string, never a crash", async () => {
-		const { web_search } = createWebTools(() => null);
-		const out = await web_search!.execute!("c1", { query: "anything" });
+		const { web_search } = createWebTools(() => null, fetchDeps);
+		const out = await web_search!.execute!("c1", { query: "anything", reason: "test" });
 		assert.match(String(out.details), /not available: no search engine is configured/);
 		assert.match(String(out.details), /Tavily or Brave/);
 	});
@@ -46,7 +52,7 @@ describe("web_search on the injected port (web.ts)", () => {
 			},
 		};
 		const { web_search } = createWebTools(() => provider);
-		const out = await web_search!.execute!("c1", { query: "sigma.js latest version" });
+		const out = await web_search!.execute!("c1", { query: "sigma.js latest version", reason: "test" });
 		assert.deepEqual(seen, [{ query: "sigma.js latest version", count: 5 }]);
 		assert.deepEqual(out.details, [{ title: "sigma.js", url: "https://www.sigmajs.org/", snippet: "v3 released" }]);
 	});
@@ -59,26 +65,26 @@ describe("web_search on the injected port (web.ts)", () => {
 			},
 		};
 		const { web_search } = createWebTools(() => provider);
-		const out = await web_search!.execute!("c1", { query: "q" });
+		const out = await web_search!.execute!("c1", { query: "q", reason: "test" });
 		assert.match(String(out.details), /web_search failed: Brave search API 429: rate limited/);
 	});
 
 	it("the resolution is FRESH per call — a key appearing mid-session takes effect", async () => {
 		let provider: SearchProvider | null = null;
 		const { web_search } = createWebTools(() => provider);
-		const first = await web_search!.execute!("c1", { query: "q" });
+		const first = await web_search!.execute!("c1", { query: "q", reason: "test" });
 		assert.match(String(first.details), /not available/);
 		provider = stubProvider();
-		const second = await web_search!.execute!("c2", { query: "q" });
+		const second = await web_search!.execute!("c2", { query: "q", reason: "test" });
 		assert.ok(Array.isArray(second.details), "the live provider answered on the very next call");
 	});
 
 	it("web_fetch needs no search engine — it stays independent", async () => {
-		const { web_fetch } = createWebTools(() => null);
+		const { web_fetch } = createWebTools(() => null, fetchDeps);
 		assert.ok(web_fetch, "web_fetch present with no provider");
 		// (Full fetch behavior is out of scope here — no network in tests.)
-		const out = await web_fetch!.execute!("c1", { url: "not a url" });
-		assert.match(String(out.details), /web_fetch failed: invalid URL/);
+		const out = await web_fetch!.execute!("c1", { url: "not a url", reason: "test" });
+		assert.match(String(out.details), /web_fetch failed for invalid URL: invalid URL/);
 	});
 
 	it("web_fetch ACCEPTS a valid http(s) URL — the protocol gate must not reject everything (the colon bug, 2026-10-07)", async () => {
@@ -88,22 +94,22 @@ describe("web_search on the injected port (web.ts)", () => {
 		// its life (owner-reported via OpenRouter logs). This pin stubs fetch
 		// so the happy path runs hermetically: a VALID url must REACH the
 		// fetch stage.
-		const { web_fetch } = createWebTools(() => null);
+		const { web_fetch } = createWebTools(() => null, fetchDeps);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			new Response("A plain text page with enough content to matter for the test.", {
 				headers: { "content-type": "text/plain" },
 			})) as typeof fetch;
 		try {
-			const ok = await web_fetch!.execute!("c-ok", { url: "https://example.com/page" });
+			const ok = await web_fetch!.execute!("c-ok", { url: "https://example.com/page", reason: "test" });
 			assert.ok(
 				!String(ok.details).includes("invalid URL"),
 				"a valid https URL passes the protocol gate and reaches fetch",
 			);
 			assert.match(String(ok.details), /plain text page/);
 
-			const ftp = await web_fetch!.execute!("c-ftp", { url: "ftp://example.com/file" });
-			assert.match(String(ftp.details), /invalid URL/, "non-http(s) schemes still rejected");
+			const ftp = await web_fetch!.execute!("c-ftp", { url: "ftp://example.com/file", reason: "test" });
+			assert.match(String(ftp.details), /only HTTP\(S\) URLs/, "non-http(s) schemes still rejected");
 		} finally {
 			globalThis.fetch = realFetch;
 		}

@@ -35,7 +35,6 @@ import {
 	kbdEventForAction,
 	KEYBOARD_ACTIONS,
 } from "@/src/core";
-import { isDictationActive } from "@/components/dictation";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 
 // Re-exported for the contract pin (tests/keyboard-toggle-sidebar.test.ts):
@@ -65,7 +64,7 @@ export function KeyboardShortcuts() {
 			// works from any focus.
 			if (e.key === "Tab") {
 				e.preventDefault();
-				if (e.shiftKey) window.dispatchEvent(new CustomEvent("lh:kbd-cycle-thinking"));
+				if (e.shiftKey) return;
 				// Plain Tab cycles the active surface's text fields (owner,
 				// keyboard round 2026-10-06) — forward-only, wrapping; each
 				// composer-bearing page answers with its own chain. The quiz
@@ -95,18 +94,13 @@ export function KeyboardShortcuts() {
 				// then abort the turn (a server-side turn has no client
 				// request to abort — the abort seam in Chat decides what's
 				// honestly stoppable, layered by escAbortTarget).
-				if (isDictationActive()) {
-					e.preventDefault();
-					window.dispatchEvent(new CustomEvent("lh:kbd-cancel-dictation"));
-					return;
-				}
 				window.dispatchEvent(new CustomEvent("lh:kbd-abort-turn"));
 				return;
 			}
 
 			// ── Registry dispatch.
 			const action = actionForBinding(eventBinding(e));
-			if (!action) return;
+			if (!action || action === "toggle-dictation" || action === "open-model-picker" || action === "cycle-thinking") return;
 
 			// The input guard: inside a typing surface only mod/alt combos
 			// fire (they never type a character). Bare keys — "?" included —
@@ -174,7 +168,7 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 					<span className="text-xs text-muted-foreground">Esc to close</span>
 				</div>
 				{scopes.map((scope) => {
-					const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+					const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope && !["toggle-dictation", "open-model-picker", "cycle-thinking"].includes(a.id));
 					if (actions.length === 0) return null;
 					return (
 						<div key={scope} className="mb-4">

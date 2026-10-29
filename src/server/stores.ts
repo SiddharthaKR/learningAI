@@ -11,7 +11,7 @@ import { graphStore } from "../store/graph.ts";
 import { jobStore } from "../store/jobs.ts";
 import { settingsStore } from "../store/settings.ts";
 import { resolveSettings, type EffectiveSettings } from "../core/settings-resolution.ts";
-import { configureLocalProviders } from "../agent/models.ts";
+import { fixedOfficeModelSpec } from "./office-config.ts";
 /** The wired adapters. Satisfies core/graph.ts's GraphDeps structurally. */
 export const stores = {
 	chatStore,
@@ -32,6 +32,12 @@ export type Stores = typeof stores;
  */
 export function effectiveSettings(): EffectiveSettings {
 	const record = settingsStore.readSettings();
-	configureLocalProviders(record ?? undefined);
-	return resolveSettings(record);
+	const effective = resolveSettings(record);
+	const fixed = fixedOfficeModelSpec();
+	for (const role of Object.keys(effective.agent.models) as Array<keyof typeof effective.agent.models>) {
+		effective.agent.models[role] = fixed;
+	}
+	effective.models = { strong: fixed, cheap: fixed, vision: fixed };
+	return effective;
 }
+

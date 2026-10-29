@@ -4,6 +4,7 @@ import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import { pdfExtract, pdfInfo, pdfProbe, pdfSearch } from "../subagents/pdf-ops.ts";
+import { restrictedWebGet, type RestrictedFetchDeps } from "./restricted-web-fetch.ts";
 
 /**
  * PDF reading tools for the RESEARCHER sub-agent (owner design B,
@@ -21,12 +22,6 @@ import { pdfExtract, pdfInfo, pdfProbe, pdfSearch } from "../subagents/pdf-ops.t
  * Tool contract (the web.ts law): NEVER throw into the agent loop — every
  * failure path returns a clear error STRING the researcher can adapt to.
  */
-
-const USER_AGENT =
-	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
-const FETCH_TIMEOUT_MS = 60_000;
-/** PDFs run bigger than pages — arxiv papers routinely 5-20 MB. */
-const MAX_PDF_BYTES = 25 * 1024 * 1024;
 
 /** The pdf-reader doctrine's size classes, by page count. */
 function sizeClass(pageCount: number): "short" | "medium" | "long" {
@@ -75,7 +70,7 @@ export interface PdfFetchSummary {
 	flagged_pages: number[];
 }
 
-export function createPdfReadTools(dir: string): Record<string, AgentTool<any>> {
+export function createPdfReadTools(dir: string, fetchDeps: RestrictedFetchDeps = {}): Record<string, AgentTool<any>> {
 	const pdfFetchInput = Type.Object({
 		url: Type.String({ description: "The PDF URL to download" }),
 	});
@@ -111,24 +106,11 @@ export function createPdfReadTools(dir: string): Record<string, AgentTool<any>> 
 					return `web_fetch_pdf failed: invalid URL "${url}"`;
 				}
 				try {
-					const resp = await fetch(url, {
-						headers: {
-							"User-Agent": USER_AGENT,
-							Accept: "application/pdf,application/octet-stream,*/*",
-						},
-						signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-					});
-					if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-					const contentType = resp.headers.get("content-type") ?? "";
-					if (!/application\/pdf/i.test(contentType) && !/\.pdf(\?|$)/i.test(parsedPathname(url))) {
-						throw new Error(`Not a PDF (content-type ${contentType.split(";")[0] || "unknown"})`);
-					}
-					const declared = Number(resp.headers.get("content-length") ?? 0);
-					if (declared > MAX_PDF_BYTES) throw new Error("PDF too large (over 25 MB)");
-					const bytes = new Uint8Array(await resp.arrayBuffer());
+					const resp = await restrictedWebGet(url, fetchDeps);
+					if (resp.contentType !== "application/pdf") throw new Error("Not a PDF");
+					const bytes = resp.bytes;
 					if (bytes.length === 0) throw new Error("Empty response");
-					if (bytes.length > MAX_PDF_BYTES) throw new Error("PDF too large (over 25 MB)");
-					const filePath = path.join(dir, pdfFileName(url));
+					const filePath = path.join(dir, pdfFileName(resp.url));
 					await fs.writeFile(filePath, bytes);
 					try {
 						await pdfProbe(filePath);
@@ -147,7 +129,8 @@ export function createPdfReadTools(dir: string): Record<string, AgentTool<any>> 
 					};
 					return summary;
 				} catch (err) {
-					return `web_fetch_pdf failed for ${url}: ${err instanceof Error ? err.message : String(err)}`;
+					const host = (() => { try { return new URL(url).hostname; } catch { return "invalid URL"; } })();
+					return `web_fetch_pdf failed for ${host}: ${err instanceof Error ? err.message : String(err)}`;
 				}
 			}),
 		},
@@ -211,11 +194,4 @@ export function createPdfReadTools(dir: string): Record<string, AgentTool<any>> 
 		},
 	};
 }
-
-function parsedPathname(url: string): string {
-	try {
-		return new URL(url).pathname;
-	} catch {
-		return "";
-	}
-}
+

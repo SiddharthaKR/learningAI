@@ -9,7 +9,7 @@
 <p align="center"><strong>An agent harness for learning.</strong></p>
 
 <p align="center">
-  <a href="https://learnharness.ai">Download</a> ·
+  <a href="#office-deployment">Office deployment</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="docs/development.md">Documentation</a> ·
   <a href="https://github.com/amosblomqvist/learnharness/issues">Issues</a>
@@ -40,31 +40,17 @@ Future teaching sessions can read the graph instead of starting from scratch. Pr
 
 ![LearnHarness knowledge graph](docs/assets/knowledge-graph.png)
 
-## Download and get started
+## Office deployment
 
-**[Download from learnharness.ai](https://learnharness.ai)** · [GitHub Releases](https://github.com/amosblomqvist/learnharness/releases)
+LearnHarness runs as a Node.js web application for an office. Copy `.env.example` to `.env` and set the internal OpenAI-compatible LLM URL, model, optional API key, session secret, and knowledge directory. The LLM URL must end in `/v1`. Set `NO_PROXY` to include the internal LLM host.
 
-- **macOS (Apple Silicon):** signed and notarized DMG. Drag the app to Applications.
-- **Windows (x64):** run the installer. It is currently unsigned; Windows may show an “unknown publisher” or SmartScreen warning.
-- **Linux (x64):** make the AppImage executable and open it, or install the Debian/Ubuntu `.deb`.
+`npm run smoke:llm` checks that the configured model answers a plain chat request and emits a tool call. Environment variables override values in `.env`, so you can test a local Ollama endpoint with `LLM_BASE_URL=http://localhost:11434/v1` and `LLM_MODEL=gemma4:e4b`.
 
-Add a provider API key or use local Ollama, then choose your models and start a session with what you want to understand. LearnHarness supports 30+ cloud providers, including OpenAI, Anthropic, Google, DeepSeek, and OpenRouter. Optional dictation and web search use separate service keys.
-
-### Local models and custom endpoints
-
-- **Ollama:** install and run Ollama on this PC. LearnHarness checks its default local API at `http://localhost:11434` and lists models already installed there. For example, you can install [Gemma 4 in Ollama](https://ollama.com/library/gemma4) and then select it in Settings → Agent → Models. No API key is needed.
-- **vLLM and other OpenAI-compatible servers:** open Settings → Agent → Models and save one API base URL ending in `/v1` (for example, `http://localhost:8000/v1`). No API key is sent. LearnHarness discovers model IDs through `/models`; if discovery is unavailable, add model IDs manually. Mark a manually added model as Vision only when it accepts image input.
-
-Choose models that support tool calling for teaching, practice, and agent tasks. Image input models can be assigned to the Vision slot.
-
-All three platforms support in-app updates.
+`npm run build` creates the production build; `npm run start` serves it. Put the Node server behind your office's HTTPS reverse proxy.
 
 ## Your keys, your data
 
-- **Your keys and models.** No LearnHarness subscription or markup. You pay your providers for usage; a live cost meter shows model costs.
-- **Local storage.** Your chats, graph, settings, and API keys live on your machine. Learning records are plain files you can inspect.
-- **External services.** Models run through your configured providers. Model requests send the context needed for the task; web research and dictation also contact external services. Local storage does not mean offline processing.
-- **Inspectable behavior.** System prompts are visible and editable. The app is open source under the AGPL-3.0 license.
+The server keeps chats, graph data, and configuration in the office deployment. Model requests go to the configured internal LLM endpoint. Restrict access to the app and storage according to your office's deployment policy.
 
 ## Development and support
 
@@ -74,7 +60,7 @@ npm run dev        # http://localhost:3000
 npm test           # deterministic, no LLM, no network
 ```
 
-See the [development guide](docs/development.md), [architecture](docs/architecture.md), and [desktop release guide](docs/desktop-release.md).
+See the [development guide](docs/development.md) and [architecture](docs/architecture.md).
 
 Questions, bug reports, and feature requests: [GitHub Issues](https://github.com/amosblomqvist/learnharness/issues).
 

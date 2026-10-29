@@ -20,6 +20,12 @@ import { after, describe, it } from "node:test";
 import { createPdfReadTools } from "../src/agent/tools/pdf-read.ts";
 import { createWebTools } from "../src/agent/tools/web.ts";
 
+const fetchDeps = {
+  fetch: ((url: string, init: RequestInit) => globalThis.fetch(url, init)) as typeof globalThis.fetch,
+  lookup: (async () => [{ address: "93.184.216.34", family: 4 }]) as any,
+  env: { HTTPS_PROXY: "http://proxy.example:8080", HTTP_PROXY: "http://proxy.example:8080" },
+};
+
 /** Build a valid N-page PDF in memory — ASCII-only so string offsets ARE
  *  byte offsets; xref entries computed as we assemble. */
 function buildPdf(pageTexts: string[]): Uint8Array {
@@ -84,7 +90,7 @@ function asText(result: unknown): string {
 describe("researcher pdf tools — download + triage", () => {
 	it("web_fetch_pdf downloads, triages, and returns a usable summary", async () => {
 		const dir = await newDir();
-		const tools = createPdfReadTools(dir);
+		const tools = createPdfReadTools(dir, fetchDeps);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			pdfResponse()) as typeof fetch;
@@ -104,12 +110,12 @@ describe("researcher pdf tools — download + triage", () => {
 
 	it("the follow-up tools read the download page-level (extract + search)", async () => {
 		const dir = await newDir();
-		const tools = createPdfReadTools(dir);
+		const tools = createPdfReadTools(dir, fetchDeps);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			pdfResponse()) as typeof fetch;
 		try {
-			const out = await tools.web_fetch_pdf!.execute!("t2", { url: "https://example.com/paper.pdf" });
+			const out = await tools.web_fetch_pdf!.execute!("t2", { url: "https://example.com/paper.pdf", reason: "test" });
 			const { path: pdfPath } = (out as { details: { path: string } }).details;
 
 			const extract = asText(await tools.pdf_extract!.execute!("t3", { path: pdfPath, pages: "2" }));
@@ -126,7 +132,7 @@ describe("researcher pdf tools — download + triage", () => {
 
 	it("rejects non-PDF responses and non-http(s) schemes with error strings", async () => {
 		const dir = await newDir();
-		const tools = createPdfReadTools(dir);
+		const tools = createPdfReadTools(dir, fetchDeps);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			new Response("<html>just a page</html>", { headers: { "content-type": "text/html" } })) as typeof fetch;
@@ -145,7 +151,7 @@ describe("researcher pdf tools — download + triage", () => {
 describe("researcher pdf tools — the temp-dir wall", () => {
 	it("path-taking tools refuse anything outside the job dir", async () => {
 		const dir = await newDir();
-		const tools = createPdfReadTools(dir);
+		const tools = createPdfReadTools(dir, fetchDeps);
 		const outside = path.join(os.tmpdir(), "escape-attempt.pdf");
 		const rel = asText(await tools.pdf_info!.execute!("t7", { path: outside }));
 		assert.match(rel, /pdf_info failed: path must stay inside/);
@@ -155,7 +161,7 @@ describe("researcher pdf tools — the temp-dir wall", () => {
 
 	it("pdf_info reports per-page triage signals for a real download", async () => {
 		const dir = await newDir();
-		const tools = createPdfReadTools(dir);
+		const tools = createPdfReadTools(dir, fetchDeps);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			pdfResponse()) as typeof fetch;
@@ -174,12 +180,12 @@ describe("researcher pdf tools — the temp-dir wall", () => {
 
 describe("web_fetch — PDF pointer + source header", () => {
 	it("a PDF URL points at web_fetch_pdf instead of dead-ending", async () => {
-		const web = createWebTools(() => null);
+		const web = createWebTools(() => null, fetchDeps);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			pdfResponse()) as typeof fetch;
 		try {
-			const out = asText(await web.web_fetch!.execute!("t11", { url: "https://example.com/paper.pdf" }));
+			const out = asText(await web.web_fetch!.execute!("t11", { url: "https://example.com/paper.pdf", reason: "test" }));
 			assert.match(out, /PDF document/);
 			assert.match(out, /web_fetch_pdf/);
 		} finally {
@@ -188,14 +194,14 @@ describe("web_fetch — PDF pointer + source header", () => {
 	});
 
 	it("output carries the source line with HTTP status", async () => {
-		const web = createWebTools(() => null);
+		const web = createWebTools(() => null, fetchDeps);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			new Response("A plain text page with enough content to matter.", {
 				headers: { "content-type": "text/plain" },
 			})) as typeof fetch;
 		try {
-			const out = asText(await web.web_fetch!.execute!("t12", { url: "https://example.com/page" }));
+			const out = asText(await web.web_fetch!.execute!("t12", { url: "https://example.com/page", reason: "test" }));
 			assert.match(out, /^Source: https:\/\/example\.com\/page \(HTTP 200\)/);
 		} finally {
 			globalThis.fetch = realFetch;

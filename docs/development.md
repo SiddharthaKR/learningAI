@@ -2,7 +2,7 @@
 
 The developer README (split out of the storefront README, 2026-10-10). Everything below is for people working ON LearnHarness, not using it.
 
-A standalone learning app (web + Electron desktop): a **teacher agent** (Next.js; the Vercel AI SDK's `UIMessage` protocol end-to-end, LLM engine [pi-ai](docs/pi-engine-swap.md) via OpenRouter), probe→teach lessons with graded quiz/ask interactions, a formal **session plan tree** the teacher authors once (`plan_init`) and whose progress is derived from tagged quiz calls, and a persistent cross-session **knowledge graph** of what the learner knows — the graph is the app's home page.
+LearnHarness is a Next.js web application for office deployment. Its teacher agent, practice flows, and knowledge graph run through the Node server.
 
 Not a chat app with a graph bolted on: sessions are probe→teach lessons, the plan tree is a structured, schema-validated object, sessions accumulate into the graph through the extraction pipeline (propositions + reasoning chains — the stored truth; the canvas renders a derived image), and the teacher reaches back into the graph through read-only prober tools on its own judgment so probing compounds across sessions.
 
@@ -16,15 +16,14 @@ Not a chat app with a graph bolted on: sessions are probe→teach lessons, the p
 npm install          # once
 
 npm run dev          # http://localhost:3000
-npm run build        # production build (standalone output)
+npm run build        # production Node web build
 npm start            # serve the production build
 
 npm test             # the full suite (node:test via tsx; deterministic, no LLM, no network)
 npm run lint         # eslint — includes the import law (architecture §2)
 npm run typecheck    # tsc --noEmit
 
-npm run desktop:dev    # next dev + Electron shell pointed at it
-npm run desktop:dist   # local signed/notarized macOS arm64 build (LH_NOTARY keychain)
+npm run smoke:llm    # manual plain chat + tool-call check against configured LLM
 
 # one-shot data scripts (run from the master tree only — data never crosses trees)
 npx tsx --env-file=.env.local scripts/import-notes.ts <dir>   # bulk-import notes → graph
@@ -33,20 +32,23 @@ npx tsx --env-file=.env.local scripts/replay-layout.ts        # re-derive layout
 npx tsx scripts/sync-pricing.ts                               # regenerate core/prices.ts tables
 ```
 
-For Windows/Linux packages and the three-OS CI/release flow, see [`desktop-release.md`](desktop-release.md). Native renderer binaries are traced per platform, so release builds run on the target OS, not as cross-builds from macOS.
+For deployment, copy `.env.example` to `.env`, set the internal LLM and office paths, then run `npm run build` and `npm run start`.
 
-## Environment (`.env.local`)
+## Environment (`.env`)
 
-Secrets and machine-specific paths only. Model choice and thinking budgets are the user's, not the environment's — BYOK model slots live in **settings** (`models` section: strong/cheap/vision, provider + model id + optional thinking level; per-role and per-chat overrides ride on top). The extraction batch threshold is a settings knob too (`graph.extractionChunkTokens`, default 4096, floor 500).
+The Node server reads office settings from environment variables. Copy `.env.example` to `.env` for a local deployment; set the same variables in your production environment. Do not commit secrets.
 
 | Variable | Purpose |
 |---|---|
-| `OPENROUTER_API_KEY` | required — all LLM calls go through OpenRouter |
-| `GOOGLE_SEARCH_API_KEY` + `GOOGLE_CSE_ID` | researcher's `web_search` (Google Custom Search) |
-| `DEEPGRAM_API_KEY` | optional — dictation (STT token minting; audio streams browser→Deepgram, never through the server) |
-| `CHROME_PATH` | optional system Chrome fallback for demo verification; the app's own browser helper is primary (nothing is downloaded) |
+| `LLM_BASE_URL` | Internal OpenAI-compatible API base ending in `/v1` |
+| `LLM_MODEL` | Model ID; the model must support tool calls |
+| `LLM_API_KEY` | Optional bearer token for the internal LLM |
+| `SESSION_SECRET` | Session signing secret, at least 32 characters |
+| `KNOWLEDGE_DIR` | Office knowledge storage path |
+| `PORT` | Node web server port (default 3000) |
+| `NO_PROXY` | Must include the internal LLM host |
 
-The packaged desktop app takes keys from `userData/auth.json` (BYOK, mode 0600, read/written directly by the server via `LH_AUTH_FILE`). PDFs render natively with pdfjs/Skia; SVGs use resvg.
+Run `npm run smoke:llm` to check plain chat and tool-call support. Process environment variables override `.env`, which makes it possible to point the check at a local Ollama instance without editing the deployment template.
 
 ## Architecture
 

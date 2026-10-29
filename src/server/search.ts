@@ -1,3 +1,4 @@
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 /**
  * The search engines' server composition (search port + model slots wave,
  * 2026-09-20): the Tavily + Brave adapters behind the core port
@@ -159,31 +160,45 @@ export function resolveSearchEngineFor(
 /** The live search state (the honest availability signal): reads the
  *  settings record's pin + the auth store fresh each call, so a key saved
  *  mid-session activates on the next check (no restart). */
+function proxyFetch(input: string, init: RequestInit): Promise<Response> {
+  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+  if (!proxy) throw new Error("HTTPS_PROXY is required for web research");
+  // Explicit dispatcher intentionally ignores NO_PROXY for all web research.
+  return undiciFetch(input, { ...init, dispatcher: new ProxyAgent(proxy) } as Parameters<typeof undiciFetch>[1]) as unknown as Promise<Response>;
+}
+function selectedSearchProvider(): "searxng" | "tavily" | "brave" {
+  const choice = process.env.SEARCH_PROVIDER?.trim().toLowerCase() || "searxng";
+  if (choice !== "searxng" && choice !== "tavily" && choice !== "brave") throw new Error("SEARCH_PROVIDER must be searxng, tavily, or brave");
+  return choice;
+}
+export function searxngProvider(baseUrl: string, fetchFn: FetchLike = proxyFetch): SearchProvider {
+  const base = new URL(baseUrl);
+  if (base.protocol !== "http:" && base.protocol !== "https:") throw new Error("SEARXNG_URL must be HTTP(S)");
+  return { id: "searxng", async search(query: string, count: number): Promise<SearchHit[]> {
+    const url = new URL("search", base.toString().endsWith("/") ? base : `${base}/`);
+    url.searchParams.set("q", query);
+    url.searchParams.set("format", "json");
+    const response = await fetchFn(url.toString(), { method: "GET", signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new Error(`SearXNG HTTP ${response.status}`);
+    const body = await response.json() as { results?: Array<{ title?: string; url?: string; content?: string }> };
+    return (body.results ?? []).slice(0, count).filter((hit) => typeof hit.url === "string").map((hit) => ({ title: hit.title ?? hit.url!, url: hit.url!, snippet: (hit.content ?? "").slice(0, 500) }));
+  } };
+}
 export function searchStatus(): SearchStatus {
-	const { available, engine, reason } = resolveSearchEngineFor(
-		effectiveSettings().agent.search?.engine,
-		{
-			tavily: engineKey("tavily") ?? undefined,
-			brave: engineKey("brave") ?? undefined,
-		},
-	);
-	return { available, engine, reason };
+  try {
+    const selected = selectedSearchProvider();
+    if (selected === "searxng" && !process.env.SEARXNG_URL) return { available: false, engine: null, reason: "SEARXNG_URL is required" };
+    if (selected !== "searxng" && !process.env.SEARCH_API_KEY) return { available: false, engine: null, reason: "SEARCH_API_KEY is required" };
+    if (!process.env.HTTPS_PROXY && !process.env.HTTP_PROXY) return { available: false, engine: null, reason: "HTTPS_PROXY is required" };
+    return { available: true, engine: selected, reason: `office search: ${selected}` };
+  } catch (error) {
+    return { available: false, engine: null, reason: error instanceof Error ? error.message : "invalid search configuration" };
+  }
 }
-
-/** Search available at all? (the settings UI's gray-out signal + the
- *  researcher's enable/disable pin — Teacher stream's rewiring reads this.) */
-export function searchAvailable(): boolean {
-	return searchStatus().available;
-}
-
-/** The LIVE adapter, or null when unavailable. Composed fresh each call —
- *  the tool layer (Teacher stream) calls this once per search, so key
- *  rotations take effect immediately. */
+export function searchAvailable(): boolean { return searchStatus().available; }
 export function searchProvider(): SearchProvider | null {
-	const resolved = resolveSearchEngineFor(effectiveSettings().agent.search?.engine, {
-		tavily: engineKey("tavily") ?? undefined,
-		brave: engineKey("brave") ?? undefined,
-	});
-	if (!resolved.available || !resolved.key) return null;
-	return resolved.engine === "tavily" ? tavilyProvider(resolved.key) : braveProvider(resolved.key);
+  if (!searchAvailable()) return null;
+  const selected = selectedSearchProvider();
+  if (selected === "searxng") return searxngProvider(process.env.SEARXNG_URL!);
+  return selected === "tavily" ? tavilyProvider(process.env.SEARCH_API_KEY!, proxyFetch) : braveProvider(process.env.SEARCH_API_KEY!, proxyFetch);
 }

@@ -45,10 +45,9 @@ let localProviderReadiness = {
 
 /** Keep settings writes on the same registered model collection before the
  * route's provider-qualified catalog validation runs. */
-export function configureModelProviders(settings: UserSettings): void {
-	configureLocalProviders(settings);
+export function configureModelProviders(_settings: UserSettings): void {
+	// The office provider is fixed by environment variables.
 }
-
 async function fetchJson(url: string, init?: RequestInit, fetchFn: typeof fetch = fetch): Promise<unknown> {
 	const response = await fetchFn(url, {
 		...init,
@@ -117,33 +116,11 @@ function customModelFromApi(value: unknown): DiscoveredLocalModel | null {
 /** Refresh local model metadata. Each endpoint fails independently, so a
  * stopped Ollama instance never hides a configured cloud/custom provider. */
 export async function refreshLocalProviders(
-	settings = settingsStore.readSettings() ?? undefined,
-	fetchFn: typeof fetch = fetch,
+	_settings?: UserSettings,
+	_fetchFn?: typeof fetch,
 ): Promise<typeof localProviderReadiness> {
-	const snapshot: LocalProviderSnapshot = { customEndpointBaseUrl: settings?.models?.customEndpoint?.baseUrl };
-	const readiness: typeof localProviderReadiness = { ollamaAvailable: false, customEndpointAvailable: false, errors: {} };
-	try {
-		snapshot.ollama = await discoverOllama(fetchFn);
-		readiness.ollamaAvailable = true;
-	} catch (error) {
-		readiness.errors.ollama = `Ollama is unavailable at http://localhost:11434 (${error instanceof Error ? error.message : "connection failed"}).`;
-	}
-	const baseUrl = settings?.models?.customEndpoint?.baseUrl;
-	if (baseUrl) {
-		try {
-			const body = record(await fetchJson(`${baseUrl}/models`, undefined, fetchFn));
-			const data = Array.isArray(body?.data) ? body.data : [];
-		snapshot.customEndpoint = data.map(customModelFromApi).filter((model): model is DiscoveredLocalModel => model !== null);
-			readiness.customEndpointAvailable = true;
-		} catch (error) {
-			readiness.errors["custom-openai"] = `Custom endpoint is unavailable (${error instanceof Error ? error.message : "connection failed"}).`;
-		}
-	}
-	configureLocalProviders(settings, snapshot);
-	localProviderReadiness = readiness;
-	return readiness;
+	return localProviderReadiness;
 }
-
 /** The picker's client-safe model entry (contract: core/contracts/models.ts). */
 export type ModelDto = ModelCatalogEntry;
 
@@ -229,33 +206,12 @@ export function catalogSlots(): SlotPins {
  *  with keyPresent read env-wins through the keys seam, fresh per call —
  *  saving a key immediately federates the provider into the picker. */
 export function catalogProviders(): CatalogProvider[] {
-	const keyed = AUTH_PROVIDER_KEYS.map((p) => ({
-		id: p.id,
-		envVar: p.envVar,
-		keyPresent: keyValue(p.envVar) !== undefined,
-	}));
-	const settings = settingsStore.readSettings();
-	const local: CatalogProvider[] = [
-		{ id: "ollama", keyPresent: false, available: localProviderReadiness.ollamaAvailable, error: localProviderReadiness.errors.ollama },
-	];
-	if (settings?.models?.customEndpoint?.baseUrl) {
-		local.push({
-			id: "custom-openai",
-			keyPresent: false,
-			available: localProviderReadiness.customEndpointAvailable,
-			error: localProviderReadiness.errors["custom-openai"],
-		});
-	}
-	return [...keyed, ...local].sort((a, b) => a.id.localeCompare(b.id));
+	return [{ id: "office", keyPresent: true }];
 }
 
-/** The providers whose key is present — the picker federates exactly
- *  these (a keyless provider's models are unreachable by design; the
- *  Keys page is the discovery surface, same discipline as search). */
 function keyedProviderIds(): Set<string> {
-	return new Set(catalogProviders().filter((p) => p.keyPresent || p.id === "ollama" || p.id === "custom-openai").map((p) => p.id));
+	return new Set(["office"]);
 }
-
 /** Project one catalog model to the client DTO. */
 export function toModelDto(model: Model<Api>): ModelDto {
 	return {
@@ -422,3 +378,4 @@ export function clampChatLevel(settings: ChatSettings, strong: EffectiveSlot | n
 	if (!provider || !id) return settings;
 	return { ...settings, thinkingLevel: clampLevelFor(provider, id, settings.thinkingLevel) };
 }
+

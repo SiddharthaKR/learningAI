@@ -1,19 +1,25 @@
 import {
 	clampThinkingLevel,
 	createModels,
+	createProvider,
 	getSupportedThinkingLevels,
 	type Api,
 	type Model,
 	type Models,
+	type ProviderStreams,
+	type SimpleStreamOptions,
+	type StreamOptions,
 	type StreamFunction,
 } from "@earendil-works/pi-ai";
-import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
+import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { MutableModels } from "@earendil-works/pi-ai";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type ModelRole } from "../../config.ts";
 import { DEFAULT_THINKING_ORDER, type UserSettings } from "../core/settings.ts";
-import { localProviders, type LocalProviderSnapshot } from "./local-providers.ts";
+import type { LocalProviderSnapshot } from "./local-providers.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
+import { officeConfig } from "../server/office-config.ts";
+import { createLlmLimiter } from "./llm-concurrency.ts";
 
 /** App identity is immutable and shared by Models and every native Agent.
  * Agent's default Pi attribution otherwise overrides the Models identity. */
@@ -46,43 +52,75 @@ export interface PiEngine {
 export type { ThinkingLevel };
 
 let collection: ReturnType<typeof createModels> | undefined;
-let lastLocalSnapshot: LocalProviderSnapshot | undefined;
+let limitLlmStream: ReturnType<typeof createLlmLimiter> | undefined;
 
-/** The process-wide pi-ai Models collection — EVERY builtin provider's
- *  catalog (model slots wave, 2026-09-20): engines and the picker resolve
- *  against all of pi-ai's per-provider catalogs, so a settings slot can pin
- *  any native model id. Auth is resolved per request by pi-ai itself from
- *  the environment (the keys seam reflects file-saved keys into env), and
- *  a provider with no key simply fails its stream with "not configured" —
- *  honest, late, and unreachable through the picker, which gates on
- *  keyPresent. */
+function officeStreams(): ProviderStreams {
+	const upstream = openAICompletionsApi();
+	const optionsFor = <T extends StreamOptions | SimpleStreamOptions>(options: T | undefined): T => {
+		const config = officeConfig();
+		const upstreamFetch = options?.fetch ?? globalThis.fetch;
+		return {
+			...options,
+			apiKey: config.llmApiKey ?? "office-no-key-placeholder",
+			...(config.llmApiKey ? {} : {
+				fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+					const headers = new Headers(init?.headers);
+					headers.delete("authorization");
+					return upstreamFetch(input, { ...init, headers });
+				},
+			}),
+		} as T;
+	};
+	return {
+		stream: (model, context, options) => upstream.stream(model, context, optionsFor(options)),
+		streamSimple: (model, context, options) => upstream.streamSimple(model, context, optionsFor(options)),
+	};
+}
+
+/** Exactly one server-owned OpenAI-compatible provider and model. */
 export function piModels() {
 	if (!collection) {
+		const config = officeConfig();
+		const model: Model<"openai-completions"> = {
+			id: config.llmModel,
+			name: config.llmModel,
+			provider: "office",
+			api: "openai-completions",
+			baseUrl: config.llmBaseUrl,
+			input: config.llmVision ? ["text", "image"] : ["text"],
+			reasoning: config.llmReasoning,
+			...(config.llmReasoning ? {
+				thinkingLevelMap: { off: null, medium: "medium" },
+				compat: { chatTemplateKwargs: { think: { $var: "thinking.enabled", omitWhenOff: true } } },
+			} : {}),
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: config.llmContextWindow,
+			maxTokens: config.llmMaxTokens,
+		};
 		collection = createModels({ identity: APP_IDENTITY });
-		for (const provider of builtinProviders()) collection.setProvider(provider);
+		collection.setProvider(createProvider({
+			id: "office",
+			name: "Office vLLM",
+			baseUrl: config.llmBaseUrl,
+			auth: { apiKey: { name: "Office environment", resolve: async () => ({
+				auth: { apiKey: config.llmApiKey ?? "office-no-key-placeholder" },
+				source: "server environment",
+			}) } },
+			models: [model],
+			api: officeStreams(),
+		}));
 	}
 	return collection;
 }
 
-/** Register the user's no-key endpoints in the same catalog the builtin
- * providers use. The latest successful discovery is retained in-process;
- * saved model pins remain resolvable when an endpoint is temporarily down. */
-export function configureLocalProviders(settings: UserSettings | undefined, snapshot?: LocalProviderSnapshot): void {
-	if (snapshot) lastLocalSnapshot = snapshot;
-	const models: MutableModels = piModels();
-	const providers = localProviders(settings, lastLocalSnapshot);
-	const configured = new Set(providers.map((provider) => provider.id));
-	for (const provider of providers) models.setProvider(provider);
-	for (const id of ["ollama", "custom-openai"]) {
-		if (!configured.has(id)) models.deleteProvider(id);
-	}
+/** Legacy discovery hook kept for callers; user endpoints are disabled. */
+export function configureLocalProviders(_settings: UserSettings | undefined, _snapshot?: LocalProviderSnapshot): void {
+	// The office provider is fixed at process startup.
 }
 
-/** OpenRouter API key (BYOK); tests never read this — they inject engines. */
 export function openRouterApiKey(): string | undefined {
-	return process.env.OPENROUTER_API_KEY || undefined;
+	return undefined;
 }
-
 /** A fully-resolved model pin — the shape every engine now comes from:
  *  the settings-resolution chain's output (role override → slot, or the
  *  chat's conversation chain). thinkingLevel is OPTIONAL: unset means
@@ -112,6 +150,7 @@ function defaultThinkingLevel(model: Model<Api>): ThinkingLevel {
  *  hardcodes OpenRouter's. */
 export function piEngineForSpec(spec: ResolvedModelSpec): PiEngine {
 	const models: Models = piModels();
+	limitLlmStream ??= createLlmLimiter(officeConfig().maxConcurrentLlm);
 	const model = models.getModel(spec.provider, spec.id);
 	if (!model) {
 		throw new Error(`${spec.provider} catalog has no model ${spec.id}`);
@@ -129,11 +168,11 @@ export function piEngineForSpec(spec: ResolvedModelSpec): PiEngine {
 		// `reasoning` (undefined = off on pi-ai's scale); the clamp above keeps
 		// the pin honest even when config or settings drift off the map.
 		streamFn: (requestModel, context, options) =>
-			models.streamSimple(requestModel, context, {
-				...options,
-				reasoning: level === "off" ? undefined : level,
-			}),
-	};
+			limitLlmStream!(requestModel, () =>
+				models.streamSimple(requestModel, context, {
+					...options,
+					reasoning: level === "off" ? undefined : level,
+				}), options?.signal),	};
 }
 
 /** The LEGACY role entry point — BYOK made it an honest THROWER (owner,

@@ -19,10 +19,6 @@ import { jobTools, type DemoInput, type PdfInput, type ResearchInput, type Visua
 import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
 import { proberGraphTools } from "./tools/graph.ts";
-import { readTool } from "./tools/read.ts";
-import { lsTool } from "./tools/ls.ts";
-import { findTool } from "./tools/find.ts";
-import { grepTool } from "./tools/grep.ts";
 import { healToolRecord } from "./tools/heal.ts";
 import type { GraphStore } from "../core/ports.ts";
 
@@ -294,12 +290,7 @@ export function createProberTools(
 	const done = probeDoneTool(ctx);
 	// The job tools build over the SAME context/gates as the teacher's
 	// (one builder, one gating semantic); the prober carries a SUBSET:
-	const jobs = jobTools({
-		chatId: ctx.chatId,
-		jobStore: ctx.jobStore,
-		spawn: ctx.spawn,
-		searchAvailable: ctx.searchAvailable,
-	});
+
 	// Quizzing mechanics (owner 2026-09-27): free-recall swaps the probe
 	// quiz for the probe explain — one quizzing tool at a time, whichever
 	// the settings arm. ask stays always-on. The registry keys are the
@@ -323,10 +314,6 @@ export function createProberTools(
 				// The learner-filesystem set is always-on (user-decided 2026-09,
 				// sources v1): the prober inspects and LOCATES learner-referenced
 				// files while assessing the edge. Read-only by construction.
-				read: readTool,
-				ls: lsTool,
-				find: findTool,
-				grep: grepTool,
 				// Job dispatch in the probe phase (owner ruling, 2026-09-20):
 				// research + pdf are ALWAYS available in every phase — the
 				// prober can verify facts or read learner PDFs while assessing.
@@ -334,8 +321,8 @@ export function createProberTools(
 				// context). Same gating as the teacher: toggle-filtered here,
 				// research subject to the searchAvailable gate (honestly absent
 				// when no engine is live).
-				...(jobs.research ? { research: jobs.research } : {}),
-				pdf: jobs.pdf!,
+				
+				
 				// The map reader (wave 7): present only when the settings gate
 				// opened — same registration-time drop as the search gate.
 				...(ctx.graphStore
@@ -457,16 +444,12 @@ export function createTeacherTools(
 			// sources v1): the teacher locates and reads learner-referenced
 			// files on its own terms — nothing auto-injects. Read-only by
 			// construction (fs-shared.ts).
-			read: readTool,
-			ls: lsTool,
-			find: findTool,
-			grep: grepTool,
 			...planTools(ctx),
 			// Fix wave (2026-09-20): searchAvailable was RECEIVED here but
 			// DROPPED when building the inner JobToolContext — the drop-gate
 			// always took its ?? true default. Threaded now: the live signal
 			// reaches jobTools' research gate.
-			...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn, searchAvailable: ctx.searchAvailable }),
+			
 		},
 		withoutMechanics(enabled),
 		),

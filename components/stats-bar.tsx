@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { contextWindow, sessionCost, turnCost, type ChatSettings, type TurnUsage } from "@/src/core";
 import { formatTokens, formatUsd, prettyModel } from "@/components/usage-format";
-import { ModelControl, catalogLimits, useModelCatalog } from "@/components/model-picker";
+import { catalogLimits, useModelCatalog } from "@/components/model-picker";
 
 /**
  * The below-composer stats bar (wave 4 observability): the session's
@@ -89,6 +89,47 @@ export function StatsBar({
 	const pricedCount = turns.length - unpriced;
 	const costLabel = pricedCount > 0 ? formatUsd(cost) : "—";
 	const lastModel = turns.at(-1)?.model;
+ const [sessionSettings, setSessionSettings] = useState<ChatSettings | null>(null);
+ const [saving, setSaving] = useState(false);
+ const [settingError, setSettingError] = useState<string | null>(null);
+ useEffect(() => {
+  if (!chatId) return;
+  let cancelled = false;
+  setSessionSettings(null);
+  fetch(`/api/chats/${encodeURIComponent(chatId)}`)
+   .then((response) => response.ok ? response.json() : Promise.reject())
+   .then((body: { settings?: ChatSettings }) => { if (!cancelled) setSessionSettings(body.settings ?? {}); })
+   .catch(() => { if (!cancelled) setSettingError("Session controls could not be loaded."); });
+  return () => { cancelled = true; };
+ }, [chatId]);
+ const saveFlag = async (field: "webResearchEnabled" | "officeKnowledgeEnabled", value: boolean) => {
+  if (!chatId || !sessionSettings || saving) return;
+  setSaving(true);
+  setSettingError(null);
+  const next = {
+   webResearchEnabled: sessionSettings.webResearchEnabled ?? false,
+   officeKnowledgeEnabled: sessionSettings.officeKnowledgeEnabled ?? false,
+   [field]: value,
+  };
+  try {
+   const response = await fetch(`/api/chats/${encodeURIComponent(chatId)}/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(next),
+   });
+   if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error ?? "Could not save session controls.");
+   }
+   const body = await response.json() as { settings?: ChatSettings };
+   setSessionSettings(body.settings ?? next);
+  } catch (error) {
+   setSettingError(error instanceof Error ? error.message : "Could not save session controls.");
+  } finally {
+   setSaving(false);
+  }
+ };
+
 
 	return (
 		<div
@@ -186,10 +227,26 @@ export function StatsBar({
 			{dictationSlot && (
 				<div className="flex min-w-0 flex-1 items-center justify-center">{dictationSlot}</div>
 			)}
-			{/* The model + thinking control — one controller for the conversation
-			    agents (prober/teacher); the record's `turns` above still folds
-			    the ACTUAL models billed, regardless of what the picker says. */}
-			<ModelControl chatId={chatId} />
+
+   {chatId && (
+    <div className="flex flex-wrap items-center gap-3" data-testid="session-source-controls">
+     {(["webResearchEnabled", "officeKnowledgeEnabled"] as const).map((field) => (
+      <label key={field} className="flex cursor-pointer items-center gap-1.5">
+       <input
+        type="checkbox"
+        checked={sessionSettings?.[field] ?? false}
+        disabled={!sessionSettings || saving}
+        onChange={(event) => void saveFlag(field, event.target.checked)}
+        aria-label={field === "webResearchEnabled" ? "Web research" : "Use office knowledge"}
+        className="accent-foreground"
+       />
+       <span>{field === "webResearchEnabled" ? "Web research" : "Use office knowledge"}</span>
+      </label>
+     ))}
+     {settingError && <span role="alert" className="text-red-400">{settingError}</span>}
+    </div>
+   )}
+
 		</div>
 	);
 }

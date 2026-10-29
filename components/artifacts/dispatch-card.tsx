@@ -1,10 +1,9 @@
 "use client";
 
 import { useContext } from "react";
-import { CheckIcon, SettingsIcon, XIcon } from "lucide-react";
+import { CheckIcon, XIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
-import { ChatActionsContext } from "@/components/chat";
-import { isModelsRefusal, isProviderKeyRefusal, type JobKind, type JobRecord } from "@/src/core";
+import { type JobKind, type JobRecord } from "@/src/core";
 import { BrailleSpinner } from "@/components/braille-spinner";
 
 /**
@@ -34,18 +33,6 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	if (!job || job.status === "running") {
 		return <DispatchActivityCard job={job} label={label} />;
 	}
-	// BYOK (owner, 2026-09-22): a job refused for missing models is INFO,
-	// not scary-error — gray glyph + "needs model setup" + the deep-link
-	// into the SetupDialog (the same flow the send interception uses).
-	// The provider-key refusal twin (zero-keys wave): a pinned model
-	// whose key is gone reads as the key being needed — the deep-link
-	// lands on the SetupDialog's first-key stage on its own.
-	if (isModelsRefusal(job.error)) {
-		return <DispatchRefusedCard label={label} line="needs model setup" button="Set up models" />;
-	}
-	if (isProviderKeyRefusal(job.error)) {
-		return <DispatchRefusedCard label={label} line="needs a provider key" button="Add a key" />;
-	}
 	const failed = job.status === "error";
 	return (
 		<div
@@ -55,31 +42,6 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 			{failed ? <XIcon className="size-3.5 text-red-500" /> : <CheckIcon className="size-3.5" />}
 			<span className="font-medium uppercase tracking-wide">{label}</span>
 			<span>{failed ? "failed" : "delivered"}</span>
-		</div>
-	);
-}
-
-/** The refused card: quiet info tone — nothing red, nothing "failed". */
-function DispatchRefusedCard({ label, line, button }: { label: string; line: string; button: string }) {
-	const ctx = useContext(ChatActionsContext);
-	return (
-		<div
-			className="flex items-center gap-2 text-xs text-muted-foreground"
-			data-testid="dispatch-refused"
-		>
-			<SettingsIcon className="size-3.5" />
-			<span className="font-medium uppercase tracking-wide">{label}</span>
-			<span>{line}</span>
-			{ctx && (
-				<button
-					type="button"
-					data-testid="dispatch-setup-link"
-					onClick={ctx.openSetup}
-					className="ml-1 rounded-sm border border-border bg-card px-2 py-0.5 font-ui normal-case tracking-normal text-foreground transition-colors hover:border-muted-foreground/50"
-				>
-					{button}
-				</button>
-			)}
 		</div>
 	);
 }

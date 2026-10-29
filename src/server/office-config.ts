@@ -1,7 +1,11 @@
-﻿/** Server-owned office deployment settings. Never expose this object to the browser. */
+/** Server-owned office deployment settings. Never expose this object to the browser. */
 export interface OfficeConfig {
   llmBaseUrl: string;
   llmModel: string;
+  llmContextWindow: number;
+  llmMaxTokens: number;
+  llmVision: boolean;
+  llmReasoning: boolean;
   llmApiKey?: string;
   embeddingModel?: string;
   port: number;
@@ -16,6 +20,16 @@ function positiveInt(value: string | undefined, fallback: number, name: string):
   return parsed;
 }
 
+function requiredPositiveInt(value: string | undefined, name: string): number {
+  if (!value?.trim()) throw new Error(name + " is required");
+  return positiveInt(value, 0, name);
+}
+
+function requiredBoolean(value: string | undefined, name: string): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(name + " must be true or false");
+}
 export function officeConfig(): OfficeConfig {
   const rawUrl = process.env.LLM_BASE_URL?.trim();
   const llmModel = process.env.LLM_MODEL?.trim();
@@ -34,6 +48,10 @@ export function officeConfig(): OfficeConfig {
   return {
     llmBaseUrl: url.toString().replace(/\/$/u, ''),
     llmModel,
+    llmContextWindow: requiredPositiveInt(process.env.LLM_CONTEXT_WINDOW, "LLM_CONTEXT_WINDOW"),
+    llmMaxTokens: requiredPositiveInt(process.env.LLM_MAX_TOKENS, "LLM_MAX_TOKENS"),
+    llmVision: requiredBoolean(process.env.LLM_VISION, "LLM_VISION"),
+    llmReasoning: requiredBoolean(process.env.LLM_REASONING, "LLM_REASONING"),
     ...(process.env.LLM_API_KEY?.trim() ? { llmApiKey: process.env.LLM_API_KEY.trim() } : {}),
     ...(process.env.EMBEDDING_MODEL?.trim() ? { embeddingModel: process.env.EMBEDDING_MODEL.trim() } : {}),
     port: positiveInt(process.env.PORT, 3000, 'PORT'),
@@ -41,4 +59,9 @@ export function officeConfig(): OfficeConfig {
     knowledgeDir: process.env.KNOWLEDGE_DIR?.trim() ?? '',
     maxConcurrentLlm: positiveInt(process.env.MAX_CONCURRENT_LLM, 4, 'MAX_CONCURRENT_LLM'),
   };
+}
+
+/** The sole model pin used by every office role and conversation. */
+export function fixedOfficeModelSpec(): { provider: "office"; id: string } {
+  return { provider: "office", id: officeConfig().llmModel };
 }

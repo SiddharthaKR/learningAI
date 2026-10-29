@@ -97,7 +97,7 @@ export function KeyboardSection() {
 	return (
 		<>
 			{SCOPES.map(({ scope, label }) => {
-				const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+				const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope && !["toggle-dictation", "open-model-picker", "cycle-thinking"].includes(a.id));
 				if (!actions.length) return null;
 				return (
 					<div key={scope} data-testid={`kbd-scope-${scope}`}>

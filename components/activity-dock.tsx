@@ -228,11 +228,9 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 			// provider-key refusal twin (zero-keys wave, Platform's
 			// 66dbea9): a pinned model whose key is gone reads as the key
 			// being needed, same quiet tone.
-			activity: isModelsRefusal(job.error)
-				? "needs model setup"
-				: isProviderKeyRefusal(job.error)
-					? "needs a provider key"
-					: (job.activity ?? ""),
+			activity: isModelsRefusal(job.error) || isProviderKeyRefusal(job.error)
+				? "request failed"
+				: (job.activity ?? ""),
 			model: usage?.model,
 			steps: usage?.steps,
 		};

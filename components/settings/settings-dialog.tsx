@@ -40,12 +40,10 @@ import {
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
-import { SettingsSection, SettingsRow, Toggle } from "./controls.tsx";
-import { AgentSection } from "./agent-section.tsx";
+import { SettingsSection } from "./controls.tsx";
 import type { ModelsSettings } from "@/src/core";
 import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
 import { notifySettingsSaved } from "@/components/settings-signal";
-import { KeysSection } from "./keys-section.tsx";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
@@ -54,9 +52,6 @@ import { KeyboardSection } from "./keyboard-section.tsx";
  *  prose is out; only the keyboard note stays (storage location is a
  *  real question users ask). */
 const SECTIONS = [
-	{ id: "general", label: "General" },
-	{ id: "keys", label: "Keys" },
-	{ id: "agent", label: "Agent" },
 	{ id: "appearance", label: "Appearance" },
 	{ id: "graph", label: "Graph" },
 	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
@@ -83,10 +78,10 @@ export function SettingsDialogProvider({
 	children: React.ReactNode;
 }) {
 	const [show, setShow] = useState(false);
-	const [landOn, setLandOn] = useState<SectionId>("general");
+	const [landOn, setLandOn] = useState<SectionId>("appearance");
 	const [landOnRow, setLandOnRow] = useState<string | null>(null);
 	const open = useCallback((section?: string, row?: string) => {
-		if (section) setLandOn(section as SectionId);
+		if (section && SECTIONS.some((item) => item.id === section)) setLandOn(section as SectionId);
 		setLandOnRow(row ?? null);
 		setShow(true);
 	}, []);
@@ -133,7 +128,7 @@ function SettingsDialog({
  *  (portals render nothing under renderToStaticMarkup). */
 export function SettingsDialogBody({
 	onClose,
-	initialSection = "general",
+	initialSection = "appearance",
 	initialRow = null,
 }: {
 	onClose: () => void;
@@ -186,7 +181,7 @@ export function SettingsDialogBody({
 	// initialSection under our feet — follow it, or the link silently does
 	// nothing.
 	useEffect(() => {
-		setActive(initialSection);
+		setActive(SECTIONS.some((item) => item.id === initialSection) ? initialSection : "appearance");
 	}, [initialSection]);
 
 	// Fetch once per dialog mount. 200 {settings: null} is FIRST BOOT
@@ -357,51 +352,6 @@ export function SettingsDialogBody({
 						</p>
 					) : (
 						<div>
-							{active === "general" && (
-								<SettingsSection
-									title="General"
-									testid="section-general"
-								>
-									<SettingsRow
-										label="Auto-update"
-										hint={AUTO_UPDATE_HINT}
-										testid="row-auto-update"
-									>
-										<Toggle
-											checked={record.general?.autoUpdate ?? true}
-											label="auto update"
-											onChange={(on) =>
-												void write("general", { autoUpdate: on })
-											}
-										/>
-									</SettingsRow>
-								</SettingsSection>
-							)}
-							{active === "keys" && (
-								<SettingsSection title="Keys" testid="section-keys">
-									<KeysSection initialRow={initialRow ?? undefined} />
-								</SettingsSection>
-							)}
-							{active === "agent" && (
-								<SettingsSection
-									title="Agent"
-									testid="section-agent"
-								>
-									<AgentSection
-										agent={record.agent}
-										models={record.models}
-										graph={record.graph}
-										compaction={record.compaction}
-							onModelsChange={(next: ModelsSettings) => write("models", next)}
-										onSectionChange={(next: AgentSettings) =>
-											void write("agent", next)
-										}
-										onCompactionChange={(next: CompactionSettings) =>
-											void write("compaction", next)
-										}
-									/>
-								</SettingsSection>
-							)}
 							{active === "appearance" && (
 								<SettingsSection
 									title="Appearance"

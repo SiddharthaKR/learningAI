@@ -3,9 +3,7 @@
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
 import { visibleQueuedSteers } from "@/components/session-core";
-import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
-import { useZeroKeys, ZeroKeysPill } from "@/components/setup-cta";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
 import {
 	Conversation,
@@ -27,10 +25,11 @@ import { useEnterSubmits } from "@/components/enter-submits";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { dockStateKey } from "@/components/dock-state-key";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
-import { DictationBar, finishDictation, joinDictation, useDictation } from "@/components/dictation";
+import { finishDictation, joinDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
 import { StatsBar } from "@/components/stats-bar";
+import { WebApprovalDialog } from "@/components/web-approval-dialog";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import {
 	isProviderKeyRefusal,
@@ -552,25 +551,6 @@ export function Chat({
 		textRef.current = v;
 		setText(v);
 	}, []);
-	// The BYOK setup flow (owner, 2026-09-22): the persistent CTA and the
-	// refusal interception share one SetupDialog mount. `configured` is
-	// seeded server-side (slotsConfigured on the record) and flips on Save.
-	const [configured, setConfigured] = useState(initialConfigured);
-	// The zero-keys truth (zero-keys wave): no provider key = the pill
-	// takes precedence over the models CTA (keys come first in the chain).
-	// Reads once on mount, re-reads on the "keys" signal.
-	const zeroKeys = useZeroKeys();
-	// Cross-surface freshness (fix wave): another surface's models write —
-	// setup save, composer pick, a settings write — re-reads the record so
-	// the setup CTA appears/disappears live (it used to lag until reload).
-	useSettingsSaved((section) => {
-		if (section !== "models") return;
-		fetch("/api/settings")
-			.then((r) => r.json() as Promise<{ settings?: { models?: ModelsSettings } | null } | null>)
-			.then((body) => setConfigured(slotsConfigured(body?.settings?.models)))
-			.catch(() => {});
-	});
-	const [setupOpen, setSetupOpen] = useState(false);
 	/** The last explicitly-sent draft (composer send): the
 	 *  refusal flow restores it into the composer, where it waits for the
 	 *  learner to re-send (Save never auto-sends, owner 2026-10-09).
@@ -578,48 +558,6 @@ export function Chat({
 	 *  opens the dialog with no replay. */
 	const draftRef = useRef<string | null>(null);
 
-	// THE BYOK REFUSAL (owner, 2026-09-22): a send that lands the server's
-	// 503 models_not_configured envelope renders as the SETUP FLOW, never
-	// the error banner. The gate refuses BEFORE the write-ahead persist,
-	// so the server record is the truth minus the refused send — the
-	// optimistic message is an orphan that goes HOME: refetch the record,
-	// drop the orphan, put the draft back in the composer, open the
-	// dialog (the prefilled tiers carry their picks, the unpinned ones the
-	// "needed" marks). The draft stays in the composer until the learner
-	// re-sends it (owner ruling 2026-10-09).
-	useEffect(() => {
-		if (!error) return;
-		const missing = parseModelsRefusal(error.message);
-		// The key-refusal twin (zero-keys wave): a pinned model whose
-		// provider key is gone gets the SAME treatment — revert-draft and
-		// open setup (the dialog derives to its first-key stage on its own).
-		const keyRefused = parseProviderKeyRefusal(error.message);
-		if (!missing && !keyRefused) return; // a real error keeps the honest banner
-		// ORDER MATTERS: clearError() flips this effect's own dep (`error`)
-		// and would cancel the in-flight work below — so the banner dismiss,
-		// the draft restore, and the dialog open all land TOGETHER after the
-		// record refetch (the honest truth minus the refused send).
-		let cancelled = false;
-		void (async () => {
-			const res = await fetch(`/api/chats/${encodeURIComponent(chatId)}`);
-			if (!cancelled && res.ok) {
-				const record = (await res.json().catch(() => null)) as { messages?: LhMessage[] } | null;
-				if (Array.isArray(record?.messages)) setMessages(record.messages);
-			}
-			if (cancelled) return;
-			if (draftRef.current !== null) {
-				applyText(draftRef.current);
-				draftRef.current = null;
-			}
-			clearError();
-			setSetupOpen(true);
-		})();
-		return () => {
-			cancelled = true;
-		};
-		// (setMessages/clearError are stable per useChat instance — the
-		//  dep pair [error, chatId] is what the flow actually keys on.)
-	}, [error, chatId]);
 	// Voice dictation (STT wave, 2026-09-17): finals append at the end of
 	// the current text (the page owns the separator, dictate-flush style);
 	// interims ghost in the stats bar's middle slot next to the meter.
@@ -838,8 +776,8 @@ export function Chat({
 	figureFocusRef.current = figureFocus;
 	const planOpenRef = useRef(planOpen);
 	planOpenRef.current = planOpen;
-	const setupOpenRef = useRef(setupOpen);
-	setupOpenRef.current = setupOpen;
+	const setupOpenRef = useRef(false);
+	setupOpenRef.current = false;
 	// The session's live plan (drives the top-bar chip; the marginalia
 	// derives its own from the same transcript).
 	const planTree = useMemo(() => latestTree(messages), [messages]);
@@ -1174,7 +1112,7 @@ export function Chat({
 				sendText: (t: string) => {
 					void send({ type: "text", text: t });
 				},
-				openSetup: () => setSetupOpen(true),
+				openSetup: () => {},
 			}}
 		>
 		<SessionMermaidContext.Provider
@@ -1605,27 +1543,8 @@ export function Chat({
 					phase={phases.at(-1) ?? "probe"}
 					turns={turns}
 					onReserve={setDockReserve}
-					dictationSlot={<DictationBar dictation={dictation} />}
 					dictationCancel={dictation.cancel}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
-					setupCta={
-						zeroKeys ? (
-							<ZeroKeysPill onOpen={() => setSetupOpen(true)} />
-						) : (
-							!configured && (
-								<div className="pointer-events-auto mb-2 flex justify-center">
-									<button
-										type="button"
-										data-testid="setup-cta"
-										onClick={() => setSetupOpen(true)}
-										className="rounded-sm border border-border bg-card px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 hover:bg-accent cursor-pointer"
-									>
-										Set up your models
-									</button>
-								</div>
-							)
-						)
-					}
 					composer={
 						<Composer
 							// Stop aborts ANY in-flight turn (stream-reattach wave): the
@@ -1686,22 +1605,7 @@ export function Chat({
 		</div>
 		</JobsContext.Provider>
 		</SessionMermaidContext.Provider>
-		{/* The BYOK setup flow (owner, 2026-09-22): one mount serves the
-		    persistent CTA, the refused-send interception, and the job cards'
-		    deep-link. Save keeps the draft in the composer — it never sends
-		    (owner ruling 2026-10-09); Esc also keeps it (the dialog is
-		    closable by design — the gate is the server, not this modal). */}
-		<SetupDialog
-			open={setupOpen}
-			onClose={() => setSetupOpen(false)}
-			onDone={() => {
-				setSetupOpen(false);
-				setConfigured(true);
-				// Save only saves (owner ruling 2026-10-09): the draft went
-				// home into the composer at refusal time and STAYS there —
-				// the learner sends it themselves.
-			}}
-		/>
+		<WebApprovalDialog chatId={chatId} />
 		</ChatActionsContext.Provider>
 	);
 }

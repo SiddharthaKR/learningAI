@@ -29,6 +29,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 	if (!getChat(id)) return Response.json({ error: "Not found" }, { status: 404 });
 
 	const body = await req.json().catch(() => null);
+	if (body && typeof body === "object" && "model" in body) return Response.json({ error: "Models are managed by the server environment" }, { status: 403 });
 	const parsed = parseSettingsBody(body);
 	if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 
@@ -46,3 +47,4 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 	stores.chatStore.saveSettings(id, settings);
 	return Response.json({ settings });
 }
+
