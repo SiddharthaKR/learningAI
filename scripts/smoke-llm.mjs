@@ -3,6 +3,7 @@ const model = process.env.LLM_MODEL?.trim();
 const key = process.env.LLM_API_KEY?.trim();
 const contextWindow = Number(process.env.LLM_CONTEXT_WINDOW);
 const maxTokens = Number(process.env.LLM_MAX_TOKENS);
+const toolMode = process.env.LLM_TOOL_MODE?.trim();
 
 function fail(message) {
   console.error(`smoke:llm: ${message}`);
@@ -15,6 +16,8 @@ if (!base || !model) {
   fail('Set positive integer LLM_CONTEXT_WINDOW and LLM_MAX_TOKENS in .env or the process environment.');
 } else if (maxTokens >= contextWindow) {
   fail('LLM_MAX_TOKENS must be smaller than LLM_CONTEXT_WINDOW.');
+} else if (toolMode !== 'native' && toolMode !== 'prompt') {
+  fail('LLM_TOOL_MODE must be native or prompt.');
 } else {
   try {
     const url = new URL(base);
@@ -78,19 +81,31 @@ if (!base || !model) {
     console.log(`smoke:llm: plain chat OK (${model})`);
 
     const toolName = 'report_smoke_result';
-    const tool = await complete('tool call', {
-      messages: [{ role: 'user', content: `Call the ${toolName} tool with value "ready". Do not answer in text.` }],
-      tools: [{ type: 'function', function: {
+    const declaration = { type: 'function', function: {
         name: toolName,
         description: 'Report the smoke check result.',
         parameters: { type: 'object', properties: { value: { type: 'string' } }, required: ['value'] },
-      } }],
-      tool_choice: 'auto',
+      } };
+    const tool = await complete('tool call', toolMode === 'native' ? {
+      messages: [{ role: 'user', content: `Call the ${toolName} tool with value "ready". Do not answer in text.` }],
+      tools: [declaration], tool_choice: 'auto',
+    } : {
+      messages: [
+        { role: 'system', content: `Available tool: ${JSON.stringify(declaration.function)}. To call it, output <|tool_call>{"name":"${toolName}","arguments":{"value":"ready"}}<|tool_call|>. Output no other text.` },
+        { role: 'user', content: `Call ${toolName} with value "ready".` },
+      ],
     });
-    if (!Array.isArray(tool?.tool_calls) || !tool.tool_calls.some((call) => call?.type === 'function' && call.function?.name === toolName)) {
+    if (toolMode === 'native' && (!Array.isArray(tool?.tool_calls) || !tool.tool_calls.some((call) => call?.type === 'function' && call.function?.name === toolName))) {
       throw new Error('tool call: response lacks choices[0].message.tool_calls with report_smoke_result; check model tool support');
     }
-    console.log(`smoke:llm: tool_calls OK (${model})`);
+    if (toolMode === 'prompt') {
+      const text = tool?.content;
+      const match = typeof text === 'string' && (text.match(/<\|tool_call>([\s\S]*?)<\|tool_call\|>/u)?.[1] ?? text.trim());
+      let parsed;
+      try { parsed = JSON.parse(match); } catch { throw new Error('tool call: prompt response is not a parseable tool call'); }
+      if (parsed?.name !== toolName || parsed?.arguments?.value !== 'ready') throw new Error('tool call: prompt response lacks the expected call and value');
+    }
+    console.log(`smoke:llm: tool call OK in ${toolMode} mode (${model})`);
   } catch (error) {
     fail(error.message);
   }

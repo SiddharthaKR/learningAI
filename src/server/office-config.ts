@@ -12,6 +12,7 @@ export interface OfficeConfig {
   sessionSecret: string;
   knowledgeDir: string;
   maxConcurrentLlm: number;
+  llmToolMode: "native" | "prompt";
 }
 
 function positiveInt(value: string | undefined, fallback: number, name: string): number {
@@ -45,6 +46,8 @@ export function officeConfig(): OfficeConfig {
   }
   const sessionSecret = process.env.SESSION_SECRET?.trim() ?? '';
   if (sessionSecret.length < 32) throw new Error('SESSION_SECRET must contain at least 32 characters');
+  const llmToolMode = process.env.LLM_TOOL_MODE?.trim();
+  if (llmToolMode !== "native" && llmToolMode !== "prompt") throw new Error("LLM_TOOL_MODE must be native or prompt");
   return {
     llmBaseUrl: url.toString().replace(/\/$/u, ''),
     llmModel,
@@ -58,6 +61,7 @@ export function officeConfig(): OfficeConfig {
     sessionSecret,
     knowledgeDir: process.env.KNOWLEDGE_DIR?.trim() ?? '',
     maxConcurrentLlm: positiveInt(process.env.MAX_CONCURRENT_LLM, 4, 'MAX_CONCURRENT_LLM'),
+    llmToolMode,
   };
 }
 
