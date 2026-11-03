@@ -52,3 +52,22 @@ it("rechecks a deleted owner in a delayed background continuation", async () => 
   resume();
   await assert.rejects(task, /Owner account no longer exists/u);
 });
+
+it("graph extraction keeps its explicit owner and rechecks before reading or writing", async () => {
+  const accounts = createAccountStore(root);
+  const alice = await accounts.create("extract_alice", "correct horse battery staple", "en");
+  const bob = await accounts.create("extract_bob", "correct horse battery staple", "en");
+  const aliceStores = checkedStoresForUser(alice.id);
+  const bobStores = checkedStoresForUser(bob.id);
+  const aliceChat = aliceStores.chatStore.createChat("Alice extraction");
+  const bobChat = bobStores.chatStore.createChat("Bob extraction");
+  const { extractionForOwner } = await import("../src/server/chat-handler.ts");
+  const aliceExtraction = extractionForOwner(alice.id);
+
+  await assert.rejects(aliceExtraction.runExtraction(bobChat.id), /Chat not found/u);
+  assert.equal(aliceStores.chatStore.getChat(aliceChat.id)?.id, aliceChat.id);
+
+  await accounts.delete("extract_alice");
+  await assert.rejects(aliceExtraction.runExtraction(aliceChat.id), /Owner account no longer exists/u);
+  assert.equal(bobStores.chatStore.getChat(bobChat.id)?.id, bobChat.id);
+});

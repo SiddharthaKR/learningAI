@@ -149,7 +149,7 @@ This session added account Preferences (`uiLanguage`, `teachingLanguage`, option
 |---|---|
 | 1 Deployment | Local test/typecheck/build gate passes; systemd and DEPLOY.md pending. |
 | 2 Auth | Signup/login/logout, cookie expiry, route gates and rate-limit tests present; live browser verification pending. |
-| 3 Isolation | Per-user stores and owner-scoped job/approval tests present; graph extraction ownership should be re-audited before deployment. |
+| 3 Isolation | Per-user stores and owner-scoped job/approval tests present. Graph extraction now has a direct isolation test covering another owner's chat and account deletion before async access. |
 | 4 Full teaching/practice | Existing local flow tests pass; real LLM tool-call run pending. |
 | 5 English/Japanese UI | Preference and session teaching language wiring begun; full UI translation and missing-key audit pending. |
 | 6 Office knowledge | Indexing, extraction, retrieval, citations, upload, and provenance behavior pending. |
@@ -159,3 +159,9 @@ This session added account Preferences (`uiLanguage`, `teachingLanguage`, option
 | 10 Concurrency | MAX_CONCURRENT_LLM and three-user live load test pending. |
 
 **Next in approved order:** finish full i18n (#5), then office knowledge (#6, including setting sticky `knowledgeUsed` on actual retrieval), web toggle/approval behavior (#7), `/source` (#9), deployment docs/systemd, and `.126` acceptance. Remove legacy prohibited source paths and complete the registered-tool allowlist test. The account `background` must be passed to measure/plan/teach only for that owner; the current foreground build passes it, but verify practice and async behavior as part of the final language audit. Do not claim v1 completion from the local gate.
+
+### Encoding and graph ownership checkpoint
+
+The Japanese source text was valid UTF-8. The apparent mojibake came from inspecting UTF-8-without-BOM files through Windows PowerShell 5.1 `Get-Content`, which decoded them with the legacy Windows code page. Do not use PowerShell 5.1 `Set-Content` or `Out-File` for repository text; edits use the patch tool, and programmatic writers must select UTF-8 without BOM explicitly. Locale catalogs now live in `locales/en.json` and `locales/ja.json`. The encoding test scans source, app, locales, and prompts for common mojibake markers, checks catalog key parity, and verifies a known Japanese string survives UTF-8 decoding unchanged.
+
+The graph extraction audit traced both the manual route and turn-triggered path through `extractionForOwner(ownerId)`. Production pipelines are cached per explicit owner and receive only `checkedStoresForUser(ownerId)`. Those proxies recheck account existence before every store operation. A direct isolation test proves Alice's pipeline cannot read Bob's chat and refuses further access after Alice's account is deleted.
