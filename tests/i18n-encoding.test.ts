@@ -1,0 +1,45 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
+import { describe, it } from "node:test";
+
+const ROOT = path.resolve(import.meta.dirname, "..");
+const SCAN_ROOTS = ["src", "app", "locales", "prompts"];
+const TEXT_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".json", ".md", ".txt"]);
+const MOJIBAKE = /\u00e3|\u00e2\u20ac|\u00c3|\uFFFD/u;
+
+function textFiles(root: string): string[] {
+  if (!existsSync(root)) return [];
+  const entries = readdirSync(root).map((entry) => path.join(root, entry));
+  return entries.flatMap((entry) => statSync(entry).isDirectory()
+    ? textFiles(entry)
+    : TEXT_EXTENSIONS.has(path.extname(entry)) ? [entry] : []);
+}
+
+describe("UTF-8 source and locale integrity", () => {
+  it("contains no common mojibake or replacement characters", () => {
+    const failures = SCAN_ROOTS
+      .flatMap((root) => textFiles(path.join(ROOT, root)))
+      .filter((file) => MOJIBAKE.test(readFileSync(file, "utf8")))
+      .map((file) => path.relative(ROOT, file));
+    assert.deepEqual(failures, []);
+  });
+
+  it("round-trips a known Japanese catalog string unchanged", () => {
+    const file = path.join(ROOT, "locales", "ja.json");
+    const bytes = readFileSync(file);
+    const decoded = bytes.toString("utf8");
+    const catalog = JSON.parse(decoded) as { preferences: { title: string } };
+    assert.equal(catalog.preferences.title, "設定");
+    assert.equal(Buffer.from(decoded, "utf8").toString("utf8"), decoded);
+  });
+
+  it("keeps the English and Japanese catalog key sets identical", () => {
+    const flatten = (value: unknown, prefix = ""): string[] => {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) return [prefix];
+      return Object.entries(value).flatMap(([key, child]) => flatten(child, prefix ? `${prefix}.${key}` : key));
+    };
+    const read = (language: "en" | "ja") => JSON.parse(readFileSync(path.join(ROOT, "locales", `${language}.json`), "utf8")) as unknown;
+    assert.deepEqual(flatten(read("ja")).sort(), flatten(read("en")).sort());
+  });
+});

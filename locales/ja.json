@@ -1,0 +1,25 @@
+{
+  "common": {
+    "english": "英語",
+    "japanese": "日本語"
+  },
+  "preferences": {
+    "title": "設定",
+    "uiLanguage": "表示言語",
+    "teachingLanguage": "新しいセッションの授業言語",
+    "background": "私の専門分野",
+    "backgroundPlaceholder": "例：FPGA/DSP エンジニア。固定小数点とリアルタイム制御が得意。量子光学は初学者。",
+    "save": "保存",
+    "saved": "保存しました",
+    "saveError": "設定を保存できませんでした"
+  },
+  "newSession": {
+    "title": "新しいセッション",
+    "practiceTitle": "新しい練習セッション",
+    "description": "まず、先生があなたの現在の理解を確認します。",
+    "practiceDescription": "知識グラフから項目を選ぶか、練習したい内容や問題を入力してください。",
+    "teachingLanguage": "授業言語",
+    "learnPlaceholder": "何を学びたいですか？",
+    "practicePlaceholder": "何を練習したいですか？"
+  }
+}

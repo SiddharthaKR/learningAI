@@ -1,0 +1,25 @@
+{
+  "common": {
+    "english": "English",
+    "japanese": "Japanese"
+  },
+  "preferences": {
+    "title": "Preferences",
+    "uiLanguage": "UI language",
+    "teachingLanguage": "Teaching language for new sessions",
+    "background": "My background",
+    "backgroundPlaceholder": "For example: FPGA/DSP engineer, strong in fixed-point and real-time control, new to quantum optics.",
+    "save": "Save",
+    "saved": "Saved",
+    "saveError": "Could not save preferences"
+  },
+  "newSession": {
+    "title": "New session",
+    "practiceTitle": "New practice session",
+    "description": "The teacher will open by probing what you already know.",
+    "practiceDescription": "Pick nodes from your knowledge graph, describe what you want to practice, or bring your own problem.",
+    "teachingLanguage": "Teaching language",
+    "learnPlaceholder": "What do you want to learn?",
+    "practicePlaceholder": "What do you want to practice?"
+  }
+}

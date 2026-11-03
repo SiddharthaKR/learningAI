@@ -23,11 +23,15 @@ export default async function NewSessionPage({
 	searchParams: Promise<{ mode?: string }>;
 }) {
 	const { mode } = await searchParams;
-	return withOfficePageUser(async () => (
+	return withOfficePageUser(async () => {
+		const account = await createAccountStore(PATHS.data).byId(currentUserId());
+		return (
 		<NewSession
 			initialConfigured={true}
-			initialLanguage={(await createAccountStore(PATHS.data).byId(currentUserId()))?.teachingLanguage ?? "en"}
+			initialLanguage={account?.teachingLanguage ?? "en"}
+			uiLanguage={account?.uiLanguage ?? "en"}
 			mode={mode === "practice" ? "practice" : "teach"}
 		/>
-	));
+		);
+	});
 }

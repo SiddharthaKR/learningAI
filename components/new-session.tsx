@@ -11,6 +11,7 @@ import { StatsBar } from "@/components/stats-bar";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
 import type { ChatSettings, GraphSnapshot } from "@/src/core";
+import { catalogFor, type UiLanguage } from "@/src/i18n/catalog";
 
 /** The draft's pick set (owner round 10): the SAME shape the home pick
  *  bar lifts — resolved nodes as the learner SAW them at pick time. */
@@ -76,6 +77,7 @@ export function DraftShell({
 	text,
 	onChange,
 	onSend,
+	uiLanguage = "en",
 	teachingLanguage,
 	onTeachingLanguageChange,
 	setupCta,
@@ -89,6 +91,7 @@ export function DraftShell({
 	text: string;
 	onChange: (v: string) => void;
 	onSend: () => void;
+	uiLanguage?: UiLanguage;
 	teachingLanguage?: "en" | "ja";
 	onTeachingLanguageChange?: (value: "en" | "ja") => void;
 	/** The practice draft (owner, 2026-10-04): ?mode=practice — the
@@ -113,6 +116,7 @@ export function DraftShell({
 	 *  Passed as a node so the pick state stays in NewSession. */
 	overlay?: ReactNode;
 }) {
+	const copy = catalogFor(uiLanguage);
 	// Voice dictation (STT wave, 2026-09-17): finals append at the end of the
 	// draft text (via the parent's onChange — the truth lives there); the
 	// strip lives in the stats bar's middle slot.
@@ -175,11 +179,11 @@ export function DraftShell({
 						<Conversation className="h-full min-w-0 flex-1" initial="instant">
 							<ConversationContent className="min-h-full gap-0 p-0">
 								<ConversationEmptyState
-									title={mode === "practice" ? "New practice session" : "New session"}
+									title={mode === "practice" ? copy.newSession.practiceTitle : copy.newSession.title}
 									description={
 										mode === "practice"
-											? "Pick nodes from your knowledge graph, describe what you want to practice, or bring your own problem."
-											: "The teacher will open by probing what you already know."
+											? copy.newSession.practiceDescription
+											: copy.newSession.description
 									}
 								/>
 							</ConversationContent>
@@ -188,9 +192,9 @@ export function DraftShell({
 						<div className="bg-background pb-4">
 							<div className={DOCK}>
 								{teachingLanguage && <label className="pointer-events-auto mb-2 flex items-center gap-2 text-xs">
-									Teaching language
-									<select aria-label="Teaching language" value={teachingLanguage} onChange={(event) => onTeachingLanguageChange?.(event.target.value as "en" | "ja")} className="rounded border bg-background p-1">
-										<option value="en">English</option><option value="ja">日本語</option>
+									{copy.newSession.teachingLanguage}
+									<select aria-label={copy.newSession.teachingLanguage} value={teachingLanguage} onChange={(event) => onTeachingLanguageChange?.(event.target.value as "en" | "ja")} className="rounded border bg-background p-1">
+										<option value="en">{copy.common.english}</option><option value="ja">{copy.common.japanese}</option>
 									</select>
 								</label>}
 								<ComposerActions
@@ -214,7 +218,7 @@ export function DraftShell({
 										// input (owner refinement round, 2026-09-24) — no lesson has
 										// started yet, so the composer must not read like one is in
 										// flight.
-										placeholder={mode === "practice" ? "What do you want to practice?" : "What do you want to learn?"}
+										placeholder={mode === "practice" ? copy.newSession.practicePlaceholder : copy.newSession.learnPlaceholder}
 									/>
 								</div>
 								<StatsBar
@@ -238,7 +242,7 @@ export function DraftShell({
 	);
 }
 
-export function NewSession({ initialConfigured, mode = "teach", initialLanguage = "en" }: { initialConfigured: boolean; mode?: "teach" | "practice"; initialLanguage?: "en" | "ja" }) {
+export function NewSession({ initialConfigured, mode = "teach", initialLanguage = "en", uiLanguage = "en" }: { initialConfigured: boolean; mode?: "teach" | "practice"; initialLanguage?: "en" | "ja"; uiLanguage?: UiLanguage }) {
 	const router = useRouter();
 	const [teachingLanguage, setTeachingLanguage] = useState<"en" | "ja">(initialLanguage);
 	const [text, setText] = useState("");
@@ -294,6 +298,7 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 	return (
 		<>
 			<DraftShell
+				uiLanguage={uiLanguage}
 				teachingLanguage={teachingLanguage}
 				onTeachingLanguageChange={setTeachingLanguage}
 				busy={busy}
