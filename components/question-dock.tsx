@@ -777,7 +777,7 @@ function QuestionDockForm({
 								value={CONFIDENCE_STOPS[confIdx]}
 								disabled={sel.dontKnow}
 								aria-label={copy.confidenceLabel}
-								aria-valuetext={formatMessage(copy.confidenceValue, { count: CONFIDENCE_STOPS[confIdx] })}
+								aria-valuetext={formatMessage(copy.confidenceValue, { count: CONFIDENCE_STOPS[confIdx]! })}
 								title={copy.confidenceHint}
 								data-testid="confidence-slider"
 								onChange={(e) => {
