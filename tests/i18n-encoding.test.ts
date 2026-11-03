@@ -92,4 +92,11 @@ describe("UTF-8 source and locale integrity", () => {
     assert.equal(catalog.planUi?.title, "学習計画");
     assert.equal(catalog.activityUi?.backgroundAgents, "バックグラウンド処理");
   });
+
+  it("serves graph copy from the Japanese catalog", () => {
+    const catalog = JSON.parse(readFileSync(path.join(ROOT, "locales", "ja.json"), "utf8")) as {
+      graphUi?: { title?: string };
+    };
+    assert.equal(catalog.graphUi?.title, "ナレッジグラフ");
+  });
 });
