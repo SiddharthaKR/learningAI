@@ -1,3 +1,4 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 import { modelCatalog, refreshLocalProviders } from "@/src/server";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,9 @@ export const dynamic = "force-dynamic";
  * model's SUPPORTED thinking levels (per its thinkingLevelMap). Static
  * catalog: no network, stable within a pi-ai version.
  */
-export async function GET() {
+async function GETImpl() {
 	await refreshLocalProviders();
 	return Response.json(modelCatalog());
 }
+
+export const GET = withOfficeUser(GETImpl);

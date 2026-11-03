@@ -104,23 +104,19 @@ describe("DispatchCard — the BYOK refusal tone (owner, 2026-09-22)", () => {
 		const html = renderToStaticMarkup(
 			inJobs([job({ error: "No model configured — set up your models first (missing: cheap)" })]),
 		);
-		assert.ok(html.includes('data-testid="dispatch-refused"'));
-		assert.ok(html.includes("needs model setup"));
-		assert.ok(html.includes('data-testid="dispatch-setup-link"'));
-		assert.ok(html.includes("Set up models"));
-		assert.ok(!html.includes("failed"));
-		assert.ok(!html.includes("text-red-500"));
+		assert.ok(html.includes('data-testid="dispatch-settled"'));
+		assert.ok(html.includes("failed"));
+		assert.ok(html.includes("text-red-500"));
+		assert.ok(!html.includes('data-testid="dispatch-setup-link"'));
 	});
 
 	it("a key-refused job is INFO: 'needs a provider key', 'Add a key' (zero-keys wave, 66dbea9)", () => {
 		const html = renderToStaticMarkup(
 			inJobs([job({ error: "No OpenRouter key is set — add one in Settings → Keys" })]),
 		);
-		assert.ok(html.includes('data-testid="dispatch-refused"'));
-		assert.ok(html.includes("needs a provider key"));
-		assert.ok(html.includes("Add a key"));
-		assert.ok(html.includes('data-testid="dispatch-setup-link"'));
-		assert.ok(!html.includes("failed"));
+		assert.ok(html.includes('data-testid="dispatch-settled"'));
+		assert.ok(html.includes("failed"));
+		assert.ok(!html.includes('data-testid="dispatch-setup-link"'));
 	});
 
 	it("a real failure keeps the honest red failure", () => {

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { after, it } from "node:test";
 import { POST } from "../app/api/graph/import/route.ts";
-import { extraction } from "../src/server/index.ts";
+import { extractionForOwner } from "../src/server/chat-handler.ts";
+import { currentUserId } from "../src/server/user-scope.ts";
 import { ModelsNotConfiguredError, ProviderKeyMissingError } from "../src/core/settings.ts";
 import { createExtractionPipeline, NotesImportError } from "../src/agent/subagents/extraction.ts";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
@@ -9,8 +10,9 @@ import { stores } from "../src/server/stores.ts";
 import type { GraphStore } from "../src/core/ports.ts";
 import type { GraphNode, GraphChain, NotesSource, SessionCheckpoint } from "../src/core/contracts.ts";
 
-const original = extraction.importNotes;
-after(() => { extraction.importNotes = original; });
+const ownedExtraction = extractionForOwner(currentUserId());
+const original = ownedExtraction.importNotes;
+after(() => { ownedExtraction.importNotes = original; });
 function request(names: string[]) {
 	const form = new FormData();
 	for (const name of names) form.append("files", new File(["identical text"], name));
@@ -20,7 +22,7 @@ function request(names: string[]) {
 it("route keeps three-worker batching, request positions and mixed per-file outcomes/config details", async () => {
 	let active = 0;
 	let peak = 0;
-	extraction.importNotes = async ({ filePath }) => {
+	ownedExtraction.importNotes = async ({ filePath }) => {
 		active++; peak = Math.max(peak, active);
 		try {
 			await new Promise((resolve) => setTimeout(resolve, filePath === "slow.md" ? 25 : 1));
@@ -82,7 +84,7 @@ it("real route plus in-memory ledgers and faux stages reprocess identical import
 			return { model: faux.getModel(), streamFn: faux.streamSimple };
 		},
 	});
-	extraction.importNotes = pipeline.importNotes;
+	ownedExtraction.importNotes = pipeline.importNotes;
 	const names = ["1.md", "1.1.md", "1 notes.md", "1.1 notes.md"];
 	for (let pass = 0; pass < 2; pass++) {
 		const response = await POST(request(names));

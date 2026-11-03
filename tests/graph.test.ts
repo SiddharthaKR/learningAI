@@ -25,9 +25,9 @@ import type { LhMessage } from "../src/core/native-messages.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
 import { deriveView, getGraph, graphSnapshot, mergeFindings, type GraphDeps } from "../src/core/graph.ts";
 import { coverageSlots } from "../src/core/coverage.ts";
-import { graphStore } from "../src/store/graph.ts";
-import { chatStore } from "../src/store/chats.ts";
-import { LEDGER_FILES, PATHS, SOURCES_FILE } from "../config.ts";
+import { graphStore } from "./support/test-stores.ts";
+import { chatStore } from "./support/test-stores.ts";
+import { TEST_LEDGER_FILES as LEDGER_FILES, TEST_PATHS as PATHS, TEST_SOURCES_FILE as SOURCES_FILE } from "./support/test-stores.ts";
 
 /** The wired fs adapters, exactly what src/server/stores.ts passes in production. */
 const graphDeps = { chatStore, graphStore } as const satisfies GraphDeps;
@@ -658,7 +658,7 @@ describe("graph ledger store", () => {
 import { deleteChatTraces, type ChatDeletionStats } from "../src/core/graph-deletion.ts";
 import { deleteChatSession, sessionCoverage } from "../src/server/chats.ts";
 import { beginTurn, endTurn } from "../src/server/turn-liveness.ts";
-import { jobStore } from "../src/store/jobs.ts";
+import { jobStore } from "./support/test-stores.ts";
 import {
 	deleteNodeTraces,
 	type NodeDeletionStats,
@@ -948,7 +948,7 @@ describe("single-node deletion (deleteNodeTraces + deleteGraphNode, node interlu
 		const realRuns = g.__lhExtractionRuns;
 		g.__lhExtractionRuns = {
 			running: new Map([
-				["chat_busy", { chatId: "chat_busy", kind: "chat", phase: "extracting", startedAt: 1, usage: {}, controller: new AbortController() }],
+				[`${process.env.LH_TEST_USER_ID}:chat_busy`, { ownerId: process.env.LH_TEST_USER_ID, chatId: "chat_busy", kind: "chat", phase: "extracting", startedAt: 1, usage: {}, controller: new AbortController() }],
 			]),
 			inFlight: new Set(),
 			lastStartedAt: 0,
@@ -1039,7 +1039,7 @@ describe("session coverage read (extraction-UX redesign, 2026-09-24)", () => {
 			assert.equal(sessionCoverage(chat.id)!.running, false, "no chat-kind run for this id");
 			g.__lhExtractionRuns = {
 				running: new Map([
-					[chat.id, { chatId: chat.id, kind: "chat", phase: "extracting", startedAt: 3, usage: {}, controller: new AbortController() }],
+					[`${process.env.LH_TEST_USER_ID}:${chat.id}`, { ownerId: process.env.LH_TEST_USER_ID, chatId: chat.id, kind: "chat", phase: "extracting", startedAt: 3, usage: {}, controller: new AbortController() }],
 				]),
 				inFlight: new Set(),
 				lastStartedAt: 0,

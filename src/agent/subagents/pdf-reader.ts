@@ -63,6 +63,7 @@ const EXTRACT_CAP = 24_000;
 
 export interface PdfReaderOptions {
 	engine?: PiEngine;
+	teachingLanguage?: "en" | "ja";
 	abortSignal?: AbortSignal;
 	onUsage?: (usage: Usage) => void;
 	onActivity?: (line: string) => void;
@@ -206,7 +207,7 @@ export async function runPdfReaderAgent(
 		for (let iteration = 0; iteration < maxIterations; iteration++) {
 			const result = await streamOnce(
 				engine,
-				INSTRUCTIONS,
+				`${INSTRUCTIONS}\n\nWrite your brief in ${opts.teachingLanguage === "ja" ? "Japanese" : "English"}, the fixed teaching language for this session.`,
 				messages,
 				toolDeclarations,
 				sessionId,

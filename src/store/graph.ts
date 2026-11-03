@@ -34,8 +34,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { LEDGER_FILES, POSITIONS_FILE, SOURCES_FILE } from "../../config.ts";
-import { assertGraphFormat, ensureGraphFormat } from "./graph-format.ts";
+import { assertGraphFormat as assertGraphFormatAt, ensureGraphFormat as ensureGraphFormatAt } from "./graph-format.ts";
 import type {
 	GraphChain,
 	GraphNode,
@@ -49,6 +48,20 @@ import type {
 import type { GraphStore } from "../core/ports.ts";
 
 // ─── JSONL primitives ────────────────────────────────────────────────────────
+
+export function createGraphStore(root: string): GraphStore {
+const graphDir = path.join(root, "graph");
+const LEDGER_FILES = {
+	nodes: path.join(graphDir, "nodes.jsonl"),
+	chains: path.join(graphDir, "chains.jsonl"),
+	sessions: path.join(graphDir, "sessions.jsonl"),
+	coverage: path.join(graphDir, "coverage.jsonl"),
+};
+const POSITIONS_FILE = path.join(graphDir, "positions.json");
+const SOURCES_FILE = path.join(graphDir, "sources.json");
+const formatFile = path.join(graphDir, "format.json");
+const assertGraphFormat = () => assertGraphFormatAt(formatFile);
+const ensureGraphFormat = () => ensureGraphFormatAt(formatFile);
 
 function appendLine<T>(file: string, record: T): void {
 	fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -128,7 +141,14 @@ const isCoverageEntry = (v: unknown): v is CoverageEntry =>
 
 // ─── the port implementation ────────────────────────────────────────────────
 
-export const graphStore: GraphStore = {
+const graphStore: GraphStore = {
+	revision(): number {
+		let revision = 0;
+		for (const file of [...Object.values(LEDGER_FILES), POSITIONS_FILE, SOURCES_FILE]) {
+			try { revision = Math.max(revision, fs.statSync(file).mtimeMs); } catch { /* absent */ }
+		}
+		return revision;
+	},
 	appendNode(node: GraphNode): void {
 		appendLine(LEDGER_FILES.nodes, node);
 	},
@@ -309,23 +329,9 @@ function writeSourceMap(map: Record<string, NotesSource>): void {
 	fs.writeFileSync(SOURCES_FILE, JSON.stringify(map, null, "\t"), "utf-8");
 }
 
-// ─── one-way purges at adapter load: dead ledgers are exactly the confusion
-// the cleanup removes (owner doctrine — nothing reads them, nothing writes
-// them, a stale file lying around is a lie). ────────────────────────────────
-{
-	const graphDir = path.dirname(LEDGER_FILES.nodes);
-	for (const legacy of ["edges.jsonl", "events.jsonl"]) {
-		const file = path.join(graphDir, legacy);
-		try {
-			if (fs.existsSync(file)) {
-				fs.rmSync(file);
-				console.info(`[graph-store] purged legacy ledger: ${file}`);
-			}
-		} catch (err) {
-			console.warn(`[graph-store] could not purge legacy ledger ${file}:`, err);
-		}
-	}
-}
-
 const isNotesSource = (v: unknown): v is NotesSource =>
 	isRecord(v) && isString(v.id) && isString(v.filePath) && isString(v.importedAt);
+
+return graphStore;
+}
+

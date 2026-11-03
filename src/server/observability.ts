@@ -19,15 +19,18 @@
  * from the pipeline's module for the abort route to call.
  */
 
-import { extractionStatuses, type ExtractionPhase } from "../agent/subagents/extraction.ts";
-import { chatStore } from "../store/chats.ts";
+import { extractionStatuses, type ExtractionPhase } from "./extraction-status.ts";
+import { stores } from "./stores.ts";
 import { graphRevision } from "./graph.ts";
 import { catalogContextLimits } from "./model-catalog.ts";
 import { listJobs } from "./jobs.ts";
 import type { JobRecord } from "../core/contracts.ts";
 
-export { abortExtraction, extractionStatuses, type ExtractionPhase, type RunningExtraction } from "../agent/subagents/extraction.ts";
-export { chatStore } from "../store/chats.ts";
+export { abortExtraction, extractionStatuses, type ExtractionPhase, type RunningExtraction } from "./extraction-status.ts";
+export const chatStore = {
+	getChat: (...args: Parameters<typeof stores.chatStore.getChat>) => stores.chatStore.getChat(...args),
+	listChats: (...args: Parameters<typeof stores.chatStore.listChats>) => stores.chatStore.listChats(...args),
+};
 
 /** A running sub-agent job, joined with its chat's title for the dock.
  *  contextLimit (context-meter amendment, owner 2026-09-23): the model's

@@ -1,3 +1,4 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 import { graphView } from "@/src/server";
 
 /**
@@ -8,6 +9,8 @@ import { graphView } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function GETImpl() {
 	return Response.json(graphView());
 }
+
+export const GET = withOfficeUser(GETImpl);

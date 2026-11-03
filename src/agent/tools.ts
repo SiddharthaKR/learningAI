@@ -321,8 +321,10 @@ export function createProberTools(
 				// context). Same gating as the teacher: toggle-filtered here,
 				// research subject to the searchAvailable gate (honestly absent
 				// when no engine is live).
-				
-				
+				...(() => {
+					const jobs = jobTools(ctx);
+					return { ...(jobs.research ? { research: jobs.research } : {}), pdf: jobs.pdf! };
+				})(),
 				// The map reader (wave 7): present only when the settings gate
 				// opened — same registration-time drop as the search gate.
 				...(ctx.graphStore
@@ -449,7 +451,7 @@ export function createTeacherTools(
 			// DROPPED when building the inner JobToolContext — the drop-gate
 			// always took its ?? true default. Threaded now: the live signal
 			// reaches jobTools' research gate.
-			
+			...jobTools(ctx),
 		},
 		withoutMechanics(enabled),
 		),

@@ -59,7 +59,7 @@ async function fetchAndExtract(url: string, deps: RestrictedFetchDeps): Promise<
 	const resp = await restrictedWebGet(url, deps);
 	const sourceLine = `Source: ${resp.url} (HTTP ${resp.status})`;
 	if (resp.contentType === "application/pdf") {
-		return "web_fetch: this URL is a PDF document; call web_fetch_pdf on it to download and read it.";
+		return "web_fetch: this URL is a PDF document; PDF downloads are unavailable.";
 	}
 	const text = new TextDecoder().decode(resp.bytes);
 	if (resp.contentType === "text/plain") return `${sourceLine}\n\n${truncate(text)}`;
@@ -86,40 +86,58 @@ const webFetchInput = Type.Object({
 
 export type WebApproval = (tool: "web_search" | "web_fetch", value: string, reason: string) => Promise<string | null>;
 
-export function createWebTools(search: () => SearchProvider | null, fetchDeps: RestrictedFetchDeps = {}, approve?: WebApproval): Record<string, AgentTool<any>> {
+export interface WebToolPolicy {
+	/** Checked again at execution so turning Web off stops an in-flight researcher. */
+	enabled?: () => boolean;
+	/** Only URLs supplied by the learner or a search result in this session qualify. */
+	canFetch?: (url: string) => boolean;
+	/** Search results are authorization sources; fetched-page links never are. */
+	onSearchResults?: (results: readonly WebSearchResult[]) => void;
+}
+
+export function createWebTools(search: () => SearchProvider | null, fetchDeps: RestrictedFetchDeps = {}, approve?: WebApproval, policy: WebToolPolicy = {}): Record<string, AgentTool<any>> {
 	return {
-		web_search: {
+		...(search() ? { web_search: {
 			name: "web_search",
 			label: "web_search",
 			description: "Search the web. One search per call — use one call per search angle. " +
 				"Returns an array of results with title, url, and snippet.",
 			parameters: webSearchInput,
 			execute: serverExecute("web_search", webSearchInput, async ({ query, count, reason }): Promise<WebSearchResult[] | string> => {
+				if (policy.enabled && !policy.enabled()) return "Web research is off for this session";
 				const provider = search();
 				if (!provider) {
 					return (
 						"web_search is not available: no search engine is configured. " +
-						"Set a Tavily or Brave search API key in settings. Report in your brief that web search is unavailable."
+						"Report in your brief that web search is unavailable."
 					);
 				}
 				try {
-					return await provider.search(query, count ?? 5);
+					if (approve && await approve("web_search", query, reason) === null) return "user denied";
+					if (policy.enabled && !policy.enabled()) return "Web research is off for this session";
+					const results = await provider.search(query, count ?? 5);
+					policy.onSearchResults?.(results);
+					return results;
 				} catch (err) {
 					return `web_search failed: ${err instanceof Error ? err.message : String(err)}`;
 				}
 			}),
-		},
+		} } : {}),
 
 		web_fetch: {
 			name: "web_fetch",
 			label: "web_fetch",
 			description:
 				"Fetch a web page and extract its readable content as markdown (Readability). " +
-				"Handles HTML and plain text; PDF links point to web_fetch_pdf.",
+				"Handles HTML and plain text. PDF downloads are unavailable.",
 			parameters: webFetchInput,
 			execute: serverExecute("web_fetch", webFetchInput, async ({ url, reason }): Promise<string> => {
 				try {
+					if (policy.enabled && !policy.enabled()) return "Web research is off for this session";
+					if (policy.canFetch && !policy.canFetch(url)) return "paste the link in chat to let me read it";
 					if (approve && await approve("web_fetch", url, reason) === null) return "user denied";
+					if (policy.enabled && !policy.enabled()) return "Web research is off for this session";
+					if (policy.canFetch && !policy.canFetch(url)) return "paste the link in chat to let me read it";
 					return await fetchAndExtract(url, fetchDeps);
 				} catch (err) {
 					const host = (() => { try { return new URL(url).hostname; } catch { return "invalid URL"; } })();

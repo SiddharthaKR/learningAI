@@ -11,16 +11,18 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { RENDER_SETTINGS_FILE } from "../../config.ts";
 import { DEFAULT_RENDER_SETTINGS, sanitizeRenderSettings, type GraphRenderSettings } from "../core/render-settings.ts";
 import { assertGraphFormat, ensureGraphFormat } from "./graph-format.ts";
 
 /** The persisted settings, or null when no file exists yet (first boot). */
-export function readRenderSettings(): GraphRenderSettings | null {
-	assertGraphFormat(); // honest refusal on a newer-stamped data dir
+export function createRenderSettingsStore(root: string) {
+	const settingsFile = path.join(root, "graph", "render-settings.json");
+	const formatFile = path.join(root, "graph", "format.json");
+	function readRenderSettings(): GraphRenderSettings | null {
+	assertGraphFormat(formatFile); // honest refusal on a newer-stamped data dir
 	let raw: string;
 	try {
-		raw = fs.readFileSync(RENDER_SETTINGS_FILE, "utf-8");
+		raw = fs.readFileSync(settingsFile, "utf-8");
 	} catch {
 		return null; // never booted / unreadable → caller uses defaults
 	}
@@ -29,15 +31,17 @@ export function readRenderSettings(): GraphRenderSettings | null {
 	} catch {
 		return null; // corrupt → defaults, never crash the view
 	}
-}
+	}
 
 /** Persist settings (sanitized). Returns what was written. */
-export function writeRenderSettings(raw: unknown): GraphRenderSettings {
+	function writeRenderSettings(raw: unknown): GraphRenderSettings {
 	const settings = sanitizeRenderSettings(raw);
-	fs.mkdirSync(path.dirname(RENDER_SETTINGS_FILE), { recursive: true });
-	ensureGraphFormat(); // the lazy format stamp (graph-format.ts)
-	fs.writeFileSync(RENDER_SETTINGS_FILE, JSON.stringify(settings, null, "\t"), "utf-8");
+	fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
+	ensureGraphFormat(formatFile); // the lazy format stamp (graph-format.ts)
+	fs.writeFileSync(settingsFile, JSON.stringify(settings, null, "\t"), "utf-8");
 	return settings;
+}
+	return { readRenderSettings, writeRenderSettings };
 }
 
 export { DEFAULT_RENDER_SETTINGS };

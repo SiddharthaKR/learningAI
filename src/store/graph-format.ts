@@ -23,10 +23,10 @@ import path from "node:path";
 import { GRAPH_FORMAT_FILE } from "../../config.ts";
 import { CURRENT_GRAPH_FORMAT_VERSION } from "../core/contracts/graph.ts";
 
-function stampedVersion(): number | null {
+function stampedVersion(file = GRAPH_FORMAT_FILE): number | null {
 	let raw: string;
 	try {
-		raw = fs.readFileSync(GRAPH_FORMAT_FILE, "utf-8");
+		raw = fs.readFileSync(file, "utf-8");
 	} catch {
 		return null; // no sidecar — the lazy-v1 pre-stamp world
 	}
@@ -41,8 +41,8 @@ function stampedVersion(): number | null {
 /** READ-SIDE GUARD: throws when the data dir was written by a NEWER build.
  *  Called by every graph-family read — never writes (the golden fixtures
  *  pin reads as byte-identical). */
-export function assertGraphFormat(): void {
-	const v = stampedVersion();
+export function assertGraphFormat(file = GRAPH_FORMAT_FILE): void {
+	const v = stampedVersion(file);
 	if (v !== null && v > CURRENT_GRAPH_FORMAT_VERSION) {
 		throw new Error(
 			`Graph data is stamped with format version ${v}, but this build understands only ${CURRENT_GRAPH_FORMAT_VERSION}. ` +
@@ -53,8 +53,8 @@ export function assertGraphFormat(): void {
 
 /** WRITE-SIDE STAMP: creates the sidecar on the first graph-family write
  *  (lazy); afterwards a no-op existence-wise. Callers keep their own mkdir. */
-export function ensureGraphFormat(): void {
-	if (stampedVersion() !== null) return;
-	fs.mkdirSync(path.dirname(GRAPH_FORMAT_FILE), { recursive: true });
-	fs.writeFileSync(GRAPH_FORMAT_FILE, JSON.stringify({ version: CURRENT_GRAPH_FORMAT_VERSION }, null, "\t") + "\n", "utf-8");
+export function ensureGraphFormat(file = GRAPH_FORMAT_FILE): void {
+	if (stampedVersion(file) !== null) return;
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	fs.writeFileSync(file, JSON.stringify({ version: CURRENT_GRAPH_FORMAT_VERSION }, null, "\t") + "\n", "utf-8");
 }

@@ -32,14 +32,15 @@ const GOLDEN = path.join(HERE, "fixtures", "golden-data");
 
 // ── the seam, BEFORE any config-loading import ──────────────────────────────
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-golden-"));
-fs.cpSync(GOLDEN, TMP, { recursive: true });
 process.env.LH_DATA_DIR = TMP;
 
-const { chatStore } = await import("../src/store/chats.ts");
-const { graphStore } = await import("../src/store/graph.ts");
-const { jobStore } = await import("../src/store/jobs.ts");
-const { settingsStore } = await import("../src/store/settings.ts");
-const { readRenderSettings } = await import("../src/store/render-settings.ts");
+const { chatStore, TEST_USER_ROOT } = await import("./support/test-stores.ts");
+fs.mkdirSync(TEST_USER_ROOT, { recursive: true });
+fs.cpSync(GOLDEN, TEST_USER_ROOT, { recursive: true });
+const { graphStore } = await import("./support/test-stores.ts");
+const { jobStore } = await import("./support/test-stores.ts");
+const { settingsStore } = await import("./support/test-stores.ts");
+const { readRenderSettings } = await import("./support/test-stores.ts");
 const { getGraph, deriveView } = await import("../src/core/graph.ts");
 const { sanitizeRenderSettings } = await import("../src/core/render-settings.ts");
 const { toLlmMessages } = await import("../src/core/native-messages.ts");
@@ -59,7 +60,7 @@ function snapshotTree(dir: string): Map<string, Buffer> {
 	}
 	return out;
 }
-const BEFORE = snapshotTree(TMP);
+const BEFORE = snapshotTree(TEST_USER_ROOT);
 
 test.after(() => {
 	fs.rmSync(TMP, { recursive: true, force: true });
@@ -188,7 +189,7 @@ test("graph: render-settings sanitize and positions parse", () => {
 	assert.ok(raw, "render-settings.json reads");
 	const clean = sanitizeRenderSettings(raw);
 	assert.ok(clean.nodeSize > 0 && typeof clean.labelZoom === "number", "sanitizes to concrete knobs");
-	const positionsFile = JSON.parse(fs.readFileSync(path.join(TMP, "graph", "positions.json"), "utf8")) as {
+	const positionsFile = JSON.parse(fs.readFileSync(path.join(TEST_USER_ROOT, "graph", "positions.json"), "utf8")) as {
 		positions: Record<string, unknown>;
 	};
 	assert.ok(Object.keys(positionsFile.positions).length >= 300, "positions parse");
@@ -222,7 +223,7 @@ test("settings: the stamped record parses", () => {
 // ── read-only: readers never write ──────────────────────────────────────────
 
 test("read-only: after every read above, the data dir is byte-identical to the fixture source", () => {
-	const after = snapshotTree(TMP);
+	const after = snapshotTree(TEST_USER_ROOT);
 	assert.deepEqual([...after.keys()].sort(), [...BEFORE.keys()].sort(), "no files added or removed");
 	for (const [name, buf] of after) {
 		assert.ok(BEFORE.has(name), `${name} existed before`);

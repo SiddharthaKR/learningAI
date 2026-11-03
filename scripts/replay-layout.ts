@@ -7,22 +7,35 @@
  * Reads ONLY the ledgers (nodes / edges / mappings / sources); writes ONLY
  * data/graph/positions.json — no LLM calls, no extraction, no chat records.
  *
- *   npx tsx scripts/replay-layout.ts [--depth=vertical|radial]
+ *   npx tsx --env-file=.env scripts/replay-layout.ts --user <username> [--depth=vertical|radial]
  *
  * --depth regenerates the ledger WITH inference-depth anchoring (the
  * playground mode baked into the rest state); omit it for the free layout.
  */
-import { graphStore } from "../src/store/graph.ts";
-// --depth=vertical|radial: bake the playground depth mode into the ledger.
-const depthArg = process.argv.find((a) => a.startsWith("--depth="));
-const depthMode: "off" | "vertical" | "radial" =
-	depthArg === "--depth=vertical" ? "vertical" : depthArg === "--depth=radial" ? "radial" : "off";
+import { PATHS } from "../config.ts";
+import { createAccountStore } from "../src/server/accounts.ts";
+import { storesForUser } from "../src/server/stores.ts";
+import { runAsUser } from "../src/server/user-scope.ts";
 import { incrementalLayout } from "../src/core/layout.ts";
 import { birthSessionPartition } from "../src/core/session-clusters.ts";
 import { deriveView, getGraph } from "../src/core/graph.ts";
 import type { GraphNode, Position } from "../src/core/contracts.ts";
 
-function main() {
+async function main() {
+	const args = process.argv.slice(2);
+	const userFlag = args.indexOf("--user");
+	const username = userFlag >= 0 ? args[userFlag + 1] : undefined;
+	if (!username) throw new Error("Usage: replay-layout.ts --user <username> [--depth=vertical|radial]");
+	const account = await createAccountStore(PATHS.data).byUsername(username);
+	if (!account) throw new Error(`Unknown user: ${username}`);
+	const depthArg = args.find((arg) => arg.startsWith("--depth="));
+	const depthMode: "off" | "vertical" | "radial" =
+		depthArg === "--depth=vertical" ? "vertical" : depthArg === "--depth=radial" ? "radial" : "off";
+	return runAsUser(account.id, () => runForUser(account.id, depthMode));
+}
+
+function runForUser(userId: string, depthMode: "off" | "vertical" | "radial") {
+	const { graphStore } = storesForUser(userId);
 	const t0 = Date.now();
 
 	// CHAINS-PRIMARY (2026-09-30): the stored truth is nodes + chains; the
@@ -139,4 +152,4 @@ function main() {
 	);
 }
 
-main();
+void main();

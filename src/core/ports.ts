@@ -34,7 +34,7 @@ export interface ChatStore {
 	/** Create a session record (persisted immediately). */
 	/** Create a session record; kind "practice" marks a practice session
 	 *  (absent = teach, the default). */
-	createChat(title: string, kind?: "practice"): ChatRecord;
+	createChat(title: string, kind?: "practice", teachingLanguage?: "en" | "ja"): ChatRecord;
 	/** The full record, or null if unknown id / corrupt file. */
 	getChat(id: string): ChatRecord | null;
 	/** All sessions, newest activity first (the sidebar's list view). */
@@ -74,6 +74,8 @@ export interface ChatStore {
 // stays.
 
 export interface GraphStore {
+	/** Last modified time of this owner's graph data, or 0 when empty. */
+	revision?(): number;
 	/** Append one GraphNode (ids are unique — no merging needed). */
 	appendNode(node: GraphNode): void;
 	/** Raw node lines in append order. */

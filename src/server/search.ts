@@ -166,9 +166,9 @@ function proxyFetch(input: string, init: RequestInit): Promise<Response> {
   // Explicit dispatcher intentionally ignores NO_PROXY for all web research.
   return undiciFetch(input, { ...init, dispatcher: new ProxyAgent(proxy) } as Parameters<typeof undiciFetch>[1]) as unknown as Promise<Response>;
 }
-function selectedSearchProvider(): "searxng" | "tavily" | "brave" {
-  const choice = process.env.SEARCH_PROVIDER?.trim().toLowerCase() || "searxng";
-  if (choice !== "searxng" && choice !== "tavily" && choice !== "brave") throw new Error("SEARCH_PROVIDER must be searxng, tavily, or brave");
+function selectedSearchProvider(): "none" | "searxng" {
+  const choice = process.env.SEARCH_PROVIDER?.trim().toLowerCase() || "none";
+  if (choice !== "searxng" && choice !== "none") throw new Error("SEARCH_PROVIDER must be none or searxng");
   return choice;
 }
 export function searxngProvider(baseUrl: string, fetchFn: FetchLike = proxyFetch): SearchProvider {
@@ -187,6 +187,7 @@ export function searxngProvider(baseUrl: string, fetchFn: FetchLike = proxyFetch
 export function searchStatus(): SearchStatus {
   try {
     const selected = selectedSearchProvider();
+    if (selected === "none") return { available: false, engine: null, reason: "URL-only mode; paste a link in chat" };
     if (selected === "searxng" && !process.env.SEARXNG_URL) return { available: false, engine: null, reason: "SEARXNG_URL is required" };
     if (selected !== "searxng" && !process.env.SEARCH_API_KEY) return { available: false, engine: null, reason: "SEARCH_API_KEY is required" };
     if (!process.env.HTTPS_PROXY && !process.env.HTTP_PROXY) return { available: false, engine: null, reason: "HTTPS_PROXY is required" };
@@ -200,5 +201,5 @@ export function searchProvider(): SearchProvider | null {
   if (!searchAvailable()) return null;
   const selected = selectedSearchProvider();
   if (selected === "searxng") return searxngProvider(process.env.SEARXNG_URL!);
-  return selected === "tavily" ? tavilyProvider(process.env.SEARCH_API_KEY!, proxyFetch) : braveProvider(process.env.SEARCH_API_KEY!, proxyFetch);
+  return null;
 }

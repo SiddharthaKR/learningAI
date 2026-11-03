@@ -95,6 +95,10 @@ export type StepUsageCollector = (usage: Usage) => void;
 
 /** Per-request construction options (the handler wires all of these). */
 export interface AgentBuildOptions {
+	/** Fixed on the session at creation, independent of the account UI language. */
+	teachingLanguage?: "en" | "ja";
+	/** Personal learner context; never persisted into another user's session. */
+	learnerBackground?: string;
 	/** Model + stream function — tests inject a scripted faux engine. */
 	engine?: PiEngine;
 	/** The initial transcript, as pi messages (the record IS agent state). */
@@ -171,9 +175,14 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	// ("practice" is not a ModelRole) honest about that.
 	const engine = opts.engine ?? piEngineFor(kind as "prober" | "teacher");
 	const stopper = makeQuestionStopper();
-	const systemPrompt = opts.promptSwitches
+	const basePrompt = opts.promptSwitches
 		? composeInstructions(kind, opts.promptSwitches)
 		: composedInstructions[kind]!;
+	const systemPrompt = [
+		basePrompt,
+		`Teach and respond in ${opts.teachingLanguage === "ja" ? "Japanese" : "English"} for this session. This language is fixed for the whole session.`,
+		opts.learnerBackground ? `Learner background (use for analogies and calibration; do not assume expertise beyond this): ${opts.learnerBackground}` : null,
+	].filter(Boolean).join("\n\n");
 	// Debug recorder (owner, 2026-10-04): raw provider events when
 	// LH_PROVIDER_EVENTS=1 and the caller handed a chatId; undefined is
 	// the normal no-observer path (tests, env-off).

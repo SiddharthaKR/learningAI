@@ -1,3 +1,4 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 /**
  * GET /api/graph/costs — the graph view's cost pill (2026-09 graph cost
  * metrics wave): what the graph PIPELINE cost, folded read-time from the
@@ -14,6 +15,8 @@ import { graphCosts } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function GETImpl() {
 	return Response.json(graphCosts());
 }
+
+export const GET = withOfficeUser(GETImpl);

@@ -86,7 +86,7 @@ describe("activity dock pure layer", () => {
 			error: "No OpenRouter key is set — add one in Settings → Keys",
 		});
 		const blob = toBlobs({ jobs: [refused], extractions: [] })[0]!;
-		assert.equal(blob.activity, "needs a provider key");
+		assert.equal(blob.activity, "request failed", "obsolete provider setup errors are treated as failures");
 	});
 
 	it("a models-refused job reads as info — 'needs model setup', not 'failed' (BYOK, 2026-09-22)", () => {
@@ -96,7 +96,7 @@ describe("activity dock pure layer", () => {
 			error: "No model configured — set up your models first (missing: vision)",
 		});
 		const blob = toBlobs({ jobs: [refused], extractions: [] })[0]!;
-		assert.equal(blob.activity, "needs model setup");
+		assert.equal(blob.activity, "request failed", "obsolete model setup errors are treated as failures");
 		// A real failure keeps the runner's honest wording.
 		const crashed = job({ status: "error", activity: "failed", error: "FAILED: headless crashed" });
 		const real = toBlobs({ jobs: [crashed], extractions: [] })[0]!;

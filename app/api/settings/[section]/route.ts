@@ -1,3 +1,4 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 /**
  * PUT /api/settings/[section] — section-scoped record writes
  * (settings-storage wave, 2026-09-19). One PUT replaces ONE section
@@ -50,7 +51,7 @@ export const dynamic = "force-dynamic";
 /** One parser, result type erased to the common envelope. */
 type AnySectionParser = (body: unknown) => SettingsBodyResult<unknown>;
 
-export async function PUT(request: Request, ctx: { params: Promise<{ section: string }> }) {
+async function PUTImpl(request: Request, ctx: { params: Promise<{ section: string }> }) {
 	const { section } = await ctx.params;
 	if (section === "models") return Response.json({ error: "Models are managed by the server environment" }, { status: 403 });
 	const parser = (SETTINGS_SECTIONS as Record<string, AnySectionParser>)[section];
@@ -136,3 +137,4 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 	return Response.json({ settings: next });
 }
 
+export const PUT = withOfficeUser(PUTImpl);

@@ -33,6 +33,10 @@ export interface ChatRecord {
 	createdAt: string;
 	updatedAt: string;
 	messages: LhMessage[];
+	/** Sticky once an office document chunk has entered this session's context. */
+	knowledgeUsed?: boolean;
+	/** Chosen at creation and fixed for this session's lifetime. */
+	teachingLanguage?: "en" | "ja";
 	/** The session's kind — absent = teach (pre-practice records). */
 	kind?: ChatKind;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */

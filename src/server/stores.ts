@@ -6,21 +6,82 @@
  * file (and the adapter implementations in src/store/).
  */
 
-import { chatStore } from "../store/chats.ts";
-import { graphStore } from "../store/graph.ts";
-import { jobStore } from "../store/jobs.ts";
-import { settingsStore } from "../store/settings.ts";
+import { createChatStore } from "../store/chats.ts";
+import { createGraphStore } from "../store/graph.ts";
+import { createJobStore } from "../store/jobs.ts";
+import { createSettingsStore } from "../store/settings.ts";
+import { createRenderSettingsStore } from "../store/render-settings.ts";
+import { PATHS } from "../../config.ts";
+import path from "node:path";
+import { currentUserId, isBackgroundOwnerScope } from "./user-scope.ts";
+import { accountExistsSync } from "./accounts.ts";
+import { setEventOwnerResolver } from "../core/events.ts";
+
+setEventOwnerResolver(() => { try { return currentUserId(); } catch { return null; } });
 import { resolveSettings, type EffectiveSettings } from "../core/settings-resolution.ts";
 import { fixedOfficeModelSpec } from "./office-config.ts";
-/** The wired adapters. Satisfies core/graph.ts's GraphDeps structurally. */
-export const stores = {
-	chatStore,
-	graphStore,
-	jobStore,
-	settingsStore,
-};
+/** The only path constructor for personal stores. */
+const cache = new Map<string, ReturnType<typeof constructUserStores>>();
+function constructUserStores(userId: string) {
+	if (!/^[A-Za-z0-9_-]+$/u.test(userId)) throw new Error("Invalid user ID");
+	const root = path.join(PATHS.data, "users", userId);
+	return {
+		root,
+		chatStore: createChatStore(root),
+		jobStore: createJobStore(root, userId),
+		graphStore: createGraphStore(root),
+		settingsStore: createSettingsStore(root),
+		renderSettingsStore: createRenderSettingsStore(root),
+	};
+}
+export function storesForUser(userId: string): ReturnType<typeof constructUserStores> {
+	if (!/^[A-Za-z0-9_-]+$/u.test(userId)) throw new Error("Invalid user ID");
+	let value = cache.get(userId);
+	if (!value) { value = constructUserStores(userId); cache.set(userId, value); }
+	return value;
+}
 
+/** Background tasks hold an owner ID and recheck account existence at each store operation. */
+export function checkedStoresForUser(userId: string): ReturnType<typeof storesForUser> {
+	const base = storesForUser(userId);
+	function checked<T extends object>(store: T): T {
+		return new Proxy(store, {
+			get(target, property) {
+				const value = Reflect.get(target, property);
+				if (typeof value !== "function") return value;
+				return (...args: unknown[]) => {
+					if (!accountExistsSync(PATHS.data, userId)) throw new Error("Owner account no longer exists");
+					return Reflect.apply(value, target, args);
+				};
+			},
+		});
+	}
+	return {
+		root: base.root,
+		chatStore: checked(base.chatStore),
+		graphStore: checked(base.graphStore),
+		jobStore: checked(base.jobStore),
+		settingsStore: checked(base.settingsStore),
+		renderSettingsStore: checked(base.renderSettingsStore),
+	};
+}
+
+/** Existing services resolve their stores from the authenticated request scope. */
+export const stores = new Proxy({} as Omit<ReturnType<typeof storesForUser>, "root">, {
+	get(_target, property) {
+		const ownerId = currentUserId();
+		return Reflect.get(isBackgroundOwnerScope() ? checkedStoresForUser(ownerId) : storesForUser(ownerId), property);
+	},
+});
 export type Stores = typeof stores;
+export const settingsStore = {
+	readSettings: () => stores.settingsStore.readSettings(),
+	writeSettings: (record: Parameters<typeof stores.settingsStore.writeSettings>[0]) => stores.settingsStore.writeSettings(record),
+};
+export const readSettingsRecord = () => settingsStore.readSettings();
+export const writeSettingsRecord = (record: Parameters<typeof settingsStore.writeSettings>[0]) => settingsStore.writeSettings(record);
+export const readRenderSettings = () => stores.renderSettingsStore.readRenderSettings();
+export const writeRenderSettings = (value: unknown) => stores.renderSettingsStore.writeRenderSettings(value);
 
 /**
  * The resolved view of the settings record (core/settings-resolution.ts):
@@ -31,7 +92,7 @@ export type Stores = typeof stores;
  * no caching layer (stale toggles after a settings PUT would be worse).
  */
 export function effectiveSettings(): EffectiveSettings {
-	const record = settingsStore.readSettings();
+	const record = stores.settingsStore.readSettings();
 	const effective = resolveSettings(record);
 	const fixed = fixedOfficeModelSpec();
 	for (const role of Object.keys(effective.agent.models) as Array<keyof typeof effective.agent.models>) {

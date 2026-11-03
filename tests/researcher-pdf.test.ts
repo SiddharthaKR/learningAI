@@ -179,7 +179,7 @@ describe("researcher pdf tools — the temp-dir wall", () => {
 });
 
 describe("web_fetch — PDF pointer + source header", () => {
-	it("a PDF URL points at web_fetch_pdf instead of dead-ending", async () => {
+	it("a PDF URL reports that downloads are unavailable", async () => {
 		const web = createWebTools(() => null, fetchDeps);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
@@ -187,7 +187,7 @@ describe("web_fetch — PDF pointer + source header", () => {
 		try {
 			const out = asText(await web.web_fetch!.execute!("t11", { url: "https://example.com/paper.pdf", reason: "test" }));
 			assert.match(out, /PDF document/);
-			assert.match(out, /web_fetch_pdf/);
+			assert.match(out, /PDF downloads are unavailable/);
 		} finally {
 			globalThis.fetch = realFetch;
 		}

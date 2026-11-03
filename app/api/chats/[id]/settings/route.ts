@@ -1,3 +1,4 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 import {
 	clampChatLevel,
 	effectiveSettings,
@@ -24,7 +25,7 @@ import type { ChatSettings } from "@/src/core";
  * The body parsing itself is shared with the draft route
  * (src/server/settings-body.ts, default-settings wave 2026-09-18).
  */
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PUTImpl(req: Request, { params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;
 	if (!getChat(id)) return Response.json({ error: "Not found" }, { status: 404 });
 
@@ -48,3 +49,4 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 	return Response.json({ settings });
 }
 
+export const PUT = withOfficeUser(PUTImpl);

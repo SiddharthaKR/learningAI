@@ -19,8 +19,6 @@ import {
 	type VisualToolInput,
 } from "../../core/contracts.ts";
 import { registerJobAbort, unregisterJobAbort } from "./aborts.ts";
-import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
 import type { ModelRole } from "../../../config.ts";
 import { ROLE_SLOT, modelsNotConfigured, type ModelSlotName, type ProviderKeyMissing } from "../../core/settings.ts";
@@ -28,6 +26,7 @@ import type { ChatStore, JobStore } from "../../core/ports.ts";
 import { runDemoBuilder } from "./demo-builder.ts";
 import { runPdfReaderAgent } from "./pdf-reader.ts";
 import { runResearcherAgent } from "./researcher.ts";
+import type { WebApproval } from "../tools/web.ts";
 import { runVisualMaker } from "./visual-maker.ts";
 
 /**
@@ -86,6 +85,11 @@ export interface JobRunnerDeps {
 	 *  drop (jobTools' searchAvailable) uses the same signal — jobs already
 	 *  in flight when a key disappears still fail honestly, never crash. */
 	searchProvider?: () => SearchProvider | null;
+	/** Server-owned session policy. Search results are added by this runner, never by fetched pages. */
+	webEnabled?: (chatId: string) => boolean;
+	webAllowedUrl?: (chatId: string, url: string) => boolean;
+	webUserUrls?: (chatId: string) => string[];
+	webApproval?: (chatId: string, tool: "web_search" | "web_fetch", value: string, reason: string, allowed: (value: string) => boolean) => Promise<string | null>;
 	/** Key-presence gate (provider-key interlude, 2026-09-25): given the
 	 *  resolved engine's provider + the kind's slot tier, return the
 	 *  refusal envelope when the provider's key is missing (null = run).
@@ -346,27 +350,32 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		const input = (passedInput ?? resolveInput(job, passedInput)) as ResearchToolInput | undefined;
 		const question = typeof input?.question === "string" && input.question.trim() ? input.question : "(no question)";
 		const context = typeof input?.context === "string" && input.context.trim() ? input.context : undefined;
+		const teachingLanguage = chatStore.getChat(job.chatId)?.teachingLanguage === "ja" ? "Japanese" : "English";
 
 		const prompt = [
+			`Write the final research brief in ${teachingLanguage}, the fixed teaching language for this session.`,
 			`Research question: ${question}`,
 			context ? `Context (what this is needed for): ${context}` : null,
+			deps.webUserUrls ? `Learner-pasted links in this session:\n${deps.webUserUrls(job.chatId).join("\n") || "(none)"}` : null,
 			"Produce your final brief in the required format.",
 		]
 			.filter(Boolean)
 			.join("\n\n");
 
 		const fetchedUrls: string[] = [];
-		// Per-job PDF dir (researcher PDF wave, 2026-10-07): web_fetch_pdf
-		// downloads land here; every pdf tool is scoped to it; it dies with
-		// the job (never enters the record).
-		const pdfDir = await fs.mkdtemp(path.join(os.tmpdir(), "lh-research-"));
+		const searchUrls = new Set<string>();
 
 		try {
 			jobStore.updateJob(jobId, { activity: "researching" });
 			const brief = await runResearcherAgent(prompt, {
 				engine: model,
 				search: deps.searchProvider,
-				pdfDir,
+				webPolicy: {
+					enabled: () => deps.webEnabled?.(job.chatId) ?? true,
+					canFetch: (url) => searchUrls.has(url) || deps.webAllowedUrl?.(job.chatId, url) === true,
+					onSearchResults: (results) => { for (const hit of results) searchUrls.add(hit.url); },
+				},
+				approve: deps.webApproval ? ((tool, value, reason) => deps.webApproval!(job.chatId, tool, value, reason, (candidate) => searchUrls.has(candidate) || deps.webAllowedUrl?.(job.chatId, candidate) === true)) as WebApproval : undefined,
 				abortSignal: loop.abortSignal,
 				chatId: loop.chatId,
 				// Money channel: each agent step is one model call — fold its
@@ -374,7 +383,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
 					onToolStart: (toolName, args) => {
 					const input = args as { query?: string; url?: string } | undefined;
-					if (typeof input?.url === "string" && (toolName === "web_fetch" || toolName === "web_fetch_pdf")) {
+					if (typeof input?.url === "string" && toolName === "web_fetch") {
 						fetchedUrls.push(input.url);
 					}
 					jobStore.updateJob(jobId, { activity: activityLine(toolName, input) });
@@ -391,8 +400,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			const reason = err instanceof Error ? err.message : String(err);
 			if (stillRunning(jobId)) jobStore.updateJob(jobId, { error: reason });
 			await finishJob(jobId, { brief: `Research failed: ${reason}`, sources: [] });
-		} finally {
-			await fs.rm(pdfDir, { recursive: true, force: true });
 		}
 	}
 
@@ -447,11 +454,12 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 		const input = (passedInput ?? resolveInput(job, passedInput)) as VisualToolInput | undefined;
 		const brief = typeof input?.brief === "string" ? input.brief : "";
+		const teachingLanguage = chatStore.getChat(job.chatId)?.teachingLanguage === "ja" ? "Japanese" : "English";
 
 		try {
 			jobStore.updateJob(jobId, { activity: "drawing figure" });
 			const result = await runVisualMaker(
-				{ brief },
+				{ brief: `${brief}\n\nUse ${teachingLanguage} for any labels or notes. This is the fixed teaching language for this session.` },
 				{
 					engine: model,
 					abortSignal: loop.abortSignal,
@@ -486,6 +494,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		const input = (passedInput ?? resolveInput(job, passedInput)) as PdfToolInput | undefined;
 		const path = typeof input?.path === "string" && input.path.trim() ? input.path.trim() : "";
 		const question = typeof input?.question === "string" ? input.question : "";
+		const teachingLanguage = chatStore.getChat(job.chatId)?.teachingLanguage === "ja" ? "ja" : "en";
 
 		try {
 			jobStore.updateJob(jobId, { activity: "reading pdf" });
@@ -493,6 +502,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				{ path, question },
 			{
 				engine: model,
+				teachingLanguage,
 				abortSignal: loop.abortSignal,
 				chatId: loop.chatId,
 				onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),

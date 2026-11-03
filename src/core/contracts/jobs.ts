@@ -17,6 +17,8 @@ export type JobStatus = "running" | "done" | "error";
 
 export interface JobRecord {
 	id: string;
+	/** Explicit owner on office-created jobs; absent only on legacy records. */
+	ownerId?: string;
 	kind: JobKind;
 	chatId: string;
 	/** The tool part this job fulfills. */

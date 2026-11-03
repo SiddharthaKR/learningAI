@@ -1,3 +1,7 @@
+import { withOfficeUser } from "@/src/server/route-scope";
+import { currentUserId } from "@/src/server/user-scope";
+import { createAccountStore } from "@/src/server/accounts";
+import { PATHS } from "@/config";
 import { chainsForSelection, formatChainLine } from "@/src/core";
 import { newGraphContextMessage, type GraphContextPick } from "@/src/core";
 import { compactionInFlight, createChat, isTurnRunning, listChats, fixedOfficeModelSpec, stores, titleFromPrompt } from "@/src/server";
@@ -10,7 +14,7 @@ import type { ChatListItem } from "@/src/core";
  *  count — the sidebar's Background agents section is their channel now
  *  (a running spinner per row would double-signal them), so busy means
  *  exactly "a teach turn is in flight". */
-export async function GET() {
+async function GETImpl() {
 	const chats: ChatListItem[] = listChats().map((c) => ({
 		...c,
 		busy: isTurnRunning(c.id),
@@ -19,13 +23,17 @@ export async function GET() {
 	return Response.json({ chats });
 }
 
-export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown };
+async function POSTImpl(req: Request) {
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; teachingLanguage?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
 	// Practice sessions (owner, 2026-10-04): kind "practice" marks the
 	// record — the practice agent + its tools from turn 1, no extraction.
 	const kind = body.kind === "practice" ? ("practice" as const) : undefined;
-	const chat = createChat(titleFromPrompt(title || "Untitled session"), kind);
+	const account = await createAccountStore(PATHS.data).byId(currentUserId());
+	if (!account) return Response.json({ error: "Account not found" }, { status: 401 });
+	const language = body.teachingLanguage === undefined ? account.teachingLanguage : body.teachingLanguage;
+	if (language !== "en" && language !== "ja") return Response.json({ error: "Invalid teaching language" }, { status: 400 });
+	const chat = createChat(titleFromPrompt(title || "Untitled session"), kind, language);
 	// New sessions are stamped with the server-owned office model.
 	const model = fixedOfficeModelSpec();
 	stores.chatStore.saveSettings(chat.id, { model });
@@ -59,4 +67,5 @@ export async function POST(req: Request) {
 	return Response.json({ id: chat.id, title: chat.title });
 }
 
-
+export const GET = withOfficeUser(GETImpl);
+export const POST = withOfficeUser(POSTImpl);

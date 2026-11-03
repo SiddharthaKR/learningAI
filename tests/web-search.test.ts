@@ -37,9 +37,7 @@ function stubProvider(hits: SearchHit[] = [{ title: "t", url: "https://e.com/", 
 describe("web_search on the injected port (web.ts)", () => {
 	it("null provider → the honest unavailability string, never a crash", async () => {
 		const { web_search } = createWebTools(() => null, fetchDeps);
-		const out = await web_search!.execute!("c1", { query: "anything", reason: "test" });
-		assert.match(String(out.details), /not available: no search engine is configured/);
-		assert.match(String(out.details), /Tavily or Brave/);
+		assert.equal(web_search, undefined);
 	});
 
 	it("a live provider returns its hits (count defaults to 5)", async () => {
@@ -72,10 +70,9 @@ describe("web_search on the injected port (web.ts)", () => {
 	it("the resolution is FRESH per call — a key appearing mid-session takes effect", async () => {
 		let provider: SearchProvider | null = null;
 		const { web_search } = createWebTools(() => provider);
-		const first = await web_search!.execute!("c1", { query: "q", reason: "test" });
-		assert.match(String(first.details), /not available/);
+		assert.equal(web_search, undefined);
 		provider = stubProvider();
-		const second = await web_search!.execute!("c2", { query: "q", reason: "test" });
+		const second = await createWebTools(() => provider).web_search!.execute!("c2", { query: "q", reason: "test" });
 		assert.ok(Array.isArray(second.details), "the live provider answered on the very next call");
 	});
 
@@ -159,7 +156,8 @@ describe("the research registry drop (jobTools)", () => {
 	it("searchUnavailable: false → research drops from the registry (the other job tools stay)", () => {
 		const tools = jobTools(fakeCtx(() => false));
 		assert.equal("research" in tools, false, "no research tool — no doomed dispatch");
-		assert.ok(tools.demo && tools.visual && tools.pdf, "the search-less server keeps its other sub-agents");
+		assert.ok(tools.visual && tools.pdf, "visual and local PDF subagents remain");
+		assert.equal(tools.demo, undefined, "demo builder is removed");
 	});
 
 	it("searchAvailable: true → research present", () => {
@@ -201,7 +199,8 @@ describe("the threaded searchAvailable gate (registry factories)", () => {
 			searchAvailable: () => false,
 		});
 		assert.equal("research" in tools, false, "the threaded signal reached jobTools' gate");
-		assert.ok(tools.demo && tools.visual && tools.pdf, "the other job tools survive");
+		assert.ok(tools.visual && tools.pdf, "visual and local PDF subagents remain");
+		assert.equal(tools.demo, undefined, "demo builder is removed");
 	});
 
 	it("createTeacherTools: available keeps research (the gate reads the signal both ways)", () => {

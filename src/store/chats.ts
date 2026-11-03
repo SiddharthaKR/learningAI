@@ -9,7 +9,6 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
 import type { ChatStore } from "../core/ports.ts";
 import type { ChatRecord, ChatSettings, ChatSummary, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
@@ -18,9 +17,11 @@ import type { LhMessage } from "../core/native-messages.ts";
 import { activeProblemOf, danglingQuestionOf } from "../core/native-messages.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 
+export function createChatStore(root: string): ChatStore {
+const chatDir = path.join(root, "chats");
 function chatFile(id: string): string {
 	if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`Invalid chat id: ${id}`);
-	return path.join(PATHS.chats, `${id}.json`);
+	return path.join(chatDir, `${id}.json`);
 }
 
 /** THE SILENCE LAW (push S6, 2026-10-02): chats-changed announces ONLY
@@ -32,7 +33,7 @@ function chatFile(id: string): string {
  *  phase, busy, pendingQuestion) is already announced by turn-started /
  *  turn-settled, which the sidebar refetches on. Silence here is law,
  *  not oversight. */
-function createChat(title: string, kind?: "practice"): ChatRecord {
+function createChat(title: string, kind?: "practice", teachingLanguage: "en" | "ja" = "en"): ChatRecord {
 	const now = new Date().toISOString();
 	const record: ChatRecord = {
 		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
@@ -40,11 +41,12 @@ function createChat(title: string, kind?: "practice"): ChatRecord {
 		createdAt: now,
 		updatedAt: now,
 		messages: [],
+		teachingLanguage,
 		// Practice sessions carry the marker; teach stays ABSENT (absence
 		// reads as teach — pre-practice records never migrate).
 		...(kind === "practice" ? { kind: "practice" as const } : {}),
 	};
-	fs.mkdirSync(PATHS.chats, { recursive: true });
+	fs.mkdirSync(chatDir, { recursive: true });
 	writeChat(record);
 	emit("chats-changed", {});
 	return { ...record, version: CURRENT_CHAT_VERSION }; // the in-memory twin of what landed on disk
@@ -78,9 +80,9 @@ function getChat(id: string): ChatRecord | null {
 
 function listChats(): ChatSummary[] {
 	try {
-		fs.mkdirSync(PATHS.chats, { recursive: true });
+		fs.mkdirSync(chatDir, { recursive: true });
 		return fs
-			.readdirSync(PATHS.chats)
+			.readdirSync(chatDir)
 			.filter((f) => f.endsWith(".json"))
 			.map((f) => getChat(f.slice(0, -5)))
 			.filter((r): r is ChatRecord => r !== null)
@@ -205,7 +207,7 @@ function saveTree(id: string, tree: PlanTree): void {
 	writeChat(record);
 }
 
-export const chatStore: ChatStore = {
+return {
 	createChat,
 	getChat,
 	listChats,
@@ -217,3 +219,5 @@ export const chatStore: ChatStore = {
 	appendTurnUsage,
 	appendExtractionUsage,
 };
+}
+

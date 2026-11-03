@@ -1,15 +1,15 @@
 ﻿/**
  * THE PRACTICE TOOLS (practice sessions, owner design 2026-10-04): the
- * practice agent's ENTIRE toolset â€” `problem` (pose: terminates the turn;
+ * practice agent's ENTIRE toolset — `problem` (pose: terminates the turn;
  * the commitment rides the call's arguments, hidden from the learner UI)
  * and `conclude` (end the problem: normal result, the turn continues so
  * the same reply can reveal + pose the next). The gating law (owner
  * ruling): an agent cannot pose while a problem is active and cannot
- * conclude with nothing active â€” activeProblemOf is the single fold both
+ * conclude with nothing active — activeProblemOf is the single fold both
  * gates read.
  *
  * Mechanics-only descriptions (the doctrine ruling, 2026-10-04): the tool
- * descriptions carry WHAT to pass and WHAT happens â€” the theory, the
+ * descriptions carry WHAT to pass and WHAT happens — the theory, the
  * commit-before-pose law, the hint ladder all live in the system prompt
  * (prompts/practice/10-doctrine.md).
  */
@@ -18,6 +18,7 @@ import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { resolveTargetId } from "../../core/chains.ts";
 import type { JobToolContext } from "./jobs.ts";
+import { jobTools } from "./jobs.ts";
 import { proberGraphTools, type GraphToolContext } from "./graph.ts";
 import { activeProblemOf } from "../../core/native-messages.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
@@ -29,7 +30,7 @@ import { healEncodedArguments, healToolRecord } from "./heal.ts";
 export interface PracticeToolContext {
 	chatId: string;
 	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null };
-	/** The WHOLE-graph node list, read fresh per pose (owner round 9 â€” the
+	/** The WHOLE-graph node list, read fresh per pose (owner round 9 — the
 	 *  mastery-trace contract): targets validate against every proposition,
 	 *  not just the session's picks, so pickless sessions and future
 	 *  graph-tools poses stay valid. Absent (tests) = no validation. */
@@ -43,48 +44,48 @@ export interface PracticeToolContext {
 }
 
 /** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
- *  to read the STORED record â€” but the record freezes at the turn's
+ *  to read the STORED record — but the record freezes at the turn's
  *  write-ahead (persistTurn lands only at turn END), so a mid-turn
- *  conclude â†’ pose pair could never see each other: every conclude
+ *  conclude → pose pair could never see each other: every conclude
  *  succeeded against the stale record and every following pose died on
  *  "a problem is already active" until the model gave up ("the problem
  *  slot is stuck"). The gate seeds ONCE from the record at construction
- *  (one practiceTools per turn â€” chat-handler builds the agent per
+ *  (one practiceTools per turn — chat-handler builds the agent per
  *  request, so there is no cross-turn leakage), and the executes flip
- *  this closure â€” the intra-turn truth the record cannot hold yet. */
+ *  this closure — the intra-turn truth the record cannot hold yet. */
 export interface PracticeGate {
 	problemActive: boolean;
 }
 
-/** Seed the turn's gate from the record (result-aware activeProblemOf â€”
+/** Seed the turn's gate from the record (result-aware activeProblemOf —
  *  only a cleanly-posed problem counts). */
 export function createPracticeGate(ctx: PracticeToolContext): PracticeGate {
 	const record = ctx.chatStore.getChat(ctx.chatId);
 	return { problemActive: record ? activeProblemOf(record.messages) !== null : false };
 }
 
-// â”€â”€â”€ problem: the pose â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── problem: the pose ───────────────────────────────────────────────────────
 
 export const problemInputObject = Type.Object({
 	statement: Type.String({
 		description:
-			"REQUIRED â€” the problem as the learner sees it (markdown + LaTeX). Must be self-contained and " +
+			"REQUIRED — the problem as the learner sees it (markdown + LaTeX). Must be self-contained and " +
 			"solvable from the session's material. NEVER announces the target proposition.",
 	}),
 	mode: Type.Union([Type.Literal("recall"), Type.Literal("discrimination"), Type.Literal("composition")], {
-		description: "REQUIRED â€” the demand mode: recall, discrimination, or composition (bare words, no quotes).",
+		description: "REQUIRED — the demand mode: recall, discrimination, or composition (bare words, no quotes).",
 	}),
 	target: Type.Optional(
 		Type.Array(Type.String(), {
 			minItems: 1,
 			description:
-				"The proposition id(s) this problem exercises, from the session context's [id] list â€” include when " +
+				"The proposition id(s) this problem exercises, from the session context's [id] list — include when " +
 				"the material is in the map; OMIT entirely when it is not (a topic session poses untagged problems). " +
 				"Names are normalized to ids at the seam; an unknown proposition is rejected.",
 		}),
 	),
 	modelSolution: Type.String({
-		description: "REQUIRED â€” the full solution, moves in order, committed BEFORE the learner sees the problem. This IS the reveal â€” conclude shows it verbatim; never re-author it.",
+		description: "REQUIRED — the full solution, moves in order, committed BEFORE the learner sees the problem. This IS the reveal — conclude shows it verbatim; never re-author it.",
 	}),
 });
 
@@ -98,19 +99,19 @@ export function problemTool(
 		name: "problem",
 		label: "problem",
 		description:
-			"Pose one practice problem. Ends the turn â€” the learner works in the thinking field; their thinking " +
+			"Pose one practice problem. Ends the turn — the learner works in the thinking field; their thinking " +
 			"traces and answer commits arrive back as labeled messages. The modelSolution rides this call's " +
-			"arguments and stays hidden from the learner until you conclude (conclude shows it verbatim â€” the " +
-			"reveal needs no new field). Only one problem may be active â€” conclude it before posing the next.",
+			"arguments and stays hidden from the learner until you conclude (conclude shows it verbatim — the " +
+			"reveal needs no new field). Only one problem may be active — conclude it before posing the next.",
 		parameters: problemInputObject,
 		executionMode: "sequential",
 		prepareArguments: (args: unknown) => {
 			const healed = healEncodedArguments(args, problemInputObject);
-			// TARGET NORMALIZATION (owner round 9): names silently become ids â€”
+			// TARGET NORMALIZATION (owner round 9): names silently become ids —
 			// the RECORD carries canonical ids (the mastery trace groups on
 			// them); unresolvable strings pass through for execute to reject.
 			// UNTAGGED PROBLEMS (owner round 12): an explicit empty list is
-			// the model saying "no targets" â€” healed AWAY, so the record's
+			// the model saying "no targets" — healed AWAY, so the record's
 			// canonical form is tagged-or-absent, never [].
 			if (!graphNodes) {
 				const bare = (healed as { target?: unknown }).target;
@@ -132,13 +133,13 @@ export function problemTool(
 		execute: async (_toolCallId, input) => {
 			if (gate.problemActive) {
 				return invalidInputResult("problem", [
-					"a problem is already active â€” call conclude on it before posing the next one",
+					"a problem is already active — call conclude on it before posing the next one",
 				]);
 			}
 			// TARGET VALIDATION (owner round 9, round 12): against the WHOLE
-			// graph, and ONLY when targets are present â€” absent means an
+			// graph, and ONLY when targets are present — absent means an
 			// untagged problem (topic sessions, owner round 12), which poses
-			// freely. A one-line rejection â€” the proposition list already
+			// freely. A one-line rejection — the proposition list already
 			// sits in the agent's context (the [id] marker); no re-listing.
 			// The message teaches the exit: omitting always works.
 			if (graphNodes && input.target && input.target.length > 0) {
@@ -146,7 +147,7 @@ export function problemTool(
 				const unknown = input.target.filter((t) => resolveTargetId(t, list) === null);
 				if (unknown.length > 0) {
 					return invalidInputResult("problem", [
-						`target ${JSON.stringify(unknown)} is not a known proposition â€” targets must be proposition ids from the session context; if the material is not in the map, omit target entirely`,
+						`target ${JSON.stringify(unknown)} is not a known proposition — targets must be proposition ids from the session context; if the material is not in the map, omit target entirely`,
 					]);
 				}
 			}
@@ -156,7 +157,7 @@ export function problemTool(
 	};
 }
 
-// â”€â”€â”€ conclude: the end of a problem â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── conclude: the end of a problem ──────────────────────────────────────────
 
 export const concludeInputObject = Type.Object({
 	outcome: Type.Union(
@@ -167,14 +168,14 @@ export const concludeInputObject = Type.Object({
 			Type.Literal("surrendered"),
 			Type.Literal("dismissed"),
 		],
-		{ description: "REQUIRED â€” the outcome: solved, solvedWithHints, movedOn, or surrendered â€” bare words, no quotes (dismissed is synthesized, never yours)." },
+		{ description: "REQUIRED — the outcome: solved, solvedWithHints, movedOn, or surrendered — bare words, no quotes (dismissed is synthesized, never yours)." },
 	),
 	verdict: Type.String({
-		description: "REQUIRED â€” the plain-language verdict: what was credited, where it broke. On a wrong answer: localize the break, do NOT give the correction.",
+		description: "REQUIRED — the plain-language verdict: what was credited, where it broke. On a wrong answer: localize the break, do NOT give the correction.",
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],
-		{ description: "REQUIRED â€” the hint-ladder rung the problem needed: R0 through R5, or null = no hint was given (bare, no quotes)." },
+		{ description: "REQUIRED — the hint-ladder rung the problem needed: R0 through R5, or null = no hint was given (bare, no quotes)." },
 	),
 	missClass: Type.Union(
 		[
@@ -185,9 +186,9 @@ export const concludeInputObject = Type.Object({
 			Type.Literal("structural"),
 			Type.Null(),
 		],
-		{ description: "REQUIRED â€” the miss classification: cue, discrimination, execution, careless, or structural â€” or null = no miss (bare, no quotes)." },
+		{ description: "REQUIRED — the miss classification: cue, discrimination, execution, careless, or structural — or null = no miss (bare, no quotes)." },
 	),
-	retest: Type.Boolean({ description: "REQUIRED â€” true marks the problem for a fresh-surface retest before the session ends." }),
+	retest: Type.Boolean({ description: "REQUIRED — true marks the problem for a fresh-surface retest before the session ends." }),
 });
 
 export type ConcludeInput = Static<typeof concludeInputObject>;
@@ -199,7 +200,7 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 		description:
 			"Conclude the active problem: records the outcome + verdict, reveals the committed solution, and frees " +
 			"the learner's composer. After the result, say your closing words about the learner's work if useful, then " +
-			"END YOUR TURN â€” no further tool calls. The next problem is NEVER posed here: it waits for the learner's " +
+			"END YOUR TURN — no further tool calls. The next problem is NEVER posed here: it waits for the learner's " +
 			"explicit go-ahead (a *Next problem* message, or their own words asking for the next one). Between problems, " +
 			"answer their questions about the concluded one. Nothing may conclude unless a problem is active.",
 		parameters: concludeInputObject,
@@ -207,7 +208,7 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 		executionMode: "sequential",
 		execute: async (_toolCallId, _input) => {
 			if (!gate.problemActive) {
-				return invalidInputResult("conclude", ["no active problem to conclude â€” pose one first"]);
+				return invalidInputResult("conclude", ["no active problem to conclude — pose one first"]);
 			}
 			gate.problemActive = false;
 			return concludeResult();
@@ -217,22 +218,23 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 
 /** The practice toolset (the practice agent's whole registry). */
 export function practiceTools(ctx: PracticeToolContext): Record<string, AgentTool<any>> {
-	// ONE gate per turn, shared by both tools â€” the intra-turn truth.
+	// ONE gate per turn, shared by both tools — the intra-turn truth.
 	const gate = createPracticeGate(ctx);
 	// THE RARELY-NEEDED SET (owner round 10): read/ls/find/grep over the
-	// learner's files (always â€” the same read-only set the teacher and
+	// learner's files (always — the same read-only set the teacher and
 	// prober carry), the research + pdf jobs (research honestly absent
 	// when no search engine is live; demo/visual stay teach-only), and
 	// the prober's map readers when the settings gate opened. None are
 	// toggle-filtered: problem/conclude are the session; these are
 	// exceptions the doctrine says to reach for rarely.
-	// healToolRecord (owner, 2026-10-09 â€” the whitehead generalization):
+	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
 	// the standard argument heal over the WHOLE registry. problem/conclude
 	// keep their own (target-normalizing) prepareArguments as the composed
 	// inner pass; the double heal is idempotent by construction.
 	return healToolRecord({
 		problem: problemTool(gate, ctx.graphNodes),
 		conclude: concludeTool(gate),
+		...(ctx.jobs ? (() => { const jobs = jobTools(ctx.jobs!); return { ...(jobs.research ? { research: jobs.research } : {}), pdf: jobs.pdf! }; })() : {}),
 		...(ctx.graph ? proberGraphTools(ctx.graph) : {}),
 	});
 }

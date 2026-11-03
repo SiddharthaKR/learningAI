@@ -146,13 +146,6 @@ export function jobTools(ctx: JobToolContext): Record<string, AgentTool<any>> {
 				),
 			},
 		}),
-		demo: {
-			name: "demo",
-			label: "demo",
-			description: DEMO_DESCRIPTION,
-			parameters: demoInputSchema,
-			execute: serverExecute("demo", demoInputSchema, (input, { toolCallId }) => dispatch(ctx, "demo", toolCallId, DEMO_ACK, input)),
-		},
 		visual: {
 			name: "visual",
 			label: "visual",

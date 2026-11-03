@@ -1,6 +1,7 @@
 ﻿import { randomUUID } from "node:crypto";
 import { emit } from "../core/events.ts";
-import { stores } from "./stores.ts";
+import { storesForUser } from "./stores.ts";
+import { currentUserId } from "./user-scope.ts";
 
 export type WebTool = "web_search" | "web_fetch";
 export type WarningMatch = { text: string; kind: "copied_text" | "sensitive_term" };
@@ -14,7 +15,7 @@ export interface PendingWebApproval {
   expiresAt: string;
 }
 type Decision = "pending" | "allowed" | "denied" | "expired";
-type ApprovalRecord = { chatId: string; item: PendingWebApproval; status: Decision; chunks: string[]; validate: (value: string) => Promise<void>; resolve: (value: string | null) => void; timer: ReturnType<typeof setTimeout> };
+type ApprovalRecord = { ownerId: string; chatId: string; item: PendingWebApproval; status: Decision; chunks: string[]; validate: (value: string) => Promise<void>; resolve: (value: string | null) => void; timer: ReturnType<typeof setTimeout> };
 const KEY = Symbol.for("lh.webApprovals");
 function approvals(): Map<string, ApprovalRecord> {
   const g = globalThis as Record<symbol, Map<string, ApprovalRecord> | undefined>;
@@ -50,19 +51,18 @@ export function warningMatches(value: string, chunks: readonly string[], sensiti
   return found;
 }
 /** One access seam. Step 4 adds user ownership here; until then this is chat-scoped only. */
-export function getApprovalForChat(ctx: { userId?: string }, chatId: string, callId: string): ApprovalRecord | null {
-  if (!stores.chatStore.getChat(chatId)) return null;
+export function getApprovalForChat(ctx: { userId: string }, chatId: string, callId: string): ApprovalRecord | null {
+	if (ctx.userId !== currentUserId() || !storesForUser(ctx.userId).chatStore.getChat(chatId)) return null;
   const entry = approvals().get(callId);
-  if (!entry || entry.chatId !== chatId) return null;
-  void ctx;
+	if (!entry || entry.ownerId !== ctx.userId || entry.chatId !== chatId) return null;
   return entry;
 }
-export function pendingApprovalsForChat(ctx: { userId?: string }, chatId: string): PendingWebApproval[] | null {
-  if (!stores.chatStore.getChat(chatId)) return null;
+export function pendingApprovalsForChat(ctx: { userId: string }, chatId: string): PendingWebApproval[] | null {
+	if (ctx.userId !== currentUserId() || !storesForUser(ctx.userId).chatStore.getChat(chatId)) return null;
   return [...approvals().values()].filter((entry) => getApprovalForChat(ctx, chatId, entry.item.callId)?.status === "pending").map((entry) => entry.item);
 }
-export function requestWebApproval(input: { chatId: string; tool: WebTool; value: string; reason: string; chunks: string[]; validate: (value: string) => Promise<void> }): Promise<string | null> {
-  if (!stores.chatStore.getChat(input.chatId)) return Promise.resolve(null);
+export function requestWebApproval(input: { ownerId: string; chatId: string; tool: WebTool; value: string; reason: string; chunks: string[]; validate: (value: string) => Promise<void> }): Promise<string | null> {
+	if (input.ownerId !== currentUserId() || !storesForUser(input.ownerId).chatStore.getChat(input.chatId)) return Promise.resolve(null);
   const callId = randomUUID();
   const createdAt = new Date();
   const expiresAt = new Date(createdAt.getTime() + timeoutSeconds() * 1000);
@@ -75,11 +75,11 @@ export function requestWebApproval(input: { chatId: string; tool: WebTool; value
       logDecision(input.chatId, input.tool, entry.item.value, "timeout");
       resolve(null);
     }, timeoutSeconds() * 1000);
-    approvals().set(callId, { chatId: input.chatId, item, status: "pending", chunks: input.chunks, validate: input.validate, resolve, timer });
+    approvals().set(callId, { ownerId: input.ownerId, chatId: input.chatId, item, status: "pending", chunks: input.chunks, validate: input.validate, resolve, timer });
     emit("web_approval_pending", { chatId: input.chatId });
   });
 }
-export async function decideWebApproval(ctx: { userId?: string }, chatId: string, callId: string, decision: "allow" | "deny", editedValue?: string): Promise<{ status: Decision; pending?: PendingWebApproval } | null> {
+export async function decideWebApproval(ctx: { userId: string }, chatId: string, callId: string, decision: "allow" | "deny", editedValue?: string): Promise<{ status: Decision; pending?: PendingWebApproval } | null> {
   const entry = getApprovalForChat(ctx, chatId, callId);
   if (!entry) return null;
   if (entry.status !== "pending") return { status: "expired" };

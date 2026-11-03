@@ -22,7 +22,7 @@ import { after, describe, it } from "node:test";
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-dismissal-park-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 
-const { chatStore } = await import("../src/store/chats.ts");
+const { chatStore } = await import("./support/test-stores.ts");
 const { applyParkedDismissal, parkDismissal, takeParkedDismissal } = await import(
 	"../src/server/dismissal-park.ts"
 );

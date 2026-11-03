@@ -1,3 +1,4 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 /**
  * GET /api/settings — THE user settings record (settings-storage wave,
  * 2026-09-19): the whole delta record at data/settings.json (config.
@@ -18,6 +19,8 @@ import { settingsStore } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function GETImpl() {
 	return Response.json({ settings: settingsStore.readSettings() });
 }
+
+export const GET = withOfficeUser(GETImpl);

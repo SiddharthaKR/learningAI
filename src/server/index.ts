@@ -12,15 +12,10 @@ export { NotesImportError } from "../agent/subagents/extraction.ts";
 export * from "./commit-positions.ts";
 export * from "./jobs.ts";
 export * from "./stores.ts";
-export { readRenderSettings, writeRenderSettings } from "../store/render-settings.ts";
+export { readRenderSettings, writeRenderSettings } from "./stores.ts";
 // The settings record + prompt overrides (settings-storage wave, 2026-09-19).
 // The *Record aliases keep the app/api/settings routes explicit about which
 // seam they touch (the raw record, not the chat-section convenience view).
-export {
-	readSettings as readSettingsRecord,
-	writeSettings as writeSettingsRecord,
-	settingsStore,
-} from "../store/settings.ts";
 export { promptOverrides } from "../store/prompt-overrides.ts";
 export { isValidSegmentPath } from "../core/prompt-segments.ts";
 // The canonical segment discovery/resolution lives in the agent layer

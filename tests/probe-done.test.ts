@@ -15,7 +15,7 @@ import { probeDoneTool } from "../src/agent/tools/probe.ts";
 import type { SteerMessage } from "../src/core/contracts.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { HANDOFF_TEXT } from "../src/core/contracts.ts";
-import { chatStore } from "../src/store/chats.ts";
+import { chatStore } from "./support/test-stores.ts";
 import { PATHS } from "../config.ts";
 
 const dataDir = path.join(PATHS.root, "data");

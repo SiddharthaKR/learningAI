@@ -34,7 +34,7 @@ before(async () => {
 	const server = await import("../src/server/chats.ts");
 	createChat = server.createChat;
 	getChat = server.getChat as typeof getChat;
-	const { chatStore } = await import("../src/store/chats.ts");
+	const { chatStore } = await import("./support/test-stores.ts");
 	saveMessages = (id, messages) => chatStore.saveMessages(id, messages as never);
 	const contracts = await import("../src/core/contracts.ts");
 	buildSubagentSteerFn = contracts.buildSubagentSteer;

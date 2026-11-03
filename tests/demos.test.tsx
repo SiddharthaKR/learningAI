@@ -56,8 +56,7 @@ import { runVisualMaker } from "../src/agent/subagents/visual-maker.ts";
 import { buildAbortSteer, buildSubagentSteer, isSubagentFailure, setSteerUiInverted, type SteerMessage } from "../src/core/contracts.ts";
 import type { JobRecord } from "../src/core/contracts.ts";
 import { createTeacherTools } from "../src/agent/tools.ts";
-import { chatStore } from "../src/store/chats.ts";
-import { jobStore } from "../src/store/jobs.ts";
+import { chatStore, jobStore, TEST_USER_ROOT } from "./support/test-stores.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
 import { createTeacherAgent } from "../src/agent/teacher-agent.ts";
@@ -95,7 +94,7 @@ process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
 
 
 
-const JOBS_DIR = path.join(PATHS.data, "jobs");
+const JOBS_DIR = path.join(TEST_USER_ROOT, "jobs");
 const createdChats: string[] = [];
 const createdJobs: string[] = [];
 
@@ -918,24 +917,24 @@ describe("demo/visual job runners", () => {
 	});
 
 	it("dispatch through a teacher turn: the call acks mid-turn and the runner completes in the background", async () => {
-		const chat = chatStore.createChat("Test: demo spawn dispatch");
+		const chat = chatStore.createChat("Test: visual spawn dispatch");
 		createdChats.push(chat.id);
 		// BYOK turn gate (owner, 2026-09-22): the scripted chat needs a
 		// conversation model — the per-chat pin, exactly like the setup flow.
 		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
 
-		// A teacher that calls demo on turn 1, then continues in the SAME turn.
+		// A teacher that calls visual on turn 1, then continues in the same turn.
 		const teacher = scriptedModel([
-			{ toolCalls: [{ toolCallId: "call-d2", toolName: "demo", input: DEMO_INPUT }] },
+			{ toolCalls: [{ toolCallId: "call-v2", toolName: "visual", input: { brief: "A simple line" } }] },
 			{ text: "Here it is." },
 		]);
 
 		// The overrides must be live BEFORE the request — dispatch fires the
 		// runner mid-stream, inside the tool execute.
-		demoModelOverride.current = scriptedModel([
-			{ toolCalls: [{ toolCallId: "w1", toolName: "write_demo", input: { html: GOOD_HTML } }] },
-			{ toolCalls: [{ toolCallId: "r1", toolName: "run_demo", input: {} }] },
-			{ text: "Sweep it." },
+		visualModelOverride.current = scriptedModel([
+			{ toolCalls: [{ toolCallId: "w1", toolName: "write_svg", input: { svg: SVG_1 } }] },
+			{ toolCalls: [{ toolCallId: "r1", toolName: "render_svg", input: {} }] },
+			{ text: "A simple line." },
 		]);
 		headlessOverride.current = fakeHeadless();
 		const { steers, runner } = testRunner();
@@ -970,19 +969,19 @@ describe("demo/visual job runners", () => {
 			if (ack.status !== 200) assert.fail(`expected 200 ack, got ${ack.status}: ${await ack.text()}`);
 			await drainRunning(chat.id);
 
-			const job = jobStore.findJobByToolCallId(chat.id, "call-d2");
+			const job = jobStore.findJobByToolCallId(chat.id, "call-v2");
 			assert.ok(job, "dispatch created a job at tool-execute time");
-			assert.equal(job!.kind, "demo");
+			assert.equal(job!.kind, "visual");
 			createdJobs.push(job!.id);
 
 			// The background runner (fire-and-forget) completes with the overrides.
-			await waitFor(() => jobStore.getJob(job!.id)!.status !== "running", 8000, "demo job completion");
+			await waitFor(() => jobStore.getJob(job!.id)!.status !== "running", 8000, "visual job completion");
 			const done = jobStore.getJob(job!.id)!;
 			assert.equal(done.status, "done");
 
 			const saved = projectNative(chatStore.getChat(chat.id)!.messages);
-			const part = saved[1]!.parts.find((p) => p.type === "tool-demo");
-			assert.ok(part && part.type === "tool-demo", "demo tool part persisted");
+			const part = saved[1]!.parts.find((p) => p.type === "tool-visual");
+			assert.ok(part && part.type === "tool-visual", "visual tool part persisted");
 			assert.equal(part.state, "output-available", "the part resolved with the ack at dispatch time");
 			assert.match(String((part as { output?: unknown }).output), /fire-and-forget/);
 
@@ -992,7 +991,7 @@ describe("demo/visual job runners", () => {
 			// Idempotency: dispatch dedupes by toolCallId — no second job.
 			assert.equal(jobStore.listJobs(chat.id).length, 1, "no duplicate job for the same tool part");
 		} finally {
-			demoModelOverride.current = undefined;
+			visualModelOverride.current = undefined;
 			headlessOverride.current = undefined;
 		}
 	});
@@ -1001,15 +1000,13 @@ describe("demo/visual job runners", () => {
 // ─── 6. registry wiring ──────────────────────────────────────────────────────
 
 describe("tool + renderer registry wiring", () => {
-	it("demo and visual are SERVER-EXECUTED dispatch tools with the contract schemas", () => {
+	it("research, visual and local PDF are the server-executed job tools", () => {
 		const { runner } = testRunner();
 		const tools = jobTools({ chatId: "chat_registry", jobStore, spawn: (job) => void runner.runJob(job.id) });
-		assert.deepEqual(Object.keys(tools).sort(), ["demo", "pdf", "research", "visual"]);
-		for (const name of ["demo", "visual", "research", "pdf"] as const) {
+		assert.deepEqual(Object.keys(tools).sort(), ["pdf", "research", "visual"]);
+		for (const name of ["visual", "research", "pdf"] as const) {
 			assert.equal(typeof (tools[name] as { execute?: unknown }).execute, "function", `${name} executes server-side — fire-and-forget ack per THE ASYNC PROTOCOL`);
 		}
-		assert.equal(Value.Check(demoInputSchema, { title: "T", brief: "b" }), true);
-		assert.equal(Value.Check(demoInputSchema, { brief: "b" }), false, "demo requires a title");
 		assert.equal(Value.Check(visualInputSchema, { brief: "b" }), true);
 		assert.equal(Value.Check(visualInputSchema, {}), false, "visual requires a brief");
 		assert.equal(Value.Check(pdfInputSchema, { path: "/tmp/doc.pdf", question: "q" }), true);

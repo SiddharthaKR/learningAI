@@ -1,5 +1,8 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 import { handleChatRequest } from "@/src/server";
 
-export async function POST(req: Request) {
+async function POSTImpl(req: Request) {
 	return handleChatRequest(req);
 }
+
+export const POST = withOfficeUser(POSTImpl);

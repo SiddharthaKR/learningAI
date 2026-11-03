@@ -1,4 +1,4 @@
-import { abortExtraction, extractionStatuses } from "../agent/subagents/extraction.ts";
+import { abortExtraction, extractionStatuses } from "./extraction-status.ts";
 import { coverageOf } from "../core/coverage.ts";
 import { deleteChatTraces, type ChatDeleteMode, type ChatDeletionStats } from "../core/graph-deletion.ts";
 import { titleFromPrompt } from "../core/contracts.ts";
@@ -18,7 +18,9 @@ import { isTurnRunning } from "./turn-liveness.ts";
  * argument.
  */
 
-export const { createChat, getChat, listChats } = stores.chatStore;
+export const createChat = (...args: Parameters<typeof stores.chatStore.createChat>) => stores.chatStore.createChat(...args);
+export const getChat = (...args: Parameters<typeof stores.chatStore.getChat>) => stores.chatStore.getChat(...args);
+export const listChats = (...args: Parameters<typeof stores.chatStore.listChats>) => stores.chatStore.listChats(...args);
 export { titleFromPrompt };
 export type { ChatDeleteMode, ChatDeletionStats } from "../core/graph-deletion.ts";
 

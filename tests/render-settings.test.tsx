@@ -46,11 +46,11 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 		assert.ok(html.includes('role="dialog"'));
 		assert.ok(html.includes('aria-modal="true"'));
 		assert.ok(html.includes('aria-label="Close settings"'));
-		for (const id of ["general", "keys", "agent", "appearance", "graph", "keyboard"]) {
+		for (const id of ["appearance", "graph", "keyboard"]) {
 			assert.ok(html.includes(`data-testid="settings-nav-${id}"`), id);
 		}
 		// General is the landing section; the others are not current.
-		assert.ok(tagOf(html, "settings-nav-general").includes('aria-current="true"'));
+		assert.ok(tagOf(html, "settings-nav-appearance").includes('aria-current="true"'));
 		assert.ok(tagOf(html, "settings-nav-keyboard").includes('aria-current="false"'));
 		// Fetches don't run under SSR — the loading state IS the SSR state.
 		assert.ok(html.includes("Loading settings…"));
@@ -256,7 +256,7 @@ describe("AppearanceSection (thin SSR)", () => {
 describe("KeyboardSection (thin SSR)", () => {
 	it("renders every registry action in its scope group", () => {
 		const html = renderToStaticMarkup(<KeyboardSection />);
-		for (const def of KEYBOARD_ACTIONS) {
+		for (const def of KEYBOARD_ACTIONS.filter((action) => !["toggle-dictation", "open-model-picker", "cycle-thinking"].includes(action.id))) {
 			assert.ok(html.includes(`data-testid="kbd-row-${def.id}"`), def.id);
 		}
 		assert.ok(html.includes("kbd-scope-global"));

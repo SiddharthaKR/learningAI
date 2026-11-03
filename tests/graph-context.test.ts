@@ -30,8 +30,8 @@ import type { LhMessage } from "../src/core/native-messages.ts";
 const { projectView } = await import("../src/core/view.ts");
 const { POST } = await import("../app/api/chats/route.ts");
 const { initialPromptOwed } = await import("../components/chat.tsx");
-const { chatStore } = await import("../src/store/chats.ts");
-const { graphStore } = await import("../src/store/graph.ts");
+const { chatStore } = await import("./support/test-stores.ts");
+const { graphStore } = await import("./support/test-stores.ts");
 
 after(() => {
 	fs.rmSync(TMP_DATA, { recursive: true, force: true });

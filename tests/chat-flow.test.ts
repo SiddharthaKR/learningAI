@@ -33,8 +33,8 @@ import { isTurnRunning } from "../src/server/turn-liveness.ts";
 import { deliverJobResult, setTurnRunner } from "../src/server/jobs.ts";
 import { buildSubagentSteer } from "../src/core/contracts.ts";
 import { abortTurn, runningTurn, settledTurnResponse } from "../src/server/turn-runs.ts";
-import { chatStore } from "../src/store/chats.ts";
-import { jobStore } from "../src/store/jobs.ts";
+import { chatStore } from "./support/test-stores.ts";
+import { jobStore } from "./support/test-stores.ts";
 import { buildAnswer, dismissedAnswer, normalizeOptions, resolveCorrect, type QuestionData } from "../src/core/question-core.ts";
 import { danglingQuestionOf, endsInDismissal, needsContinuation, newAnswerResult } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/view.ts";
@@ -474,6 +474,8 @@ describe("teacher chat flow (scripted model)", () => {
 		// the reaction AFTER the boundary injection (records its prompt).
 		let release!: () => void;
 		const gate = new Promise<void>((r) => (release = r));
+		let firstStepEntered!: () => void;
+		const entered = new Promise<void>((r) => (firstStepEntered = r));
 		let release2!: () => void;
 		const gate2 = new Promise<void>((r) => (release2 = r));
 		let jobIdMid = "";
@@ -482,6 +484,7 @@ describe("teacher chat flow (scripted model)", () => {
 		const faux = createFauxCore({});
 		faux.setResponses([
 			async () => {
+				firstStepEntered();
 				await gate;
 				return fauxAssistantMessage(
 					[fauxToolCall("no_such_tool", { note: "x" }, { id: "call-mid" })],
@@ -512,6 +515,7 @@ describe("teacher chat flow (scripted model)", () => {
 		// The turn floats mid-run: step 1 is gated, the run is live.
 		const res = handleChatRequest(post(chat.id, { type: "text", text: "teach" }), agentFactory(engine));
 		await waitFor(() => isTurnRunning(chat.id), 8000, "the turn is live");
+		await entered;
 
 		// The result lands MID-RUN: the pump hands it to the live agent's
 		// steering queue (vehicle 1) — the queued marker waits for the
@@ -973,7 +977,7 @@ describe("the key-presence turn gate (provider-key interlude, 2026-09-25)", () =
 	// The gate's truth is env-first (keyValue): in tests process.env is the
 	// WHOLE truth (the throwaway data dir has no auth.json), so each test
 	// pins its provider's env var explicitly and restores it after.
-	it("a pinned provider whose key is gone refuses with 503 provider_key_missing — nothing lingers", async () => {
+	it("an obsolete per-chat provider pin cannot override the fixed office endpoint", async () => {
 		const chat = chatStore.createChat("Test: keyless provider");
 		createdChats.push(chat.id);
 		const saved = process.env.TOGETHER_API_KEY;
@@ -985,14 +989,9 @@ describe("the key-presence turn gate (provider-key interlude, 2026-09-25)", () =
 			chatStore.saveSettings(chat.id, { model: { provider: "together", id: "no-such-model" } });
 			const res = await handleChatRequest(post(chat.id, { type: "text", text: "teach me something" }), agentFactory(scriptedTeacher(defaultLesson).engine));
 
-			assert.equal(res.status, 503, "the key-presence gate refuses before beginTurn");
-			const body = (await res.json()) as { error: string; code: string; provider: string; slots: string[] };
-			assert.equal(body.code, "provider_key_missing");
-			assert.equal(body.provider, "together", "the envelope names whose key is gone");
-			assert.deepEqual(body.slots, ["strong"], "the conversation tier is the affected slot");
-			assert.equal(body.error, "No Together key is set — add one in Settings → Keys", "the human line names the provider");
-			assert.equal(isTurnRunning(chat.id), false, "the refusal never registers a live turn");
-			assert.equal(chatStore.getChat(chat.id)!.messages.length, 0, "no write-ahead persist before the gate");
+			assert.equal(res.status, 200, "the office model runs independently of an obsolete per-chat provider pin");
+			await drainRunning(chat.id);
+			assert.ok(chatStore.getChat(chat.id)!.messages.length > 0, "the office turn persists its messages");
 		} finally {
 			if (saved !== undefined) process.env.TOGETHER_API_KEY = saved;
 		}

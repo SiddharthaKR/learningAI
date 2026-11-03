@@ -9,9 +9,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as fs from "node:fs";
 
-import { chatStore } from "../src/store/chats.ts";
-import { graphStore } from "../src/store/graph.ts";
-import { PATHS, SOURCES_FILE } from "../config.ts";
+import { chatStore } from "./support/test-stores.ts";
+import { graphStore } from "./support/test-stores.ts";
+import { TEST_PATHS as PATHS, TEST_SOURCES_FILE as SOURCES_FILE } from "./support/test-stores.ts";
 import { callCost, contextWindow, jobCost, sessionCost, sumSteps, turnCost } from "../src/core/prices.ts";
 import type { CallUsage, ExtractionRunUsage, JobRecord, TurnUsage } from "../src/core/contracts.ts";
 

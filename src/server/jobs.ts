@@ -67,6 +67,7 @@ import type { TurnInput } from "../core/input-events.ts";
 import { danglingQuestionOf, endsInDismissal, type LhMessage } from "../core/native-messages.ts";
 import { fireJobAbort, isJobLive } from "../agent/subagents/aborts.ts";
 import { stores } from "./stores.ts";
+import { ownerKey } from "./owner-key.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
 import type { Agent } from "@earendil-works/pi-agent-core";
 
@@ -195,9 +196,9 @@ export function deliverJobResult(steer: SteerMessage): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 		const s = state();
 		const chatId = chatIdOf(steer);
-		const queue = s.queues.get(chatId) ?? [];
+		const queue = s.queues.get(ownerKey(chatId)) ?? [];
 		queue.push({ steer, resolve, reject });
-		s.queues.set(chatId, queue);
+		s.queues.set(ownerKey(chatId), queue);
 		void pump(chatId);
 	});
 }
@@ -211,7 +212,7 @@ export function deliverJobResult(steer: SteerMessage): Promise<void> {
  *  run's FIRST LLM call (the native equivalent of the old continuation
  *  coalescing). */
 function handOffEligible(chatId: string, agent: Agent): void {
-	const queue = state().queues.get(chatId);
+	const queue = state().queues.get(ownerKey(chatId));
 	if (queue && queue.length > 0) {
 		for (const entry of queue) {
 			if (entry.handedTo !== agent && entry.steer.customType !== "probe-handoff") {
@@ -224,7 +225,7 @@ function handOffEligible(chatId: string, agent: Agent): void {
 	// stranded behind a question or abort rides the chat's next run's
 	// first boundary. No probe-handoff exclusion: these are learner
 	// words, owed to whatever run is live.
-	const userQueue = state().userSteers.get(chatId);
+	const userQueue = state().userSteers.get(ownerKey(chatId));
 	if (userQueue && userQueue.length > 0) {
 		for (const entry of userQueue) {
 			if (entry.handedTo !== agent) {
@@ -242,7 +243,7 @@ function handOffEligible(chatId: string, agent: Agent): void {
  *  beat the registration: settlement needs a streamed response, which
  *  never happens inside the constructor call. */
 export function registerLiveAgent(chatId: string, agent: Agent): void {
-	state().liveAgents.set(chatId, agent);
+	state().liveAgents.set(ownerKey(chatId), agent);
 	handOffEligible(chatId, agent);
 }
 
@@ -263,12 +264,12 @@ export interface UserSteerEntry {
  *  termination, abort), reconcileUserSteers keeps it parked for the
  *  chat's next run. */
 export function steerLiveChat(chatId: string, message: LhMessage): boolean {
-	const agent = state().liveAgents.get(chatId);
+	const agent = state().liveAgents.get(ownerKey(chatId));
 	if (!agent) return false;
 	const entry: UserSteerEntry = { message };
-	const q = state().userSteers.get(chatId) ?? [];
+	const q = state().userSteers.get(ownerKey(chatId)) ?? [];
 	q.push(entry);
-	state().userSteers.set(chatId, q);
+	state().userSteers.set(ownerKey(chatId), q);
 	agent.steer(message);
 	entry.handedTo = agent;
 	return true;
@@ -279,18 +280,18 @@ export function steerLiveChat(chatId: string, message: LhMessage): boolean {
  *  Memory-only by design (same tradeoff as job markers): a server
  *  restart drops parked steers — and the whole turn dies with it anyway. */
 export function reconcileUserSteers(chatId: string, persisted: readonly LhMessage[]): void {
-	const q = state().userSteers.get(chatId);
+	const q = state().userSteers.get(ownerKey(chatId));
 	if (!q || q.length === 0) return;
 	const ids = new Set(persisted.map((m) => (m as { id?: string }).id));
 	const kept = q.filter((e) => !ids.has(e.message.id));
-	if (kept.length === 0) state().userSteers.delete(chatId);
-	else state().userSteers.set(chatId, kept);
+	if (kept.length === 0) state().userSteers.delete(ownerKey(chatId));
+	else state().userSteers.set(ownerKey(chatId), kept);
 }
 
 /** Clear the live agent at settlement — MUST run before settleSteers so the
  *  reconciliation's re-pump can never hand a marker to the dying agent. */
 export function unregisterLiveAgent(chatId: string): void {
-	state().liveAgents.delete(chatId);
+	state().liveAgents.delete(ownerKey(chatId));
 }
 
 /** TURN SETTLEMENT RECONCILIATION (Wave C): the handler calls this AFTER
@@ -307,7 +308,7 @@ export function unregisterLiveAgent(chatId: string): void {
  * stranded in a settled agent's queue, so the registry stays the truth and
  * the dead agent's copy is simply abandoned (GC'd with the agent). */
 export function settleSteers(chatId: string, persisted: { id?: string }[]): void {
-	const queue = state().queues.get(chatId);
+	const queue = state().queues.get(ownerKey(chatId));
 	if (!queue || queue.length === 0) return;
 	const deliveredIds = new Set(persisted.map((m) => m.id).filter(Boolean));
 	const remaining: QueuedSteer[] = [];
@@ -320,9 +321,9 @@ export function settleSteers(chatId: string, persisted: { id?: string }[]): void
 			remaining.push(entry);
 		}
 	}
-	if (remaining.length === 0) state().queues.delete(chatId);
+	if (remaining.length === 0) state().queues.delete(ownerKey(chatId));
 	else {
-		state().queues.set(chatId, remaining);
+		state().queues.set(ownerKey(chatId), remaining);
 		void pump(chatId);
 	}
 }
@@ -372,13 +373,13 @@ export function abortJob(jobId: string): AbortOutcome {
 	// HANDED entries (already in a live run's follow-up queue) are past
 	// recall — same ruling as a fired wake: the result lands, and the abort
 	// note below dedupes against it via steerDelivered (same jobId).
-	const queue = state().queues.get(job.chatId);
+	const queue = state().queues.get(ownerKey(job.chatId));
 	if (queue) {
 		const remaining = queue.filter(
 			(e) => jobIdOf(e.steer) !== jobId || e.handedTo !== undefined,
 		);
-		if (remaining.length === 0) state().queues.delete(job.chatId);
-		else state().queues.set(job.chatId, remaining);
+		if (remaining.length === 0) state().queues.delete(ownerKey(job.chatId));
+		else state().queues.set(ownerKey(job.chatId), remaining);
 		for (const entry of queue) {
 			if (jobIdOf(entry.steer) === jobId && entry.handedTo === undefined) entry.resolve();
 		}
@@ -417,20 +418,20 @@ function chatIdOf(steer: SteerMessage): string {
 async function pump(chatId: string): Promise<void> {
 	if (!chatId) return;
 	const s = state();
-	if (s.pumping.has(chatId)) return;
-	s.pumping.add(chatId);
+	if (s.pumping.has(ownerKey(chatId))) return;
+	s.pumping.add(ownerKey(chatId));
 	try {
 		for (let attempt = 0; ; ) {
-			const queue = s.queues.get(chatId);
+			const queue = s.queues.get(ownerKey(chatId));
 			if (!queue || queue.length === 0) {
-				s.queues.delete(chatId);
+				s.queues.delete(ownerKey(chatId));
 				return;
 			}
 
 			// Gone chat: nothing to deliver into.
 			const record = stores.chatStore.getChat(chatId);
 			if (!record) {
-				s.queues.delete(chatId);
+				s.queues.delete(ownerKey(chatId));
 				for (const entry of queue) {
 					entry.reject(new Error(`chat ${chatId} not found — cannot deliver steer ${entry.steer.id}`));
 				}
@@ -448,10 +449,10 @@ async function pump(chatId: string): Promise<void> {
 				}
 			}
 			if (stillPending.length === 0) {
-				s.queues.delete(chatId);
+				s.queues.delete(ownerKey(chatId));
 				return;
 			}
-			s.queues.set(chatId, stillPending);
+			s.queues.set(ownerKey(chatId), stillPending);
 
 			// VEHICLE 1 — THE LIVE RUN: pi's steering queue. The agent of the
 			// streaming turn takes every eligible marker; pi injects at the
@@ -459,7 +460,7 @@ async function pump(chatId: string): Promise<void> {
 			// between completed assistant+toolResult units) and continues the
 			// run. Delivery resolves at settlement (settleSteers). Nothing else
 			// to do in this loop iteration — the turn owns the delivery.
-			const live = s.liveAgents.get(chatId);
+			const live = s.liveAgents.get(ownerKey(chatId));
 			if (live && isTurnRunning(chatId)) {
 				handOffEligible(chatId, live);
 				const handable = stillPending.filter((e) => e.handedTo === live);
@@ -495,7 +496,7 @@ async function pump(chatId: string): Promise<void> {
 			// The runner is required — chat-handler sets it at init. If some
 			// module instance missed the wiring, fail loudly rather than hang.
 			if (!s.turnRunner) {
-				s.queues.delete(chatId);
+				s.queues.delete(ownerKey(chatId));
 				const err = new Error("wake pipeline: no turn runner wired (setTurnRunner)");
 				for (const entry of stillPending) {
 					failSteer(entry.steer, err);
@@ -514,7 +515,7 @@ async function pump(chatId: string): Promise<void> {
 				}
 			}
 			if (fire.length === 0) {
-				s.queues.delete(chatId);
+				s.queues.delete(ownerKey(chatId));
 				return;
 			}
 
@@ -533,7 +534,7 @@ async function pump(chatId: string): Promise<void> {
 			// the carried markers leave the registry BEFORE the turn runs —
 			// the wake run's OWN follow-up poll must never see its own cargo,
 			// and a 409 (client raced in) must be able to push them back.
-			s.queues.delete(chatId);
+			s.queues.delete(ownerKey(chatId));
 			const steers = fire.map((e) => e.steer);
 
 			// Fire the wake (every marker as the turn's input appends). A 409 =
@@ -545,9 +546,9 @@ async function pump(chatId: string): Promise<void> {
 				return -1;
 			});
 			if (status === 409) {
-				const back = s.queues.get(chatId) ?? [];
+				const back = s.queues.get(ownerKey(chatId)) ?? [];
 				back.push(...fire);
-				s.queues.set(chatId, back);
+				s.queues.set(ownerKey(chatId), back);
 				await delay(RETRY_BACKOFF_MS[Math.min(attempt++, RETRY_BACKOFF_MS.length - 1)]!);
 				continue;
 			}
@@ -567,12 +568,12 @@ async function pump(chatId: string): Promise<void> {
 			}
 		}
 	} finally {
-		s.pumping.delete(chatId);
+		s.pumping.delete(ownerKey(chatId));
 		// A steer may have arrived between the last check and the finally —
 		// restart the pump rather than strand it. Entries already handed to
 		// a live run are NOT stragglers (settleSteers owns their resurrection)
 		// — restarting for them would just park in waitForIdle forever.
-		const q = state().queues.get(chatId) ?? [];
+		const q = state().queues.get(ownerKey(chatId)) ?? [];
 		if (q.some((e) => e.handedTo === undefined)) void pump(chatId);
 	}
 }

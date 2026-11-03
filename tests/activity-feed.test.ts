@@ -10,8 +10,7 @@ import test from "node:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { chatStore } from "../src/store/chats.ts";
-import { jobStore } from "../src/store/jobs.ts";
+import { chatStore, jobStore, TEST_USER_ROOT } from "./support/test-stores.ts";
 import { PATHS } from "../config.ts";
 import { activityFeed } from "../src/server/observability.ts";
 
@@ -53,14 +52,14 @@ test("activityFeed: running jobs across ALL chats, running-only, title-joined, o
 	} finally {
 		fs.unlinkSync(`${PATHS.chats}/${chatA.id}.json`);
 		fs.unlinkSync(`${PATHS.chats}/${chatB.id}.json`);
-		const jobsDir = path.join(PATHS.data, "jobs");
+		const jobsDir = path.join(TEST_USER_ROOT, "jobs");
 		for (const id of createdJobs) {
 			fs.unlinkSync(path.join(jobsDir, `${id}.json`));
 		}
 	}
 });
 
-test("activityFeed: contextLimit is the server's live-catalog join (owner amendment, 2026-09-23)", () => {
+test("activityFeed: unknown models have no guessed context limit", () => {
 	// keyed-provider federation — the same env-key pattern as the
 	// model-catalog tests; file-local (each test file is its own process)
 	process.env.OPENROUTER_API_KEY ??= "test-key-openrouter-catalog";
@@ -80,21 +79,19 @@ test("activityFeed: contextLimit is the server's live-catalog join (owner amendm
 		const unknown = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "tc_unknown" });
 		const bare = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "tc_bare" });
 		createdJobs.push(known.id, unknown.id, bare.id);
-		jobStore.updateJob(known.id, { usage: usageFor("openrouter:z-ai/glm-5.3-flash") });
+		jobStore.updateJob(known.id, { usage: usageFor("test-model") });
 		jobStore.updateJob(unknown.id, { usage: usageFor("nope/unknown") });
 
 		const feed = activityFeed();
 		const knownJob = feed.jobs.find((j) => j.id === known.id)!;
-		// pi 1.0.2's catalog: glm-5.3-flash contextWindow 1_048_575 (was
-		// 1_048_576 at 0.87.1 — upstream models.dev refresh).
-		assert.equal(knownJob.contextLimit, 1_048_575, "pi's catalog, joined server-side onto the feed");
+		assert.equal(knownJob.contextLimit, null, "an unlisted model has no guessed context limit");
 		const unknownJob = feed.jobs.find((j) => j.id === unknown.id)!;
 		assert.equal(unknownJob.contextLimit, null, "missing from the live catalog → null, never a guessed window");
 		const bareJob = feed.jobs.find((j) => j.id === bare.id)!;
 		assert.equal(bareJob.contextLimit, null, "no usage yet → no context line");
 	} finally {
 		fs.unlinkSync(`${PATHS.chats}/${chat.id}.json`);
-		const jobsDir = path.join(PATHS.data, "jobs");
+		const jobsDir = path.join(TEST_USER_ROOT, "jobs");
 		for (const id of createdJobs) {
 			fs.unlinkSync(path.join(jobsDir, `${id}.json`));
 		}

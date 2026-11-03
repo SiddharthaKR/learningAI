@@ -1,3 +1,4 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 /**
  * GET /api/activity — the dock's one poll: every running background
  * process, every view (chat, home, everywhere). Composition only — the
@@ -9,6 +10,8 @@ import { activityFeed } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function GETImpl() {
 	return Response.json(activityFeed());
 }
+
+export const GET = withOfficeUser(GETImpl);

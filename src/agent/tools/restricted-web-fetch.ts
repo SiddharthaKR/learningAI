@@ -72,6 +72,16 @@ async function validateDns(url: URL, lookup: typeof dnsLookup): Promise<void> {
   }
 }
 
+/** Validate an edited approval URL before resolving the pending request. */
+export async function validateRestrictedWebTarget(rawUrl: string, deps: RestrictedFetchDeps = {}): Promise<void> {
+  const env = deps.env ?? process.env;
+  const blocklist = (env.WEB_FETCH_BLOCKLIST ?? '').split(/[\s,]+/u).map((item) => item.trim().toLowerCase().replace(/^\./u, '').replace(/\.$/u, '')).filter(Boolean);
+  const url = validateUrl(rawUrl, blocklist);
+  await validateDns(url, deps.lookup ?? dnsLookup);
+  const proxy = url.protocol === 'https:' ? (env.HTTPS_PROXY ?? env.https_proxy) : (env.HTTP_PROXY ?? env.http_proxy);
+  if (!proxy?.trim()) throw new Error(`${url.protocol.slice(0, -1).toUpperCase()}_PROXY is required for web fetch`);
+}
+
 export async function restrictedWebGet(rawUrl: string, deps: RestrictedFetchDeps = {}): Promise<RestrictedResponse> {
   const env = deps.env ?? process.env;
   const blocklist = (env.WEB_FETCH_BLOCKLIST ?? '').split(/[\s,]+/u).map((item) => item.trim().toLowerCase().replace(/^\./u, '').replace(/\.$/u, '')).filter(Boolean);

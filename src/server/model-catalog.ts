@@ -21,7 +21,7 @@ import { clampThinkingLevel, getSupportedThinkingLevels, type Api, type Model } 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { configureLocalProviders, piModels } from "../agent/models.ts";
 import type { DiscoveredLocalModel, LocalProviderSnapshot } from "../agent/local-providers.ts";
-import { settingsStore } from "../store/settings.ts";
+import { settingsStore } from "./stores.ts";
 import { effectiveSettings } from "./stores.ts";
 import { keyValue } from "./keys.ts";
 import type { ChatSettings } from "../core/contracts/chat.ts";

@@ -1,3 +1,4 @@
+import { withOfficeUser } from "@/src/server/route-scope";
 /**
  * GET /api/settings/prompts — the system-prompt segment view
  * (settings-storage wave, 2026-09-19): the effective prompt segments for
@@ -20,10 +21,12 @@ import { effectivePromptSegments, readSettingsRecord } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function GETImpl() {
 	const switches = readSettingsRecord()?.agent?.prompts ?? {};
 	return Response.json({
 		prober: effectivePromptSegments("prober", switches),
 		teacher: effectivePromptSegments("teacher", switches),
 	});
 }
+
+export const GET = withOfficeUser(GETImpl);

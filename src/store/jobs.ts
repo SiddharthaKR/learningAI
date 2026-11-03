@@ -10,14 +10,14 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
 import type { JobStore } from "../core/ports.ts";
 import type { CreateJobInit, JobPatch } from "../core/ports.ts";
 import type { JobRecord } from "../core/contracts.ts";
 
 /** Background jobs (data/jobs). Not in config.ts PATHS (orchestrator-owned). */
-const JOBS_DIR = path.join(PATHS.data, "jobs");
+export function createJobStore(root: string, ownerId?: string): JobStore {
+const JOBS_DIR = path.join(root, "jobs");
 
 function jobFile(id: string): string {
 	if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`Invalid job id: ${id}`);
@@ -32,6 +32,7 @@ function createJob(init: CreateJobInit): JobRecord {
 	const now = new Date().toISOString();
 	const record: JobRecord = {
 		id: `job_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
+		...(ownerId ? { ownerId } : {}),
 		kind: init.kind,
 		chatId: init.chatId,
 		toolCallId: init.toolCallId,
@@ -109,7 +110,7 @@ function deleteJobsForChat(chatId: string): number {
 	return removed;
 }
 
-export const jobStore: JobStore = {
+return {
 	createJob,
 	getJob,
 	updateJob,
@@ -117,3 +118,5 @@ export const jobStore: JobStore = {
 	findJobByToolCallId,
 	deleteJobsForChat,
 };
+}
+

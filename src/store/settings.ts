@@ -19,7 +19,6 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { SETTINGS_FILE } from "../../config.ts";
 import {
 	sanitizeUserSettings,
 	type UserSettings,
@@ -28,10 +27,12 @@ import type { SettingsStore } from "../core/ports.ts";
 
 /** The persisted record, or null when none exists (first boot). Runs the
  *  migration chain on every read — cheap: a no-op file check when current. */
-export function readSettings(): UserSettings | null {
+export function createSettingsStore(root: string): SettingsStore {
+const settingsFile = path.join(root, "settings.json");
+function readSettings(): UserSettings | null {
 	let raw: string;
 	try {
-		raw = fs.readFileSync(SETTINGS_FILE, "utf-8");
+		raw = fs.readFileSync(settingsFile, "utf-8");
 	} catch {
 		return null; // no settings.json yet — first boot, all factory defaults
 	}
@@ -50,16 +51,18 @@ export function readSettings(): UserSettings | null {
 }
 
 /** Persist the record (sanitized). Returns what was written. */
-export function writeSettings(raw: unknown): UserSettings {
+function writeSettings(raw: unknown): UserSettings {
 	const settings = sanitizeUserSettings(raw);
 	if (!settings) throw new Error("settings record must be a JSON object");
-	fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
-	fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, "\t"), "utf-8");
+	fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
+	fs.writeFileSync(settingsFile, JSON.stringify(settings, null, "\t"), "utf-8");
 	return settings;
 }
 
 /** The typed adapter (core/ports.ts SettingsStore), for the composition root. */
-export const settingsStore: SettingsStore = {
+return {
 	readSettings,
 	writeSettings,
 };
+}
+

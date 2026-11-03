@@ -64,8 +64,7 @@ import {
 import { registerJobAbort, unregisterJobAbort } from "../src/agent/subagents/aborts.ts";
 import { beginTurn, endTurn } from "../src/server/turn-liveness.ts";
 import { persistTurn } from "../src/server/turn-service.ts";
-import { chatStore } from "../src/store/chats.ts";
-import { jobStore } from "../src/store/jobs.ts";
+import { chatStore, jobStore, TEST_USER_ROOT } from "./support/test-stores.ts";
 import { createJobRunner, pdfModelOverride, researchModelOverride } from "../src/agent/subagents/runner.ts";
 import { providerKeyMissing, type ModelSlotName } from "../src/core/settings.ts";
 import type { PiEngine } from "../src/agent/models.ts";
@@ -76,7 +75,7 @@ import { subscribe } from "../src/core/events.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import type { SteerInput, TurnInput } from "../src/core/input-events.ts";
 
-const JOBS_DIR = path.join(PATHS.data, "jobs");
+const JOBS_DIR = path.join(TEST_USER_ROOT, "jobs");
 
 const createdChats: string[] = [];
 
@@ -552,7 +551,7 @@ sigma.js v3 is current.
  *  turn 2: the final text brief. */
 function researcherModel(): PiEngine {
 	return fauxEngine([
-		fauxAssistantMessage([fauxToolCall("web_search", { query: "sigma.js latest version" }, { id: "ws1" })], {
+		fauxAssistantMessage([fauxToolCall("web_search", { query: "sigma.js latest version", reason: "check the current release" }, { id: "ws1" })], {
 			stopReason: "toolUse",
 		}),
 		fauxAssistantMessage([fauxText(BRIEF)]),
@@ -749,9 +748,9 @@ describe("researcher agent", () => {
 	it("runs with the web tool set (no network touched)", () => {
 		// The researcher is a runSubagent call over the webTools registry —
 		// the tool set is what the loop sees.
-		assert.ok(webTools.web_search, "web_search available");
+		assert.equal(webTools.web_search, undefined, "URL-only mode has no web_search");
 		assert.ok(webTools.web_fetch, "web_fetch available");
-		assert.equal(Object.keys(webTools).length, 2, "ONLY the web tools — no question/plan tools");
+		assert.equal(Object.keys(webTools).length, 1, "only web_fetch in URL-only mode");
 		// reset any accidental global override
 		researchModelOverride.current = undefined;
 	});
