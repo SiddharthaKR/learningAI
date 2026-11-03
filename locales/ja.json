@@ -66,5 +66,29 @@
     "teachingLanguage": "授業言語",
     "learnPlaceholder": "何を学びたいですか？",
     "practicePlaceholder": "何を練習したいですか？"
+  },
+  "home": {
+    "startSession": "セッションを開始"
+  },
+  "chat": {
+    "sessionTitle": "セッション名",
+    "renameThisSession": "このセッションの名前を変更",
+    "renameSession": "セッション名を変更",
+    "teachingLanguage": "授業言語",
+    "containsOfficeDocuments": "社内文書を含む",
+    "openPlan": "学習プランを開く",
+    "plan": "プラン",
+    "practice": "練習",
+    "newSession": "新しいセッション",
+    "you": "あなた",
+    "compactingContext": "履歴を整理中",
+    "compacting": "履歴を整理中…",
+    "thinking": "考え中",
+    "askOrNext": "質問を入力するか、Enterキーで次の問題へ進みます。"
+  },
+  "composer": {
+    "nextProblem": "次の問題",
+    "stop": "停止",
+    "send": "送信"
   }
 }

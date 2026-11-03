@@ -66,5 +66,29 @@
     "teachingLanguage": "Teaching language",
     "learnPlaceholder": "What do you want to learn?",
     "practicePlaceholder": "What do you want to practice?"
+  },
+  "home": {
+    "startSession": "Start session"
+  },
+  "chat": {
+    "sessionTitle": "Session title",
+    "renameThisSession": "Rename this session",
+    "renameSession": "Rename session",
+    "teachingLanguage": "Teaching language",
+    "containsOfficeDocuments": "contains office documents",
+    "openPlan": "Open the full plan",
+    "plan": "Plan",
+    "practice": "Practice",
+    "newSession": "New session",
+    "you": "You",
+    "compactingContext": "Compacting context",
+    "compacting": "COMPACTING CONTEXT…",
+    "thinking": "Thinking",
+    "askOrNext": "Ask anything, or press Enter for the next one."
+  },
+  "composer": {
+    "nextProblem": "Next problem",
+    "stop": "Stop",
+    "send": "Send"
   }
 }

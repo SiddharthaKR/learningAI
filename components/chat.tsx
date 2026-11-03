@@ -65,6 +65,7 @@ import {
 	type CompactionDividerData,
 } from "@/components/compaction-divider";
 import { CoverageRing } from "@/components/extraction-coverage";
+import { useI18n } from "@/components/i18n-provider";
 import {
 	activeProblemOf,
 	dismissedAnswer,
@@ -228,6 +229,7 @@ export function Chat({
 	 *  only decides whether the pill rides the composer. */
 	initialConfigured?: boolean;
 }) {
+	const copy = useI18n();
 	// Reattach plumbing (background-turn runner wave): the hook holds the
 	// settled terminal's callback — a stable ref assigned below, once
 	// syncFromServer exists (refs, not closures: no stale capture).
@@ -1175,8 +1177,8 @@ export function Chat({
 								}}
 								onBlur={() => void commitRename(titleDraft)}
 								spellCheck={false}
-								aria-label="Session title"
-								title="Rename this session"
+								aria-label={copy.chat.sessionTitle}
+								title={copy.chat.renameThisSession}
 								className="lh-no-drag min-w-[8ch] max-w-[70%] shrink-0 bg-transparent font-title text-3xl tracking-tight caret-current outline-none [field-sizing:content]"
 							/>
 							{/* flex-1 spacer during rename too, so the chips stay at
@@ -1188,7 +1190,7 @@ export function Chat({
 					<>
 						<Hint
 							// F2 renames (registry) — surfaced on the hover.
-							label="Rename session"
+							label={copy.chat.renameSession}
 							action="rename-session"
 							side="bottom"
 						>
@@ -1208,15 +1210,15 @@ export function Chat({
 							<div className="min-w-4 flex-1" aria-hidden="true" />
 					</>
 					)}
-					<span aria-label="Teaching language" className="pointer-events-none shrink-0 text-xs text-muted-foreground">
-						{teachingLanguage === "ja" ? "日本語" : "English"}
+					<span aria-label={copy.chat.teachingLanguage} className="pointer-events-none shrink-0 text-xs text-muted-foreground">
+						{teachingLanguage === "ja" ? copy.common.japanese : copy.common.english}
 					</span>
-					{knowledgeUsed && <span className="pointer-events-none shrink-0 text-xs text-muted-foreground">contains office documents</span>}
+					{knowledgeUsed && <span className="pointer-events-none shrink-0 text-xs text-muted-foreground">{copy.chat.containsOfficeDocuments}</span>}
 					{/* The plan chip (owner, plan-placement round): session-level
 					    structure beside the phase chip — access to the full-DAG popup
 					    at every width; the marginalia is the wide-screen glance view. */}
 					{planTree && (
-						<Hint label="Open the full plan" side="bottom">
+						<Hint label={copy.chat.openPlan} side="bottom">
 <button
 							type="button"
 							data-testid="plan-chip"
@@ -1227,7 +1229,7 @@ export function Chat({
 							className="lh-no-drag flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border/80 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:border-border hover:text-foreground"
 						>
 							<WaypointsIcon className="size-3.5 text-primary" aria-hidden />
-							Plan
+							{copy.chat.plan}
 						</button>
 </Hint>
 					)}
@@ -1249,7 +1251,7 @@ export function Chat({
 							className="pointer-events-none flex shrink-0 select-none items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
 						>
 							<DumbbellIcon className="size-3" />
-							Practice
+							{copy.chat.practice}
 						</span>
 					) : (
 						<PhaseChip phase={phases.at(-1) ?? "probe"} />
@@ -1264,7 +1266,7 @@ export function Chat({
 						<div data-session-find-root="" className={`${COLUMN} flex flex-1 flex-col gap-4 pt-4`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
-									title="New session"
+									title={copy.chat.newSession}
 									description="The teacher will open by probing what you already know."
 								/>
 							)}
@@ -1375,7 +1377,7 @@ export function Chat({
 												{/* The rail GROUPS (owner round 4, 2026-10-05): the YOU heading
 												    sits INSIDE the rail, same mono-xs register and same 1ch
 												    rail as the thinking rows — one quote geometry. */}
-												<div className="font-medium uppercase tracking-wide text-muted-foreground">You</div>
+										<div className="font-medium uppercase tracking-wide text-muted-foreground">{copy.chat.you}</div>
 												<div className="lh-prose whitespace-pre-wrap text-foreground">
 													{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
 												</div>
@@ -1505,13 +1507,13 @@ export function Chat({
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && (
 								<span className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
-									<BrailleSpinner label="Compacting context" />
-									<Shimmer duration={1}>COMPACTING CONTEXT…</Shimmer>
+									<BrailleSpinner label={copy.chat.compactingContext} />
+									<Shimmer duration={1}>{copy.chat.compacting}</Shimmer>
 								</span>
 							)}
 							{(status === "submitted" || turnInFlight) && (
 								<span className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
-									<BrailleSpinner label="Thinking" />
+									<BrailleSpinner label={copy.chat.thinking} />
 									<Shimmer duration={1}>
 										THINKING…
 									</Shimmer>
@@ -1572,7 +1574,7 @@ export function Chat({
 							// applies.
 							nextProblem={nextReady}
 							onNext={sendNext}
-							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : undefined}
+							placeholder={nextReady ? copy.chat.askOrNext : undefined}
 						/>
 					}
 					onSubmitAnswer={(output) => {
@@ -1792,6 +1794,7 @@ function DockOverlay({
 	 *  home and /chat/new carry, above the composer while slots are unset. */
 	setupCta?: React.ReactNode;
 }) {
+	const copy = useI18n();
 	const { isAtBottom, scrollToBottom, scrollRef } = useStickToBottomContext();
 	// Render-fresh bottom state (flicker round): the arrival block below reads
 	// it DURING RENDER — the same value the after-paint effect used to read a
@@ -2266,7 +2269,7 @@ function DockOverlay({
 				    mid-question unmount), and widening past the floor fades it
 				    back in. */}
 				{pending && plan && (
-					<Hint label="Open the full plan" side="bottom">
+					<Hint label={copy.chat.openPlan} side="bottom">
 <button
 						type="button"
 						data-testid="plan-marginalia"
