@@ -35,6 +35,8 @@ import {
 	type Phase3,
 } from "@/src/core";
 import { CONFIDENCE_COLORS, confidenceRailStyle } from "@/components/confidence-rail";
+import { useI18n } from "@/components/i18n-provider";
+import { formatMessage } from "@/src/i18n/catalog";
 
 /**
  * The question dock — a pending quiz/ask REPLACES the chat composer: the
@@ -105,6 +107,7 @@ export function QuestionDock({
 	dictationClaim = true,
 	compactionRunning = false,
 }: QuestionDockProps) {
+	const copy = useI18n().learning;
 	// The probe-phase names (owner, 2026-10-09) canonicalize onto their
 	// teach twins for every dock concern — parse dispatch, labels, kinds:
 	// the probe quiz ("probe") is quiz-shaped, the probe free-recall
@@ -114,7 +117,7 @@ export function QuestionDock({
 	// The chip's display name carries the tool's OWN name (owner
 	// 2026-10-09): probe-phase questions label Probe/Recall in the
 	// composer; teach tools keep the standing labels.
-	const toolLabel = toolName === "probe" ? "Probe" : toolName === "recall" ? "Recall" : undefined;
+	const toolLabel = toolName === "probe" ? copy.probe : toolName === "recall" ? copy.recall : undefined;
 	// Parse, don't cast (src/core/tool-parts.ts): the model authored this
 	// input, and only the schema the tool declared vouches for its shape.
 	// The dock mounts on input-available parts (already validated at the
@@ -126,7 +129,7 @@ export function QuestionDock({
 	if (!parsed) {
 		return (
 			<div data-testid="malformed-question" className="rounded-xl border border-dashed bg-card/60 p-3 text-sm text-muted-foreground">
-				This question arrived malformed — the transcript keeps the retry.
+				{copy.malformedQuestion}
 			</div>
 		);
 	}
@@ -142,7 +145,7 @@ export function QuestionDock({
 					label={
 						(canonical === "quiz" || canonical === "explain") &&
 						normalizeQuizType((parsed as { type?: unknown }).type) === "predict"
-							? "Prediction"
+							? copy.prediction
 							: undefined
 					}
 				/>
@@ -201,6 +204,7 @@ export function QuestionDockBar({
 	 *  label Probe/Recall — the phase boundary visible in the composer. */
 	toolLabel?: string;
 }) {
+	const copy = useI18n().learning;
 	if (variant === "reveal") {
 		return (
 			<button
@@ -213,11 +217,11 @@ export function QuestionDockBar({
 					<PlayIcon className="size-3.5" />
 				</span>
 				<span className="min-w-0 flex-1">
-					<span className="block text-sm font-medium">Check your understanding</span>
+					<span className="block text-sm font-medium">{copy.checkUnderstanding}</span>
 					<span className="block truncate text-xs text-muted-foreground">{teaserText(question)}</span>
 				</span>
 				<span className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
-					Open <ChevronRightIcon className="size-3.5" />
+					{copy.open} <ChevronRightIcon className="size-3.5" />
 				</span>
 			</button>
 		);
@@ -232,11 +236,11 @@ export function QuestionDockBar({
 			<span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
 				{label ??
 							toolLabel ??
-							(toolName === "quiz" ? "Check" : toolName === "explain" ? "Explain" : "Question")}
+							(toolName === "quiz" ? copy.check : toolName === "explain" ? copy.explain : copy.question)}
 			</span>
 			<span className="min-w-0 flex-1 truncate text-muted-foreground">{teaserText(question)}</span>
 			<span className="flex shrink-0 items-center gap-1 text-xs font-medium">
-				Answer <ArrowDownIcon className="size-3.5" />
+				{copy.answer} <ArrowDownIcon className="size-3.5" />
 			</span>
 		</button>
 	);
@@ -254,6 +258,7 @@ function QuestionDockForm({
 	dictationClaim = true,
 	compactionRunning = false,
 }: Omit<QuestionDockProps, "expanded" | "onExpand" | "reveal">) {
+	const copy = useI18n().learning;
 	const kind = toolQuestionKind(toolName);
 
 	// Canonical QuestionData, built once per question. Quiz options are
@@ -547,16 +552,16 @@ function QuestionDockForm({
 			<div data-session-find-root="" className="max-h-[var(--dock-max-h,55dvh)] overflow-y-auto px-4 pt-3">
 				<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
 					{toolName === "probe"
-						? "Probe"
+						? copy.probe
 						: toolName === "recall"
-							? "Recall"
+							? copy.recall
 							: kind === "quiz"
 								? qd.questionType === "predict"
-									? "Prediction"
+									? copy.prediction
 									: "Check"
 									: kind === "explain"
-										? "Explain"
-											: "Question"}
+										? copy.explain
+											: copy.question}
 					{qd.mode === "multi-select" && " · select all that apply"}
 				</div>
 				<div className="mb-3 font-medium">
@@ -644,7 +649,7 @@ function QuestionDockForm({
 								>
 									{sel.dontKnow && <span className="size-1.5 rounded-full bg-current" />}
 								</span>
-								<span>I don't know</span>
+								<span>{copy.iDontKnow}</span>
 							</button>
 						)}
 
@@ -710,7 +715,7 @@ function QuestionDockForm({
 												submit();
 											}
 									}}
-									placeholder="Type your own answer…"
+									placeholder={copy.otherAnswer}
 									className="lh-input w-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
 									onClick={(e) => e.stopPropagation()}
 								/>
@@ -771,9 +776,9 @@ function QuestionDockForm({
 								step={1}
 								value={CONFIDENCE_STOPS[confIdx]}
 								disabled={sel.dontKnow}
-								aria-label="Confidence — the probability your selected answer is correct"
-								aria-valuetext={`${CONFIDENCE_STOPS[confIdx]} percent`}
-								title="The probability your selected answer is correct — 50% is a coin flip. Adjust with ←/→."
+								aria-label={copy.confidenceLabel}
+								aria-valuetext={formatMessage(copy.confidenceValue, { count: CONFIDENCE_STOPS[confIdx] })}
+								title={copy.confidenceHint}
 								data-testid="confidence-slider"
 								onChange={(e) => {
 									// Snap to the nearest stop; the rendered VALUE is the stop's own
@@ -828,7 +833,7 @@ function QuestionDockForm({
 					className="rounded-[10px] border border-border/70 bg-background/60 transition-colors focus-within:border-primary/50"
 				>
 					<div className="px-2.5 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-						{qd.mode === "text" ? "Your answer" : "YOUR THINKING"}
+						{qd.mode === "text" ? copy.yourAnswer : copy.yourThinking}
 					</div>
 					{qd.mode === "text" ? (
 						<textarea
@@ -854,7 +859,7 @@ function QuestionDockForm({
 									submit();
 								}
 							}}
-							placeholder="Type your answer…"
+							placeholder={copy.answerPlaceholder}
 							rows={1}
 							className="field-sizing-content lh-input max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"
 						/>
@@ -884,7 +889,7 @@ function QuestionDockForm({
 									submit();
 								}
 							}}
-							placeholder="Why this answer? Whatever comes to mind."
+							placeholder={copy.thinkingPlaceholder}
 							rows={1}
 							className={cn(
 								"field-sizing-content lh-input max-h-48 w-full resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground/70",
@@ -896,14 +901,14 @@ function QuestionDockForm({
 					)}
 					<div className="flex items-center justify-between gap-2 p-1">
 						<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
-								{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
+								{compactionRunning ? copy.compacting : copy.submitHint}
 						</span>
 						<Button
 							type="submit"
 							disabled={!canSubmit || compactionRunning}
 							className="ml-auto h-9 rounded-[6px] px-3.5 text-sm font-medium"
 						>
-							Submit answer
+							{copy.submitAnswer}
 						</Button>
 					</div>
 				</div>
