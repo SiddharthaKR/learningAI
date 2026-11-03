@@ -9,3 +9,7 @@ const catalogs: Record<UiLanguage, LocaleCatalog> = { en, ja };
 export function catalogFor(language: UiLanguage): LocaleCatalog {
   return catalogs[language] ?? catalogs.en;
 }
+
+export function formatMessage(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, String(value)), template);
+}

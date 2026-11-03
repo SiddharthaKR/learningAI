@@ -239,7 +239,7 @@ function fill(template: string, values: Record<string, string | number>): string
 	return Object.entries(values).reduce((text, [key, value]) => text.replace(`{${key}}`, String(value)), template);
 }
 
-function localizedTimeAgo(iso: string, copy: LocaleCatalog["sidebar"], now = new Date()): string {
+export function localizedTimeAgo(iso: string, copy: LocaleCatalog["sidebar"], now = new Date()): string {
 	const ms = now.getTime() - new Date(iso).getTime();
 	if (ms < 60_000) return copy.justNow;
 	const min = Math.floor(ms / 60_000);

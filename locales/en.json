@@ -90,5 +90,36 @@
     "nextProblem": "Next problem",
     "stop": "Stop",
     "send": "Send"
+  },
+  "coverage": {
+    "extracting": "extracting…",
+    "fullyExtracted": "fully extracted",
+    "tokensUncovered": "{count} tok uncovered",
+    "messagesUnextracted": "{count} message(s) unextracted",
+    "running": "Running",
+    "extract": "Extract",
+    "hint": "How much of this session isn't mapped yet",
+    "title": "Extraction coverage",
+    "uncovered": "Uncovered",
+    "covered": "Covered",
+    "messages": "Messages",
+    "chunkThreshold": "Chunk threshold",
+    "lastExtraction": "Last extraction",
+    "status": "Status",
+    "tokens": "{count} tokens",
+    "none": "—"
+  },
+  "webApproval": {
+    "title": "Approve web access",
+    "searchQuery": "Exact search query",
+    "fullUrl": "Full URL",
+    "officeWarning": "This request may include office knowledge.",
+    "sensitiveTerm": "Sensitive term",
+    "copiedText": "Copied text",
+    "deny": "Deny",
+    "allow": "Allow",
+    "submitError": "Could not submit this decision.",
+    "newWarnings": "The edited request has new warning matches. Review them, then choose Allow again.",
+    "serverError": "Could not reach the server. Please try again."
   }
 }

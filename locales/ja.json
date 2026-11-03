@@ -90,5 +90,36 @@
     "nextProblem": "次の問題",
     "stop": "停止",
     "send": "送信"
+  },
+  "coverage": {
+    "extracting": "抽出中…",
+    "fullyExtracted": "抽出済み",
+    "tokensUncovered": "未抽出 {count} トークン",
+    "messagesUnextracted": "未抽出 {count} 件",
+    "running": "実行中",
+    "extract": "抽出",
+    "hint": "このセッションでまだ知識マップに反映されていない量",
+    "title": "抽出状況",
+    "uncovered": "未抽出",
+    "covered": "抽出済み",
+    "messages": "メッセージ",
+    "chunkThreshold": "チャンクしきい値",
+    "lastExtraction": "最終抽出",
+    "status": "状態",
+    "tokens": "{count} トークン",
+    "none": "—"
+  },
+  "webApproval": {
+    "title": "ウェブアクセスの確認",
+    "searchQuery": "検索クエリ全文",
+    "fullUrl": "URL全文",
+    "officeWarning": "このリクエストには社内情報が含まれている可能性があります。",
+    "sensitiveTerm": "機密用語",
+    "copiedText": "コピーされた文章",
+    "deny": "拒否",
+    "allow": "許可",
+    "submitError": "判断を送信できませんでした。",
+    "newWarnings": "編集後の内容に新しい警告があります。確認してから、もう一度「許可」を選んでください。",
+    "serverError": "サーバーに接続できませんでした。もう一度お試しください。"
   }
 }
