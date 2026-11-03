@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
+import { useI18n } from "@/components/i18n-provider";
 
 /**
  * The ESC-abort guard (owner, 2026-10-02): the global Esc → abort chain
@@ -27,24 +28,6 @@ import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 /** What Esc is aborting — drives copy and the confirm action. */
 export type AbortMode = "turn" | "question" | "problem";
 
-const COPY: Record<AbortMode, { title: string; line: string; action: string }> = {
-	turn: {
-		title: "Abort this turn?",
-		line: "The partial answer stays in the transcript.",
-		action: "Abort",
-	},
-	question: {
-		title: "Dismiss this question?",
-		line: "Skipped — the teacher moves on without it.",
-		action: "Dismiss",
-	},
-	problem: {
-		title: "Discard this problem?",
-		line: "The problem is dropped — no solution is revealed.",
-		action: "Discard",
-	},
-};
-
 /** The dialog's pure body — exported for SSR pins (the delete-node
  * pattern). The wrapper owns effects + the portal. */
 export function AbortTurnBody({
@@ -60,13 +43,19 @@ export function AbortTurnBody({
 	 * (owner, 2026-10-04): the line says so. */
 	busy?: boolean;
 }) {
+	const catalog = useI18n().dialogs;
 	const backdropDismiss = useBackdropDismiss(onClose);
-	const copy = COPY[mode];
+	const copy: Record<AbortMode, { title: string; line: string; action: string }> = {
+		turn: { title: catalog.abortTurn, line: catalog.abortTurnLine, action: catalog.abort },
+		question: { title: catalog.dismissQuestion, line: catalog.dismissQuestionLine, action: catalog.dismiss },
+		problem: { title: catalog.discardProblem, line: catalog.discardProblemLine, action: catalog.discard },
+	};
+	const modeCopy = copy[mode];
 	return (
 		<div
 			role="dialog"
 			aria-modal="true"
-			aria-label={copy.title}
+			aria-label={modeCopy.title}
 			data-testid="abort-turn-dialog"
 			className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
 			// A genuine click on the scrim cancels — the cautious default, like Esc.
@@ -77,11 +66,11 @@ export function AbortTurnBody({
 				onClick={(e) => e.stopPropagation()}
 			>
 				<h2 className="text-sm font-semibold text-card-foreground" data-testid="abort-turn-title">
-					{copy.title}
+					{modeCopy.title}
 				</h2>
 				<p className="mt-1.5 text-xs text-muted-foreground" data-testid="abort-turn-line">
-					{copy.line}
-					{busy && mode !== "turn" ? " The working turn stops too." : ""}
+					{modeCopy.line}
+					{busy && mode !== "turn" ? ` ${catalog.workingTurnStops}` : ""}
 				</p>
 				<div className="mt-4 flex justify-end gap-2">
 					<button
@@ -90,7 +79,7 @@ export function AbortTurnBody({
 						onClick={onClose}
 						className="rounded-sm px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
 					>
-						Cancel
+						{catalog.cancel}
 					</button>
 					<button
 						type="button"
@@ -99,7 +88,7 @@ export function AbortTurnBody({
 						// Destructive red — the app's established destructive pair.
 						className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/20"
 					>
-						{copy.action}
+						{modeCopy.action}
 					</button>
 				</div>
 			</div>

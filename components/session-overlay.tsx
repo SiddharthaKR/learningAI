@@ -7,6 +7,7 @@ import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/comp
 import { renderMermaid } from "@/components/mermaid-render";
 import { MermaidError } from "@/components/mermaid-error";
 import { Hint } from "@/components/ui/hint";
+import { useI18n } from "@/components/i18n-provider";
 
 /**
  * SESSION-SCOPED OVERLAYS (owner wave, 2026-09-19): the "fullscreen"
@@ -83,6 +84,7 @@ export function MermaidOverlay({
 	inverted?: boolean;
 	onClose: () => void;
 }) {
+	const copy = useI18n().diagram;
 	// ── chart render (own instance, own ids); figure mode uses the raw svg ──
 	const [svg, setSvg] = useState<string | null>(rawSvg ?? null);
 	const [error, setError] = useState<string | null>(null);
@@ -218,16 +220,16 @@ export function MermaidOverlay({
 			className="absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm"
 			role="dialog"
 			aria-modal="true"
-			aria-label="Diagram focus"
+			aria-label={copy.focus}
 		>
 			<div className="mb-2 flex items-center gap-2">
-				<span className="text-sm font-medium">Diagram</span>
-				<span className="text-xs text-muted-foreground">from this lesson</span>
+				<span className="text-sm font-medium">{copy.title}</span>
+				<span className="text-xs text-muted-foreground">{copy.fromLesson}</span>
 				<Hint label="Close" binding="escape" side="left">
 <button
 					type="button"
 					onClick={onClose}
-					aria-label="Close"
+					aria-label={copy.close}
 					data-testid="mermaid-overlay-close"
 					className="ml-auto rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 				>
@@ -287,12 +289,12 @@ export function MermaidOverlay({
 							/>
 						</div>
 						<div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between p-2">
-							<span className="text-xs text-muted-foreground/60">Drag to pan · scroll to zoom</span>
+							<span className="text-xs text-muted-foreground/60">{copy.panZoom}</span>
 							<div className="flex gap-1">
 								<Hint label="Zoom out" side="bottom">
 <button
 									type="button"
-									aria-label="Zoom out"
+									aria-label={copy.zoomOut}
 									onClick={() => stepZoom(1 / 1.25)}
 									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
 								>
@@ -302,7 +304,7 @@ export function MermaidOverlay({
 								<Hint label="Fit diagram to view" side="bottom">
 <button
 									type="button"
-									aria-label="Fit diagram to view"
+									aria-label={copy.fit}
 									onClick={fitView}
 									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
 								>
@@ -312,7 +314,7 @@ export function MermaidOverlay({
 								<Hint label="Zoom in" side="bottom">
 <button
 									type="button"
-									aria-label="Zoom in"
+									aria-label={copy.zoomIn}
 									onClick={() => stepZoom(1.25)}
 									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
 								>

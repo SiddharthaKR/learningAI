@@ -69,4 +69,11 @@ describe("UTF-8 source and locale integrity", () => {
     };
     assert.equal(catalog.learning?.checkUnderstanding, "理解度を確認");
   });
+
+  it("serves dialog and overlay copy from the Japanese catalog", () => {
+    const catalog = JSON.parse(readFileSync(path.join(ROOT, "locales", "ja.json"), "utf8")) as {
+      dialogs?: { deleteSession?: string };
+    };
+    assert.equal(catalog.dialogs?.deleteSession, "セッションを削除しますか？");
+  });
 });
