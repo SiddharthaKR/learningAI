@@ -76,4 +76,11 @@ describe("UTF-8 source and locale integrity", () => {
     };
     assert.equal(catalog.dialogs?.deleteSession, "セッションを削除しますか？");
   });
+
+  it("serves settings copy from the Japanese catalog", () => {
+    const catalog = JSON.parse(readFileSync(path.join(ROOT, "locales", "ja.json"), "utf8")) as {
+      settingsUi?: { title?: string };
+    };
+    assert.equal(catalog.settingsUi?.title, "設定");
+  });
 });

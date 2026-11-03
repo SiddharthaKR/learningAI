@@ -47,14 +47,15 @@ import { notifySettingsSaved } from "@/components/settings-signal";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
+import { useI18n } from "@/components/i18n-provider";
 
 /** Owner (2026-09-20): hints earn their place — mechanics-explaining
  *  prose is out; only the keyboard note stays (storage location is a
  *  real question users ask). */
 const SECTIONS = [
-	{ id: "appearance", label: "Appearance" },
-	{ id: "graph", label: "Graph" },
-	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
+	{ id: "appearance" },
+	{ id: "graph" },
+	{ id: "keyboard" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -137,6 +138,12 @@ export function SettingsDialogBody({
 	 *  retargets follow it exactly like initialSection below. */
 	initialRow?: string | null;
 }) {
+	const copy = useI18n().settingsUi;
+	const sectionLabels: Record<SectionId, string> = {
+		appearance: copy.appearance,
+		graph: copy.graph,
+		keyboard: copy.keyboard,
+	};
 	const { onAppearanceChange } = useAppearance();
 	const [record, setRecord] = useState<UserSettings | null | undefined>(
 		undefined,
@@ -262,23 +269,23 @@ export function SettingsDialogBody({
 		<div
 			role="dialog"
 			aria-modal="true"
-			aria-label="Settings"
+			aria-label={copy.title}
 			data-testid="settings-dialog"
 			className="settings-dialog-pop flex h-[620px] max-h-[85vh] w-[920px] max-w-[90vw] flex-col overflow-hidden rounded-md border border-border bg-card shadow-xl"
 			onClick={(e) => e.stopPropagation()}
 		>
 			{/* Header — the app's quiet CMU title language. */}
 			<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
-				<h2 className="font-title text-2xl tracking-tight">Settings</h2>
+				<h2 className="font-title text-2xl tracking-tight">{copy.title}</h2>
 				<Hint
 						// Esc closes the dialog (its own listener) — surface it.
-						label="Close"
+						label={copy.close}
 						binding="escape"
 						side="left"
 					>
 						<button
 					type="button"
-					aria-label="Close settings"
+					aria-label={copy.closeSettings}
 					data-testid="settings-close"
 					className="ml-auto size-7 rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 					onClick={onClose}
@@ -300,7 +307,7 @@ export function SettingsDialogBody({
 				{/* Left nav — text-only, the session-list mono language,
 					    active = bg-accent. */}
 				<nav
-					aria-label="Settings sections"
+					aria-label={copy.sections}
 					data-testid="settings-nav"
 					className="flex w-44 shrink-0 flex-col gap-1 border-r border-border p-2"
 				>
@@ -317,7 +324,7 @@ export function SettingsDialogBody({
 							}`}
 							onClick={() => setActive(s.id)}
 						>
-							{s.label}
+							{sectionLabels[s.id]}
 						</button>
 					))}
 				</nav>
@@ -344,17 +351,17 @@ export function SettingsDialogBody({
 					)}
 					{record === undefined ? (
 						<p className="px-6 py-5 text-xs text-muted-foreground/70">
-							Loading settings…
+							{copy.loading}
 						</p>
 					) : record === null ? (
 						<p className="px-6 py-5 text-xs text-muted-foreground/70">
-							Settings could not be loaded — refresh to retry.
+							{copy.loadFailed}
 						</p>
 					) : (
 						<div>
 							{active === "appearance" && (
 								<SettingsSection
-									title="Appearance"
+									title={copy.appearance}
 									testid="section-appearance"
 								>
 									<AppearanceSection
@@ -367,7 +374,7 @@ export function SettingsDialogBody({
 							)}
 							{active === "graph" && (
 								<SettingsSection
-									title="Graph"
+									title={copy.graph}
 									testid="section-graph"
 								>
 									<GraphSection
@@ -380,8 +387,8 @@ export function SettingsDialogBody({
 							)}
 							{active === "keyboard" && (
 								<SettingsSection
-									title="Keyboard"
-									hint="Stored on this device"
+									title={copy.keyboard}
+									hint={copy.storedOnDevice}
 									testid="section-keyboard"
 								>
 									<KeyboardSection />

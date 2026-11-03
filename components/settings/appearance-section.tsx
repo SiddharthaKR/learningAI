@@ -42,6 +42,8 @@ import { Hint } from "@/components/ui/hint";
 import { useAppearance } from "./appearance.tsx";
 import { FontMenuList } from "./model-menu";
 import { CommitInput, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
+import { useI18n } from "@/components/i18n-provider";
+import { formatMessage } from "@/src/i18n/catalog";
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
@@ -97,6 +99,7 @@ export function AppearanceSection({
 	/** PUT the whole appearance section; the page re-applies on success. */
 	onSectionChange: (next: AppearanceSettings) => void;
 }) {
+	const copy = useI18n().settingsUi;
 	const { appearance: resolved } = useAppearance();
 	const md = appearance?.mdRendering;
 
@@ -186,14 +189,14 @@ export function AppearanceSection({
 
 	return (
 		<>
-			<SettingsRow label="Mode" hint="Coming soon" testid="row-mode" dimmed>
-				<ThinSelect value="dark" ariaLabel="mode" onChange={() => {}} testid="select-mode" disabled>
-					<option value="dark">Dark</option>
+			<SettingsRow label={copy.mode} hint={copy.comingSoon} testid="row-mode" dimmed>
+				<ThinSelect value="dark" ariaLabel={copy.mode} onChange={() => {}} testid="select-mode" disabled>
+					<option value="dark">{copy.dark}</option>
 				</ThinSelect>
 			</SettingsRow>
 			<SettingsRow
-				label="Background"
-				hint={`Empty = ${resolved.background ?? "#141414"}`}
+				label={copy.background}
+				hint={formatMessage(copy.emptyValue, { value: resolved.background ?? "#141414" })}
 				testid="row-background"
 			>
 				<CommitInput
@@ -205,8 +208,8 @@ export function AppearanceSection({
 				/>
 			</SettingsRow>
 			<SettingsRow
-				label="Reading font"
-				hint={`Empty = ${DEFAULT_READING_FONT}`}
+				label={copy.readingFont}
+				hint={formatMessage(copy.emptyValue, { value: DEFAULT_READING_FONT })}
 				testid="row-font"
 			>
 				<span ref={fontMenuOpen ? menuAnchorRef : undefined} className="relative flex items-center gap-2">
@@ -222,7 +225,7 @@ export function AppearanceSection({
 						const triggerButton = (
 							<button
 								type="button"
-								aria-label="Reading font"
+								aria-label={copy.readingFont}
 								aria-expanded={fontMenuOpen}
 								data-testid="font-trigger"
 								onClick={openFontMenu}
@@ -237,7 +240,7 @@ export function AppearanceSection({
 						return fontMenuOpen ? (
 							triggerButton
 						) : (
-							<Hint label="Choose from your installed fonts" side="left">
+							<Hint label={copy.chooseInstalledFont} side="left">
 								{triggerButton}
 							</Hint>
 						);
@@ -267,7 +270,7 @@ export function AppearanceSection({
 					)}
 				</span>
 			</SettingsRow>
-			<SettingsRow label="Reading font size" hint={`${resolved.proseFontSize}px`} testid="row-prose-size">
+			<SettingsRow label={copy.readingFontSize} hint={`${resolved.proseFontSize}px`} testid="row-prose-size">
 				<CommitInput
 					type="number"
 					value={String(appearance?.proseFontSize ?? "")}
@@ -288,14 +291,14 @@ export function AppearanceSection({
 					}}
 				/>
 			</SettingsRow>
-			<SettingsRow label="Session names in serif" testid="row-session-serif">
+			<SettingsRow label={copy.sessionNamesSerif} testid="row-session-serif">
 				<Toggle
 					checked={appearance?.sessionNameSerif ?? true}
-					label="session names serif"
+					label={copy.sessionNamesSerifAria}
 					onChange={(on) => onSectionChange({ ...appearance, sessionNameSerif: on })}
 				/>
 			</SettingsRow>
-			<SettingsRow label="Heading weight" hint={`${resolved.mdRendering.headingWeight}`} testid="row-heading-weight">
+			<SettingsRow label={copy.headingWeight} hint={`${resolved.mdRendering.headingWeight}`} testid="row-heading-weight">
 				<CommitInput
 					type="number"
 					value={String(md?.headingWeight ?? "")}
@@ -321,19 +324,19 @@ export function AppearanceSection({
 			{/* The emphasis inks default to the REGULAR TEXT COLOR now
 			    (appearance wave, 2026-09-26) — the empty-state labels say
 			    so; explicit hex overrides ride unchanged. */}
-			<SettingsRow label="Bold color" hint="Empty = same as text" testid="row-bold-color">
+			<SettingsRow label={copy.boldColor} hint={copy.emptySameText} testid="row-bold-color">
 				<CommitInput
 					value={md?.boldColor ?? ""}
-					placeholder="same as text"
+					placeholder={copy.sameAsText}
 					ariaLabel="bold color"
 					testid="input-bold-color"
 					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, boldColor: v === "" ? null : v } })}
 				/>
 			</SettingsRow>
-			<SettingsRow label="Italic color" hint="Empty = same as text" testid="row-italic-color">
+			<SettingsRow label={copy.italicColor} hint={copy.emptySameText} testid="row-italic-color">
 				<CommitInput
 					value={md?.italicColor ?? ""}
-					placeholder="same as text"
+					placeholder={copy.sameAsText}
 					ariaLabel="italic color"
 					testid="input-italic-color"
 					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, italicColor: v === "" ? null : v } })}
@@ -350,6 +353,7 @@ export function GraphSection({
 	graph: GraphSettings | undefined;
 	onSectionChange: (next: GraphSettings) => void;
 }) {
+	const copy = useI18n().settingsUi;
 	// Wave 7 collapse (owner ruling 2026-09-23): the section is the MASTER
 	// SWITCH — the embedding/clustering/labeling rungs are gone; clustering
 	// is the free birth-session partition derived on read, labels ARE session
@@ -370,10 +374,10 @@ export function GraphSection({
 			    switch below arrived: off ≠ no graph, off = the graph stops
 			    growing. The testid keeps the old name's shape (row-enabled) so
 			    this stays one rename, not a test re-pin. */}
-			<SettingsRow label="Extraction" hint="Off = the graph stops growing" testid="graph-row-enabled">
+			<SettingsRow label={copy.extraction} hint={copy.extractionHint} testid="graph-row-enabled">
 				<Toggle
 					checked={graph?.enabled ?? true}
-					label="extraction enabled"
+					label={copy.extractionAria}
 					onChange={(on) =>
 						// Compose, never replace-whole (the section PUT is, but the
 					// row must not drop its sibling field — fixed with the budget
@@ -386,16 +390,16 @@ export function GraphSection({
 			    round): display-only. Off = the home shows the chains view
 			    instead of the canvas. The ledgers, the pipeline, everything
 			    data keeps working — that is the extraction switch above. */}
-			<SettingsRow label="Graph rendering" hint="Off = home shows the chains view" testid="graph-row-rendering">
+			<SettingsRow label={copy.graphRendering} hint={copy.graphRenderingHint} testid="graph-row-rendering">
 				<Toggle
 					checked={graph?.rendering ?? true}
-					label="graph rendering enabled"
+					label={copy.graphRenderingAria}
 					onChange={(on) => onSectionChange({ ...graph, rendering: on })}
 				/>
 			</SettingsRow>
 			<SettingsRow
-				label="Extraction chunk budget"
-				hint={`${resolved.extractionChunkTokens} tok`}
+				label={copy.chunkBudget}
+				hint={formatMessage(copy.tokenCount, { count: resolved.extractionChunkTokens })}
 				testid="graph-row-chunk-tokens"
 			>
 				<CommitInput

@@ -36,6 +36,8 @@ import {
 	KEYBOARD_ACTIONS,
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { useI18n } from "@/components/i18n-provider";
+import { keyboardActionLabel } from "@/src/i18n/catalog";
 
 // Re-exported for the contract pin (tests/keyboard-toggle-sidebar.test.ts):
 // the dispatcher composes event names through the ONE helper — a second
@@ -145,13 +147,15 @@ export function KeyboardShortcuts() {
  *  Until the settings milestone ships an editor, this is how shortcuts
  *  stay discoverable. */
 function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+	const catalog = useI18n();
+	const copy = catalog.settingsUi;
 	const backdropDismiss = useBackdropDismiss(onClose);
 	if (!open) return null;
 	const scopes = ["global", "chat", "graph"] as const;
 	const scopeLabels: Record<(typeof scopes)[number], string> = {
-		global: "Global",
-		chat: "Chat",
-		graph: "Graph view",
+		global: copy.global,
+		chat: copy.chat,
+		graph: copy.actionGraphView,
 	};
 	return (
 		<div
@@ -164,8 +168,8 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 				onClick={(e) => e.stopPropagation()}
 			>
 				<div className="mb-4 flex items-baseline justify-between">
-					<span className="text-sm font-medium text-card-foreground">Keyboard shortcuts</span>
-					<span className="text-xs text-muted-foreground">Esc to close</span>
+					<span className="text-sm font-medium text-card-foreground">{copy.keyboardShortcuts}</span>
+					<span className="text-xs text-muted-foreground">{copy.escToClose}</span>
 				</div>
 				{scopes.map((scope) => {
 					const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope && !["toggle-dictation", "open-model-picker", "cycle-thinking"].includes(a.id));
@@ -178,7 +182,7 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 							<div className="flex flex-col gap-1">
 								{actions.map((a) => (
 									<div key={a.id} className="flex items-center justify-between gap-4 text-sm">
-										<span className="text-muted-foreground">{a.label}</span>
+										<span className="text-muted-foreground">{keyboardActionLabel(catalog, a.id)}</span>
 										<kbd className="rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-card-foreground">
 											{formatBinding(bindingForAction(a.id))}
 										</kbd>

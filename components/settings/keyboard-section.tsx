@@ -27,12 +27,8 @@ import {
 	type KeyScope,
 } from "@/src/core";
 import { SettingsRow } from "./controls.tsx";
-
-const SCOPES: { scope: KeyScope; label: string }[] = [
-	{ scope: "global", label: "Global" },
-	{ scope: "chat", label: "Chat" },
-	{ scope: "graph", label: "Graph" },
-];
+import { useI18n } from "@/components/i18n-provider";
+import { keyboardActionLabel } from "@/src/i18n/catalog";
 
 /** The overrides map after ONE change (pure — exported for tests):
  *  binding null = reset the action to its default (key removed). */
@@ -48,6 +44,13 @@ export function nextOverrides(
 }
 
 export function KeyboardSection() {
+	const catalog = useI18n();
+	const copy = catalog.settingsUi;
+	const scopes: { scope: KeyScope; label: string }[] = [
+		{ scope: "global", label: copy.global },
+		{ scope: "chat", label: copy.chat },
+		{ scope: "graph", label: copy.graph },
+	];
 	const [overrides, setOverrides] = useState<Partial<Record<KeyAction, string>>>({});
 	const [rebinding, setRebinding] = useState<KeyAction | null>(null);
 	const [nonce, setNonce] = useState(0);
@@ -96,7 +99,7 @@ export function KeyboardSection() {
 
 	return (
 		<>
-			{SCOPES.map(({ scope, label }) => {
+			{scopes.map(({ scope, label }) => {
 				const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope && !["toggle-dictation", "open-model-picker", "cycle-thinking"].includes(a.id));
 				if (!actions.length) return null;
 				return (
@@ -108,13 +111,13 @@ export function KeyboardSection() {
 								return (
 									<SettingsRow
 										key={def.id}
-										label={def.label}
-										hint={def.displayOnly ? "Fixed — part of this screen" : undefined}
+										label={keyboardActionLabel(catalog, def.id)}
+										hint={def.displayOnly ? copy.fixedAction : undefined}
 										testid={`kbd-row-${def.id}`}
 									>
 										<span className="flex items-center gap-2">
 											<kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-ui text-xs">
-												{rebinding === def.id ? "Press keys…" : formatBinding(effective)}
+												{rebinding === def.id ? copy.pressKeys : formatBinding(effective)}
 											</kbd>
 											{def.displayOnly ? null : rebinding === def.id ? (
 												<button
@@ -122,7 +125,7 @@ export function KeyboardSection() {
 													onClick={() => setRebinding(null)}
 													className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 												>
-													Cancel
+													{copy.cancel}
 												</button>
 											) : (
 												<>
@@ -132,7 +135,7 @@ export function KeyboardSection() {
 														data-testid={`kbd-rebind-${def.id}`}
 														className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 													>
-														Rebind
+														{copy.rebind}
 													</button>
 													{overridden(def.id) && (
 														<button
@@ -141,7 +144,7 @@ export function KeyboardSection() {
 															data-testid={`kbd-reset-${def.id}`}
 															className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
 														>
-															Reset
+															{copy.reset}
 														</button>
 													)}
 												</>
@@ -155,14 +158,14 @@ export function KeyboardSection() {
 				);
 			})}
 			<div className="mt-1 flex items-center justify-between">
-				<span className="text-xs text-muted-foreground/70">Stored on this device (lh:keymap) — overrides only.</span>
+				<span className="text-xs text-muted-foreground/70">{copy.storedOverrides}</span>
 				<button
 					type="button"
 					onClick={resetAll}
 					data-testid="kbd-reset-all"
 					className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 				>
-					Reset all to defaults
+					{copy.resetAll}
 				</button>
 			</div>
 		</>
