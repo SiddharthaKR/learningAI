@@ -1,6 +1,8 @@
 import { NewSession } from "@/components/new-session";
-import { readSettingsRecord } from "@/src/server";
-import { slotsConfigured } from "@/src/core";
+import { withOfficePageUser } from "@/src/server/page-scope";
+import { currentUserId } from "@/src/server/user-scope";
+import { createAccountStore } from "@/src/server/accounts";
+import { PATHS } from "@/config";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +23,11 @@ export default async function NewSessionPage({
 	searchParams: Promise<{ mode?: string }>;
 }) {
 	const { mode } = await searchParams;
-	return (
+	return withOfficePageUser(async () => (
 		<NewSession
-			initialConfigured={slotsConfigured(readSettingsRecord()?.models)}
+			initialConfigured={true}
+			initialLanguage={(await createAccountStore(PATHS.data).byId(currentUserId()))?.teachingLanguage ?? "en"}
 			mode={mode === "practice" ? "practice" : "teach"}
 		/>
-	);
+	));
 }

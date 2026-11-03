@@ -202,6 +202,8 @@ export function Chat({
 	initiallyCompacting = false,
 	initialConfigured = false,
 	kind = "teach",
+	teachingLanguage = "en",
+	knowledgeUsed = false,
 }: {
 	chatId: string;
 	title: string;
@@ -210,6 +212,8 @@ export function Chat({
 	 *  renders no phase chip (no probe→teach arc applies) and a Practice
 	 *  tag rides the header instead. */
 	kind?: "teach" | "practice";
+	teachingLanguage?: "en" | "ja";
+	knowledgeUsed?: boolean;
 	initialPrompt?: string;
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
@@ -1204,6 +1208,10 @@ export function Chat({
 							<div className="min-w-4 flex-1" aria-hidden="true" />
 					</>
 					)}
+					<span aria-label="Teaching language" className="pointer-events-none shrink-0 text-xs text-muted-foreground">
+						{teachingLanguage === "ja" ? "日本語" : "English"}
+					</span>
+					{knowledgeUsed && <span className="pointer-events-none shrink-0 text-xs text-muted-foreground">contains office documents</span>}
 					{/* The plan chip (owner, plan-placement round): session-level
 					    structure beside the phase chip — access to the full-DAG popup
 					    at every width; the marginalia is the wide-screen glance view. */}

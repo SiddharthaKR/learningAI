@@ -47,6 +47,12 @@ describe("startDraftSession — the create-on-send contract", () => {
 		assert.equal(await startDraftSession("   ", f), null);
 		assert.equal(calls.length, 0);
 	});
+
+	it("sends the language chosen on the new-session form", async () => {
+		const { f, calls } = fakeFetch("c_ja");
+		await startDraftSession("量子光学", f, undefined, undefined, "ja");
+		assert.deepEqual(calls[0]!.body, { title: "量子光学", teachingLanguage: "ja" });
+	});
 });
 
 describe("DraftShell — the sessionless surface", () => {
@@ -63,7 +69,7 @@ describe("DraftShell — the sessionless surface", () => {
 		assert.ok(html.includes('data-testid="composer"'));
 		// The draft's model control binds the strong slot — the
 		// new-session default (per-session models, owner 2026-09-28).
-		assert.ok(html.includes('data-testid="stats-model"'));
+		assert.ok(!html.includes('data-testid="stats-model"'), "the office model is fixed by the server");
 		// No CTA by default: a configured surface stays quiet.
 		assert.ok(!html.includes('data-testid="setup-cta"'));
 		// The same empty state a fresh chat shows.

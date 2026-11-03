@@ -43,6 +43,7 @@ export async function startDraftSession(
 	fetchLike: typeof fetch,
 	mode?: "practice",
 	picks?: readonly DraftPick[],
+	teachingLanguage?: "en" | "ja",
 ): Promise<string | null> {
 	const t = text.trim();
 	if (!t) return null;
@@ -55,8 +56,8 @@ export async function startDraftSession(
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(
 			mode === "practice"
-				? { title: t, kind: "practice", ...(picks && picks.length > 0 ? { graphContext: { propositions: picks } } : {}) }
-				: { title: t },
+				? { title: t, kind: "practice", ...(picks && picks.length > 0 ? { graphContext: { propositions: picks } } : {}), ...(teachingLanguage ? { teachingLanguage } : {}) }
+				: { title: t, ...(teachingLanguage ? { teachingLanguage } : {}) },
 		),
 	});
 	const { id } = (await res.json()) as { id: string };
@@ -75,6 +76,8 @@ export function DraftShell({
 	text,
 	onChange,
 	onSend,
+	teachingLanguage,
+	onTeachingLanguageChange,
 	setupCta,
 	mode = "teach",
 	picks = [],
@@ -86,6 +89,8 @@ export function DraftShell({
 	text: string;
 	onChange: (v: string) => void;
 	onSend: () => void;
+	teachingLanguage?: "en" | "ja";
+	onTeachingLanguageChange?: (value: "en" | "ja") => void;
 	/** The practice draft (owner, 2026-10-04): ?mode=practice — the
 	 *  created session carries kind:"practice" and the copy changes
 	 *  (the practice agent opens; no probing). */
@@ -182,6 +187,12 @@ export function DraftShell({
 						<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 						<div className="bg-background pb-4">
 							<div className={DOCK}>
+								{teachingLanguage && <label className="pointer-events-auto mb-2 flex items-center gap-2 text-xs">
+									Teaching language
+									<select aria-label="Teaching language" value={teachingLanguage} onChange={(event) => onTeachingLanguageChange?.(event.target.value as "en" | "ja")} className="rounded border bg-background p-1">
+										<option value="en">English</option><option value="ja">日本語</option>
+									</select>
+								</label>}
 								<ComposerActions
 									picker={(picks.length > 0 || mode === "practice") && (
 										<NodePickerControl count={picks.length} onOpen={onOpenPicker} onClear={onClearPicks} />
@@ -227,8 +238,9 @@ export function DraftShell({
 	);
 }
 
-export function NewSession({ initialConfigured, mode = "teach" }: { initialConfigured: boolean; mode?: "teach" | "practice" }) {
+export function NewSession({ initialConfigured, mode = "teach", initialLanguage = "en" }: { initialConfigured: boolean; mode?: "teach" | "practice"; initialLanguage?: "en" | "ja" }) {
 	const router = useRouter();
+	const [teachingLanguage, setTeachingLanguage] = useState<"en" | "ja">(initialLanguage);
 	const [text, setText] = useState("");
 	/* The draft MIRROR ("nothing gets lost" round, 2026-10-01): the shell's
 	 * finish-first send calls THIS send after the dictation flush — which
@@ -271,17 +283,19 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 		const draft = textRef.current.trim();
 		if (!draft || busy) return;
 		setBusy(true);
-		void startDraftSession(draft, fetch, mode === "practice" ? "practice" : undefined, mode === "practice" ? picksRef.current : undefined)
+		void startDraftSession(draft, fetch, mode === "practice" ? "practice" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage)
 			.then((target) => {
 				if (target) router.push(target);
 				else setBusy(false);
 			})
 			.catch(() => setBusy(false));
-	}, [busy, router, mode]);
+	}, [busy, router, mode, teachingLanguage]);
 
 	return (
 		<>
 			<DraftShell
+				teachingLanguage={teachingLanguage}
+				onTeachingLanguageChange={setTeachingLanguage}
 				busy={busy}
 				text={text}
 				onChange={applyText}
