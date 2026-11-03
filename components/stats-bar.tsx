@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { contextWindow, sessionCost, turnCost, type ChatSettings, type TurnUsage } from "@/src/core";
 import { formatTokens, formatUsd, prettyModel } from "@/components/usage-format";
 import { catalogLimits, useModelCatalog } from "@/components/model-picker";
+import { useI18n } from "@/components/i18n-provider";
+import { formatMessage } from "@/src/i18n/catalog";
 
 /**
  * The below-composer stats bar (wave 4 observability): the session's
@@ -31,6 +33,7 @@ export function StatsBar({
 	dictationSlot,
 	chatId,
 	leadingSlot,
+	webMode = "linked-pages",
 }: {
 	turns: TurnUsage[];
 	/** The bound session (per-session models, owner 2026-09-28): present
@@ -47,7 +50,10 @@ export function StatsBar({
 	 *  composer's teach | practice switch rides here — before the session
 	 *  data (which renders nothing pre-chat on that surface). */
 	leadingSlot?: ReactNode;
+	/** Pilot mode uses URL-only fetching; searxng changes this label to web research. */
+	webMode?: "linked-pages" | "search";
 }) {
+	const copy = useI18n().activityUi;
 	const [open, setOpen] = useState(false);
 	// Same dropdown discipline as the model control (owner, df4433f treatment,
 	// stats round 1): close on any pointerdown outside the bar or on Escape.
@@ -99,7 +105,7 @@ export function StatsBar({
   fetch(`/api/chats/${encodeURIComponent(chatId)}`)
    .then((response) => response.ok ? response.json() : Promise.reject())
    .then((body: { settings?: ChatSettings }) => { if (!cancelled) setSessionSettings(body.settings ?? {}); })
-   .catch(() => { if (!cancelled) setSettingError("Session controls could not be loaded."); });
+   .catch(() => { if (!cancelled) setSettingError(copy.loadControlsError); });
   return () => { cancelled = true; };
  }, [chatId]);
  const saveFlag = async (field: "webResearchEnabled" | "officeKnowledgeEnabled", value: boolean) => {
@@ -119,12 +125,12 @@ export function StatsBar({
    });
    if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { error?: string };
-    throw new Error(body.error ?? "Could not save session controls.");
+    throw new Error(body.error ?? copy.saveControlsError);
    }
    const body = await response.json() as { settings?: ChatSettings };
    setSessionSettings(body.settings ?? next);
   } catch (error) {
-   setSettingError(error instanceof Error ? error.message : "Could not save session controls.");
+   setSettingError(error instanceof Error ? error.message : copy.saveControlsError);
   } finally {
    setSaving(false);
   }
@@ -174,22 +180,22 @@ export function StatsBar({
 						className="absolute bottom-full left-1/2 z-40 mb-1.5 w-72 -translate-x-1/2 rounded-xl border bg-card p-3 text-xs shadow-xl"
 					>
 						<div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-							Session stats
+							{copy.sessionStats}
 						</div>
 						<div className="flex flex-col gap-1 text-muted-foreground">
 							<div className="flex justify-between gap-2">
-								<span>Context (last call)</span>
+								<span>{copy.contextLastCall}</span>
 								<span className="tabular-nums text-card-foreground">
 									{ctx ? (ctx.limit !== null ? `${formatTokens(ctx.usedTokens)} / ${formatTokens(ctx.limit)}` : formatTokens(ctx.usedTokens)) : "—"}
 								</span>
 							</div>
 							<div className="flex justify-between gap-2">
-								<span>Total cost</span>
+								<span>{copy.totalCost}</span>
 								<span className="tabular-nums text-card-foreground">{costLabel}</span>
 							</div>
 							{unpriced > 0 && (
 								<div className="flex justify-between gap-2">
-									<span>Unpriced turns</span>
+									<span>{copy.unpricedTurns}</span>
 									<span className="tabular-nums text-card-foreground">{unpriced}</span>
 								</div>
 							)}
@@ -197,7 +203,7 @@ export function StatsBar({
 						{turns.length > 0 && (
 							<>
 								<div className="mb-1 mt-2.5 border-t pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-									Turns
+									{copy.turns}
 								</div>
 								<ul className="flex max-h-56 flex-col gap-1 overflow-y-auto">
 									{turns.map((turn, i) => {
@@ -208,7 +214,7 @@ export function StatsBar({
 													#{i + 1} · {prettyModel(turn.model, true)}
 												</span>
 												<span className="flex shrink-0 items-center gap-2 tabular-nums text-card-foreground">
-													<span className="text-muted-foreground">{turn.steps.length} steps</span>
+											<span className="text-muted-foreground">{formatMessage(copy.stepCount, { count: turn.steps.length })}</span>
 													<span>{c === null ? "—" : formatUsd(c)}</span>
 												</span>
 											</li>
@@ -237,10 +243,10 @@ export function StatsBar({
         checked={sessionSettings?.[field] ?? false}
         disabled={!sessionSettings || saving}
         onChange={(event) => void saveFlag(field, event.target.checked)}
-        aria-label={field === "webResearchEnabled" ? "Web research" : "Use office knowledge"}
+        aria-label={field === "webResearchEnabled" ? (webMode === "search" ? copy.webResearch : copy.readLinkedPages) : copy.officeKnowledge}
         className="accent-foreground"
        />
-       <span>{field === "webResearchEnabled" ? "Web research" : "Use office knowledge"}</span>
+       <span>{field === "webResearchEnabled" ? (webMode === "search" ? copy.webResearch : copy.readLinkedPages) : copy.officeKnowledge}</span>
       </label>
      ))}
      {settingError && <span role="alert" className="text-red-400">{settingError}</span>}
