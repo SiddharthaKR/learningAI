@@ -47,4 +47,9 @@ describe("UTF-8 source and locale integrity", () => {
     const catalog = JSON.parse(readFileSync(path.join(ROOT, "locales", "ja.json"), "utf8")) as { auth?: { loginTitle?: string } };
     assert.equal(catalog.auth?.loginTitle, "ログイン");
   });
+
+  it("serves navigation copy from the Japanese catalog", () => {
+    const catalog = JSON.parse(readFileSync(path.join(ROOT, "locales", "ja.json"), "utf8")) as { sidebar?: { sessions?: string } };
+    assert.equal(catalog.sidebar?.sessions, "セッション");
+  });
 });
