@@ -7,6 +7,7 @@ import { AppShell, SidebarProvider } from "@/components/sidebar";
 import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
+import { I18nProvider } from "@/components/i18n-provider";
 
 export const metadata: Metadata = {
 	title: "Learning Harness",
@@ -21,6 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	return (
 		<html lang={language} className="dark">
 			<body className="min-h-dvh antialiased">
+			<I18nProvider language={language}>
 			{/* The notification channel rides OUTSIDE everything: sidebar, dock,
 				 and pages all subscribe as the polls retire (push S3, 2026-10-02). */}
 			<ServerEventsProvider>
@@ -32,6 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 					</SidebarProvider>
 				</AppearanceProvider>
 			</ServerEventsProvider>
+			</I18nProvider>
 		</body>
 		</html>
 	);

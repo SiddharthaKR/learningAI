@@ -3,6 +3,19 @@
     "english": "English",
     "japanese": "Japanese"
   },
+  "auth": {
+    "loginTitle": "Log in",
+    "signupTitle": "Create account",
+    "language": "Language",
+    "username": "Username",
+    "password": "Password",
+    "login": "Log in",
+    "signup": "Sign up",
+    "toLogin": "Have an account? Log in",
+    "toSignup": "Create an account",
+    "requestFailed": "Request failed",
+    "pending": "…"
+  },
   "preferences": {
     "title": "Preferences",
     "uiLanguage": "UI language",

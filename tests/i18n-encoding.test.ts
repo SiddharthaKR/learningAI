@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const SCAN_ROOTS = ["src", "app", "locales", "prompts"];
+const SCAN_ROOTS = ["src", "app", "components", "locales", "prompts"];
 const TEXT_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".json", ".md", ".txt"]);
 const MOJIBAKE = /\u00e3|\u00e2\u20ac|\u00c3|\uFFFD/u;
 
@@ -41,5 +41,10 @@ describe("UTF-8 source and locale integrity", () => {
     };
     const read = (language: "en" | "ja") => JSON.parse(readFileSync(path.join(ROOT, "locales", `${language}.json`), "utf8")) as unknown;
     assert.deepEqual(flatten(read("ja")).sort(), flatten(read("en")).sort());
+  });
+
+  it("serves authentication copy from the Japanese catalog", () => {
+    const catalog = JSON.parse(readFileSync(path.join(ROOT, "locales", "ja.json"), "utf8")) as { auth?: { loginTitle?: string } };
+    assert.equal(catalog.auth?.loginTitle, "ログイン");
   });
 });
