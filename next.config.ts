@@ -10,6 +10,17 @@ const nextConfig: NextConfig = {
 		"@napi-rs/canvas",
 		"@resvg/resvg-js",
 	],
+	// Personal and shared corpora are runtime data and must never be traced
+	// into route bundles or a standalone deployment.
+	outputFileTracingExcludes: {
+		"/*": [
+			"./data/**/*",
+			"./knowledge/**/*",
+			"./index/**/*",
+			"./indexes/**/*",
+			"./**/*.jsonl",
+		],
+	},
 };
 
 export default nextConfig;
