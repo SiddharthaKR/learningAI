@@ -11,6 +11,17 @@ export interface ExtractedBlock {
 	citation: KnowledgeCitation;
 }
 
+export interface KnowledgeChunk {
+	id: string;
+	sourceId: string;
+	text: string;
+	citation: KnowledgeCitation;
+}
+
+export interface KnowledgeResult extends KnowledgeChunk {
+	score: number;
+}
+
 export type ExtractedDocument = {
 	fileName: string;
 	format: KnowledgeFormat;
