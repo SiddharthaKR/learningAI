@@ -108,4 +108,11 @@ describe("UTF-8 source and locale integrity", () => {
     assert.equal(catalog.artifactUi?.figure, "図");
     assert.equal(catalog.markdownUi?.retry, "再試行");
   });
+
+  it("serves residual reachable UI copy from the Japanese catalog", () => {
+    const catalog = JSON.parse(readFileSync(path.join(ROOT, "locales", "ja.json"), "utf8")) as {
+      composer?: { pickNodes?: string };
+    };
+    assert.equal(catalog.composer?.pickNodes, "ノードを選択");
+  });
 });

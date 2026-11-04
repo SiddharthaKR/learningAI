@@ -225,7 +225,7 @@ export function MermaidOverlay({
 			<div className="mb-2 flex items-center gap-2">
 				<span className="text-sm font-medium">{copy.title}</span>
 				<span className="text-xs text-muted-foreground">{copy.fromLesson}</span>
-				<Hint label="Close" binding="escape" side="left">
+				<Hint label={copy.close} binding="escape" side="left">
 <button
 					type="button"
 					onClick={onClose}
@@ -291,7 +291,7 @@ export function MermaidOverlay({
 						<div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between p-2">
 							<span className="text-xs text-muted-foreground/60">{copy.panZoom}</span>
 							<div className="flex gap-1">
-								<Hint label="Zoom out" side="bottom">
+								<Hint label={copy.zoomOut} side="bottom">
 <button
 									type="button"
 									aria-label={copy.zoomOut}
@@ -301,7 +301,7 @@ export function MermaidOverlay({
 									<MinusIcon className="size-3.5" />
 								</button>
 </Hint>
-								<Hint label="Fit diagram to view" side="bottom">
+								<Hint label={copy.fit} side="bottom">
 <button
 									type="button"
 									aria-label={copy.fit}
@@ -311,7 +311,7 @@ export function MermaidOverlay({
 									<MaximizeIcon className="size-3.5" />
 								</button>
 </Hint>
-								<Hint label="Zoom in" side="bottom">
+								<Hint label={copy.zoomIn} side="bottom">
 <button
 									type="button"
 									aria-label={copy.zoomIn}

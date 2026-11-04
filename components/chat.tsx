@@ -1267,7 +1267,7 @@ export function Chat({
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title={copy.chat.newSession}
-									description="The teacher will open by probing what you already know."
+									description={copy.newSession.description}
 								/>
 							)}
 

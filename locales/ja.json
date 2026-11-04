@@ -68,7 +68,9 @@
     "practicePlaceholder": "何を練習したいですか？"
   },
   "home": {
-    "startSession": "セッションを開始"
+    "startSession": "セッションを開始",
+    "teach": "学習",
+    "practice": "練習"
   },
   "chat": {
     "sessionTitle": "セッション名",
@@ -84,17 +86,25 @@
     "compactingContext": "履歴を整理中",
     "compacting": "履歴を整理中…",
     "thinking": "考え中",
-    "askOrNext": "質問を入力するか、Enterキーで次の問題へ進みます。"
+    "askOrNext": "質問を入力するか、Enterキーで次の問題へ進みます。",
+    "contextCompacted": "履歴を整理しました",
+    "historyCompacted": "履歴を整理済み",
+    "compactionTokenCount": "約{count}千トークン"
   },
   "composer": {
     "nextProblem": "次の問題",
     "stop": "停止",
-    "send": "送信"
+    "send": "送信",
+    "selectedNode": "{count}件のノードを選択中",
+    "selectedNodes": "{count}件のノードを選択中",
+    "pickNodes": "ノードを選択",
+    "clear": "クリア"
   },
   "coverage": {
     "extracting": "抽出中…",
     "fullyExtracted": "抽出済み",
     "tokensUncovered": "未抽出 {count} トークン",
+    "messageUnextracted": "未抽出 {count} 件",
     "messagesUnextracted": "未抽出 {count} 件",
     "running": "実行中",
     "extract": "抽出",
@@ -265,6 +275,14 @@
     "emptyValue": "空欄 = {value}",
     "readingFont": "本文フォント",
     "chooseInstalledFont": "インストール済みフォントから選択",
+    "searchFonts": "フォントを検索…",
+    "loadingFonts": "フォントを読み込み中…",
+    "defaultFont": "既定",
+    "useCustomFont": "「{family}」を使用",
+    "customFont": "カスタム",
+    "commonFonts": "一般的なフォント",
+    "fontReadFailed": "一般的なフォント — インストール済みフォントを読み取れませんでした",
+    "installedFonts": "インストール済みフォント",
     "readingFontSize": "本文の文字サイズ",
     "sessionNamesSerif": "セッション名をセリフ体にする",
     "sessionNamesSerifAria": "セッション名をセリフ体にする",

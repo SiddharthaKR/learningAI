@@ -68,7 +68,9 @@
     "practicePlaceholder": "What do you want to practice?"
   },
   "home": {
-    "startSession": "Start session"
+    "startSession": "Start session",
+    "teach": "Teach",
+    "practice": "Practice"
   },
   "chat": {
     "sessionTitle": "Session title",
@@ -84,18 +86,26 @@
     "compactingContext": "Compacting context",
     "compacting": "COMPACTING CONTEXT…",
     "thinking": "Thinking",
-    "askOrNext": "Ask anything, or press Enter for the next one."
+    "askOrNext": "Ask anything, or press Enter for the next one.",
+    "contextCompacted": "Context compacted",
+    "historyCompacted": "History compacted",
+    "compactionTokenCount": "{count}k tok"
   },
   "composer": {
     "nextProblem": "Next problem",
     "stop": "Stop",
-    "send": "Send"
+    "send": "Send",
+    "selectedNode": "{count} node selected",
+    "selectedNodes": "{count} nodes selected",
+    "pickNodes": "Pick nodes",
+    "clear": "Clear"
   },
   "coverage": {
     "extracting": "extracting…",
     "fullyExtracted": "fully extracted",
     "tokensUncovered": "{count} tok uncovered",
-    "messagesUnextracted": "{count} message(s) unextracted",
+    "messageUnextracted": "{count} message unextracted",
+    "messagesUnextracted": "{count} messages unextracted",
     "running": "Running",
     "extract": "Extract",
     "hint": "How much of this session isn't mapped yet",
@@ -265,6 +275,14 @@
     "emptyValue": "Empty = {value}",
     "readingFont": "Reading font",
     "chooseInstalledFont": "Choose from your installed fonts",
+    "searchFonts": "Search fonts…",
+    "loadingFonts": "Loading fonts…",
+    "defaultFont": "default",
+    "useCustomFont": "Use “{family}”",
+    "customFont": "custom",
+    "commonFonts": "Common families",
+    "fontReadFailed": "Common families — installed fonts could not be read",
+    "installedFonts": "Your installed fonts",
     "readingFontSize": "Reading font size",
     "sessionNamesSerif": "Session names in serif",
     "sessionNamesSerifAria": "session names serif",

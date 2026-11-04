@@ -203,7 +203,10 @@ export function CoverageMenuBody({
 						{formatMessage(copy.coverage.tokensUncovered, { count: formatTokens(coverage.uncoveredTokens) })}
 					</span>
 					<span className="tabular-nums text-muted-foreground">
-						{formatMessage(copy.coverage.messagesUnextracted, { count: coverage.uncoveredCount })}
+						{formatMessage(
+							coverage.uncoveredCount === 1 ? copy.coverage.messageUnextracted : copy.coverage.messagesUnextracted,
+							{ count: coverage.uncoveredCount },
+						)}
 					</span>
 				</span>
 			)}

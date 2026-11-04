@@ -219,9 +219,9 @@ export function SidebarToggle() {
  * the meta line's "Waiting for input" text carries it. Idle is the
  * absence of a signal, by design.
  */
-function SessionStatus({ busy }: { busy: boolean }) {
+function SessionStatus({ busy, label }: { busy: boolean; label: string }) {
 	if (!busy) return null;
-	return <BrailleSpinner />;
+	return <BrailleSpinner label={label} />;
 }
 
 /** Compact "how long ago": "just now", "5m ago", "3h ago", "2d ago",
@@ -304,7 +304,7 @@ export function SessionRow({
 				kbdSelected && !active && "bg-accent/60 ring-1 ring-border",
 			)}
 		>
-			<SessionStatus busy={chat.busy || chat.compacting} />
+			<SessionStatus busy={chat.busy || chat.compacting} label={copy.sidebar.working} />
 			<span className="min-w-0 flex-1">
 				{/* Titles are the learner's/teacher's WORDS — Source Sans 3, the
 				    same voice the words were typed in (every input is lh-prose);
