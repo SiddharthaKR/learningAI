@@ -4,9 +4,10 @@ import { CheckIcon, CircleX } from "lucide-react";
 import type { PdfResult, ResearchResult, SubagentArtifactData } from "@/src/core";
 import type { LhViewMessage } from "@/src/core";
 import { isSubagentFailure } from "@/src/core";
-import { DemoOutputCard } from "@/components/artifacts/demo-card";
 import { PdfBriefCard, ResearchBriefCard } from "@/components/artifacts/job-card";
 import { VisualOutputCard } from "@/components/artifacts/visual-card";
+import { useI18n } from "@/components/i18n-provider";
+import { formatMessage } from "@/src/i18n/catalog";
 
 /**
  * The sub-agent result delivery card (contracts.ts "THE ASYNC PROTOCOL" §4).
@@ -26,6 +27,7 @@ import { VisualOutputCard } from "@/components/artifacts/visual-card";
  *     render; only a failure note does.
  */
 export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
+	const copy = useI18n().artifactUi;
 	const artifactPart = message.parts.find((p) => p.type === "data-subagent-artifact");
 	const data = artifactPart?.data as SubagentArtifactData | undefined;
 	// The abort steer (2026-09 dock semantics): its message-type part is
@@ -38,7 +40,7 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 		if (aborted?.data) return <AbortedBadge kind={aborted.data.kind ?? "job"} />;
 		return (
 				<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-				A sub-agent finished, but its result could not be displayed.
+				{copy.subagentUnavailable}
 			</div>
 		);
 	}
@@ -55,8 +57,6 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 			) : (
 				<PdfCompleteBadge result={data.result as PdfResult} />
 			);
-		case "demo":
-			return <DemoOutputCard output={data.result} messageId={message.id} initialInverted={data.ui?.inverted ?? false} />;
 		case "visual":
 			return <VisualOutputCard output={data.result} messageId={message.id} initialInverted={data.ui?.inverted ?? false} />;
 	}
@@ -66,11 +66,13 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
  * teacher's wake turn acknowledges the abort in the lesson itself,
  * this just marks what happened. */
 function AbortedBadge({ kind }: { kind: string }) {
+	const copy = useI18n().artifactUi;
+	const label = kind === "research" ? copy.researchKind : kind === "pdf" ? copy.pdf : kind === "visual" ? copy.figure : kind;
 	return (
 		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-xs text-muted-foreground">
 			<CircleX className="size-3.5" />
-			<span className="font-medium uppercase tracking-wide">{kind}</span>
-			<span>aborted by the learner</span>
+			<span className="font-medium uppercase tracking-wide">{label}</span>
+			<span>{copy.abortedByLearner}</span>
 		</div>
 	);
 }
@@ -80,6 +82,7 @@ function AbortedBadge({ kind }: { kind: string }) {
  * the badge marks delivery, the collapsed details carries the full text
  * + consulted pages. */
 function PdfCompleteBadge({ result }: { result: PdfResult }) {
+	const copy = useI18n().artifactUi;
 	// The honest count is READ pages (extract/render — sources v1 split);
 	// the ?? is runtime tolerance for pre-split persisted steers.
 	const readPages = result.pagesRead ?? result.pagesConsulted;
@@ -87,15 +90,15 @@ function PdfCompleteBadge({ result }: { result: PdfResult }) {
 		<details data-testid="pdf-complete-badge" className="group w-full text-xs text-muted-foreground">
 			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
 				<CheckIcon className="size-3.5" />
-				<span className="font-medium uppercase tracking-wide">PDF</span>
-				<span>reading complete</span>
+				<span className="font-medium uppercase tracking-wide">{copy.pdf}</span>
+				<span>{copy.readingComplete}</span>
 				{readPages.length > 0 && (
 					<span>
-						· read {readPages.length} page{readPages.length === 1 ? "" : "s"}
+						· {formatMessage(copy.readPageCount, { count: readPages.length, pages: readPages.length === 1 ? copy.page : copy.pages })}
 					</span>
 				)}
-				<span className="ml-1 text-xs text-muted-foreground/70 group-open:hidden">view brief</span>
-				<span className="ml-1 hidden text-xs text-muted-foreground/70 group-open:inline">hide brief</span>
+				<span className="ml-1 text-xs text-muted-foreground/70 group-open:hidden">{copy.viewBrief}</span>
+				<span className="ml-1 hidden text-xs text-muted-foreground/70 group-open:inline">{copy.hideBrief}</span>
 			</summary>
 			<div className="mt-2">
 				<PdfBriefCard output={result} />
@@ -110,15 +113,16 @@ function PdfCompleteBadge({ result }: { result: PdfResult }) {
  * affordance): full markdown + sources, one click away, no extra fetch —
  * the artifact part in the record is the single source of truth. */
 function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
+	const copy = useI18n().artifactUi;
 	return (
 		<details data-testid="research-complete-badge" className="group w-full text-xs text-muted-foreground">
 			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
 				<CheckIcon className="size-3.5" />
-				<span className="font-medium uppercase tracking-wide">Research</span>
-				<span>complete</span>
-				{result.sources.length > 0 && <span>· {result.sources.length} sources</span>}
-				<span className="ml-1 text-xs text-muted-foreground/70 group-open:hidden">view brief</span>
-				<span className="ml-1 hidden text-xs text-muted-foreground/70 group-open:inline">hide brief</span>
+				<span className="font-medium uppercase tracking-wide">{copy.research}</span>
+				<span>{copy.complete}</span>
+				{result.sources.length > 0 && <span>· {formatMessage(copy.sourceCount, { count: result.sources.length, sources: result.sources.length === 1 ? copy.source : copy.sourcesNoun })}</span>}
+				<span className="ml-1 text-xs text-muted-foreground/70 group-open:hidden">{copy.viewBrief}</span>
+				<span className="ml-1 hidden text-xs text-muted-foreground/70 group-open:inline">{copy.hideBrief}</span>
 			</summary>
 			<div className="mt-2">
 				<ResearchBriefCard output={result} />

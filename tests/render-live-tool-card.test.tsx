@@ -16,16 +16,16 @@ function part(tool: string, input: unknown) {
 
 describe("LiveToolCard (the working-state grammar)", () => {
 	it("spinner + shimmered activity label + headline arg, input on expand", () => {
-		const html = renderToStaticMarkup(<LiveToolCard part={part("read", { path: "notes.md" }) as never} />);
+		const html = renderToStaticMarkup(<LiveToolCard part={part("list_propositions", { session: "session-1" }) as never} />);
 		assert.match(html, /data-testid="live-tool-card"/);
 		assert.match(html, /data-testid="braille-spinner"/);
 		// the label names the ACTUAL tool (the old bottom line's text)
-		assert.match(html, /Reading a file…/);
+		assert.match(html, /Reading propositions…/);
 		// the headline argument rides the header
-		assert.match(html, /notes\.md/);
+		assert.match(html, /session-1/);
 		// the streaming input is shown in the expandable body
 		assert.match(html, /Input \(streaming\)/);
-		assert.match(html, /notes\.md/);
+		assert.match(html, /session-1/);
 	});
 
 	it("unknown tools stay generic; jobs get their dispatch labels", () => {
@@ -37,7 +37,7 @@ describe("LiveToolCard (the working-state grammar)", () => {
 	});
 
 	it("no input yet renders a placeholder, not an empty pre", () => {
-		const html = renderToStaticMarkup(<LiveToolCard part={part("grep", undefined) as never} />);
+		const html = renderToStaticMarkup(<LiveToolCard part={part("mystery_tool", undefined) as never} />);
 		assert.match(html, /<pre[^>]*>…<\/pre>/);
 	});
 });

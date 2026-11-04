@@ -5,6 +5,8 @@ import { CheckIcon, XIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
 import { type JobKind, type JobRecord } from "@/src/core";
 import { BrailleSpinner } from "@/components/braille-spinner";
+import { useI18n } from "@/components/i18n-provider";
+import { formatMessage } from "@/src/i18n/catalog";
 
 /**
  * The dispatch card (contracts.ts "THE ASYNC PROTOCOL" §4): the tool-call
@@ -18,17 +20,17 @@ import { BrailleSpinner } from "@/components/braille-spinner";
  *                 itself arrives in the steer message right below, so the
  *                 box must not duplicate it.
  */
-const KIND_LABEL: Record<JobKind, string> = {
-	research: "Research agent",
-	demo: "Demo agent",
-	visual: "Figure agent",
-	pdf: "PDF reader",
-};
-
 export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: JobKind }) {
+	const copy = useI18n().artifactUi;
 	const jobs = useContext(JobsContext);
 	const job = jobs.find((j) => j.toolCallId === toolCallId) ?? null;
-	const label = KIND_LABEL[kind];
+	const labels: Record<JobKind, string> = {
+		research: copy.researchAgent,
+		demo: copy.demoAgent,
+		visual: copy.figureAgent,
+		pdf: copy.pdfReader,
+	};
+	const label = labels[kind];
 
 	if (!job || job.status === "running") {
 		return <DispatchActivityCard job={job} label={label} />;
@@ -41,12 +43,13 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 		>
 			{failed ? <XIcon className="size-3.5 text-red-500" /> : <CheckIcon className="size-3.5" />}
 			<span className="font-medium uppercase tracking-wide">{label}</span>
-			<span>{failed ? "failed" : "delivered"}</span>
+			<span>{failed ? copy.failed : copy.delivered}</span>
 		</div>
 	);
 }
 
 function DispatchActivityCard({ job, label }: { job: JobRecord | null; label: string }) {
+	const copy = useI18n().artifactUi;
 	// Elapsed from createdAt — jobs appear here only via the jobs feed (post-mount),
 	// so no SSR/hydration mismatch.
 	const elapsed =
@@ -61,7 +64,7 @@ function DispatchActivityCard({ job, label }: { job: JobRecord | null; label: st
 				    the Braille spinner replaces the pulsing dot — one indicator
 				    everywhere. This is the ONLY dispatch-card change; the card's
 				    shape is untouched. */}
-				<BrailleSpinner label={`${label} running`} />
+				<BrailleSpinner label={formatMessage(copy.runningAria, { agent: label })} />
 				{label}
 				{elapsed !== null && <span className="font-normal">· {elapsed}s</span>}
 			</div>
@@ -72,7 +75,7 @@ function DispatchActivityCard({ job, label }: { job: JobRecord | null; label: st
 			)}
 			{!job && (
 				<div className="mt-1 text-sm text-muted-foreground" data-testid="dispatch-pending">
-					Dispatched…
+					{copy.dispatched}
 				</div>
 			)}
 		</div>

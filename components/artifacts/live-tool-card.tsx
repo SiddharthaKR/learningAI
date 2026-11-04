@@ -3,8 +3,9 @@
 import { ChevronRight } from "lucide-react";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { Shimmer } from "@/components/ai-elements/shimmer";
-import { toolActivityLabel } from "@/src/core";
 import type { ArtifactPartProps } from "@/src/core";
+import { useI18n } from "@/components/i18n-provider";
+import { formatMessage } from "@/src/i18n/catalog";
 
 /**
  * The LIVE tool-input card (owner, streaming round 2026-10-01): what a
@@ -28,8 +29,18 @@ interface StreamingToolPart {
 }
 
 export function LiveToolCard({ part }: ArtifactPartProps) {
+	const copy = useI18n().artifactUi;
 	const p = part as StreamingToolPart;
 	const tool = p.type.replace(/^tool-/, "");
+	const activity = tool === "research" ? copy.activityResearch
+		: tool === "visual" ? copy.activityVisual
+		: tool === "pdf" ? copy.activityPdf
+		: tool === "plan_init" ? copy.activityPlan
+		: tool === "probe_done" ? copy.activityProbeDone
+		: ["quiz", "probe", "ask_user_question", "explain", "recall"].includes(tool) ? copy.activityQuestion
+		: tool === "list_sessions" ? copy.activityListSessions
+		: tool === "list_propositions" ? copy.activityListPropositions
+		: copy.activityWorking;
 	const inp = (p.input ?? {}) as Record<string, unknown>;
 	// The headline argument (ToolCallCard's rule, shown as given): path for
 	// read/ls, pattern for find/grep, session for list_propositions.
@@ -47,15 +58,15 @@ export function LiveToolCard({ part }: ArtifactPartProps) {
 			className="group my-1 w-full max-w-2xl select-none"
 		>
 			<summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
-				<BrailleSpinner label={`${toolActivityLabel(tool)} — live`} />
+				<BrailleSpinner label={formatMessage(copy.liveAria, { activity })} />
 				<Shimmer duration={1} className="text-xs">
-					{toolActivityLabel(tool)}
+					{activity}
 				</Shimmer>
 				{arg && <span className="truncate">{arg}</span>}
 				<ChevronRight className="size-3 shrink-0 opacity-50 transition-transform group-open:rotate-90" />
 			</summary>
 			<div className="mt-2 rounded-xl border bg-card p-3 text-xs">
-				<div className="mb-1 font-medium uppercase tracking-wide text-muted-foreground">Input (streaming)</div>
+				<div className="mb-1 font-medium uppercase tracking-wide text-muted-foreground">{copy.streamingInput}</div>
 				<pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed">
 					{hasInput ? JSON.stringify(p.input, null, 2) : "…"}
 				</pre>

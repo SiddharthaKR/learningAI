@@ -9,6 +9,7 @@ import { useSessionMermaid } from "@/components/session-overlay";
 import { downloadFile } from "@/components/artifacts/download";
 import { DispatchCard } from "@/components/artifacts/dispatch-card";
 import type { ArtifactPartProps, VisualResult } from "@/src/core";
+import { useI18n } from "@/components/i18n-provider";
 
 /**
  * Visual artifact card (W6 → ack protocol): the tool part's output is the
@@ -61,6 +62,7 @@ export function VisualOutputCard({
 	messageId?: string;
 	initialInverted?: boolean;
 }) {
+	const copy = useI18n().artifactUi;
 	const result = output as VisualResult | undefined;
 	const overlay = useSessionMermaid();
 	const actions = useContext(ChatActionsContext);
@@ -83,7 +85,7 @@ export function VisualOutputCard({
 	if (!result || typeof result.svg !== "string") {
 		return (
 			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-				Figure completed, but the result could not be displayed.
+				{copy.figureUnavailable}
 			</div>
 		);
 	}
@@ -92,10 +94,10 @@ export function VisualOutputCard({
 		return (
 			<div className="rounded-xl border bg-card p-4 text-card-foreground" data-testid="visual-card-failed">
 				<div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-					Figure
-					<span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-500">failed</span>
+					{copy.figure}
+					<span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-500">{copy.failed}</span>
 				</div>
-				<p className="mt-2 text-sm text-muted-foreground">{result.notes ?? "The figure could not be drawn."}</p>
+				<p className="mt-2 text-sm text-muted-foreground">{result.notes ?? copy.figureFailed}</p>
 			</div>
 		);
 	}
@@ -130,21 +132,21 @@ export function VisualOutputCard({
 				data-testid="visual-svg"
 			/>
 			<div className="mt-2 flex items-center justify-between gap-2">
-				<div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Figure</div>
+				<div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{copy.figure}</div>
 				<div className="flex items-center gap-1.5">
 					{/* The invert affordance (owner round, 2026-10-07): the disc IS
 					    the half-filled contrast circle; the tooltip names it. */}
 					<Toggle
 						checked={inverted}
 						onChange={toggleInverted}
-						label="Invert figure brightness"
-						title="Invert colors"
+						label={copy.invertBrightness}
+						title={copy.invertColors}
 						discIcon={<InvertDiscIcon className="size-3" />}
 					/>
 					<button
 						type="button"
-						aria-label="Download figure as SVG"
-						title="Download as SVG"
+						aria-label={copy.downloadFigure}
+						title={copy.downloadSvg}
 						onClick={() => downloadFile("figure.svg", result.svg, "image/svg+xml")}
 						data-testid="visual-download"
 						className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -154,8 +156,8 @@ export function VisualOutputCard({
 					{overlay && (
 						<button
 							type="button"
-							aria-label="Open figure fullscreen"
-							title="Open fullscreen"
+							aria-label={copy.openFigure}
+							title={copy.openFullscreen}
 							onClick={() => overlay.openFigure(result.svg, inverted)}
 							data-testid="visual-open"
 							className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

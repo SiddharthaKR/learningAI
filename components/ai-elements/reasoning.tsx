@@ -27,6 +27,7 @@ import { transformMathDelimiters } from "@/src/core";
 import { streamdownPlugins } from "./message";
 import { mdComponents } from "@/components/md-blocks";
 import { Shimmer } from "./shimmer";
+import { useI18n } from "@/components/i18n-provider";
 
 interface ReasoningContextValue {
   isStreaming: boolean;
@@ -134,21 +135,20 @@ export type ReasoningTriggerProps = ComponentProps<
    for a few seconds"), bookkeeping for information we knowingly lose. The
    label pairs with the user's collapsed "Your thinking" rows — one
    language; motion (spinner + shimmer) stays the working signal. */
-const defaultGetThinkingMessage = (isStreaming: boolean) => {
-  if (isStreaming) {
-    return <Shimmer duration={1}>Thinking...</Shimmer>;
-  }
-  return <p>AGENT’S THINKING</p>;
-};
-
 export const ReasoningTrigger = memo(
   ({
     className,
     children,
-    getThinkingMessage = defaultGetThinkingMessage,
+    getThinkingMessage,
     ...props
   }: ReasoningTriggerProps) => {
     const { isStreaming, isOpen } = useReasoning();
+    const copy = useI18n().messageUi;
+    const message = getThinkingMessage
+      ? getThinkingMessage(isStreaming)
+      : isStreaming
+        ? <Shimmer duration={1}>{copy.thinkingActive}</Shimmer>
+        : <p>{copy.agentThinking}</p>;
 
     return (
       <CollapsibleTrigger
@@ -175,8 +175,8 @@ export const ReasoningTrigger = memo(
                 the component default (h-3) — IDENTICAL to the placeholder
                 spinner (owner, 2026-10-02): the handoff between the two
                 states must be visually seamless, one size everywhere. */}
-            {isStreaming && <BrailleSpinner label="Thinking" />}
-            {getThinkingMessage(isStreaming)}
+            {isStreaming && <BrailleSpinner label={copy.thinking} />}
+            {message}
             <ChevronDownIcon
               className={cn(
                 "size-4 transition-transform",

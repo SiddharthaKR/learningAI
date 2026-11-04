@@ -7,6 +7,8 @@ import { ArrowDownIcon, DownloadIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useCallback } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import { useI18n } from "@/components/i18n-provider";
+import { catalogFor, type LocaleCatalog } from "@/src/i18n/catalog";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
@@ -42,12 +44,16 @@ export type ConversationEmptyStateProps = ComponentProps<"div"> & {
 
 export const ConversationEmptyState = ({
   className,
-  title = "No messages yet",
-  description = "Start a conversation to see messages here",
+  title,
+  description,
   icon,
   children,
   ...props
-}: ConversationEmptyStateProps) => (
+}: ConversationEmptyStateProps) => {
+  const copy = useI18n().messageUi;
+  const resolvedTitle = title ?? copy.noMessages;
+  const resolvedDescription = description ?? copy.startConversation;
+  return (
   <div
     className={cn(
       "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
@@ -59,15 +65,16 @@ export const ConversationEmptyState = ({
       <>
         {icon && <div className="text-muted-foreground">{icon}</div>}
         <div className="space-y-1">
-          <h3 className="font-medium text-sm">{title}</h3>
-          {description && (
-            <p className="text-muted-foreground text-sm">{description}</p>
+          <h3 className="font-medium text-sm">{resolvedTitle}</h3>
+          {resolvedDescription && (
+            <p className="text-muted-foreground text-sm">{resolvedDescription}</p>
           )}
         </div>
       </>
     )}
   </div>
 );
+};
 
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
 
@@ -75,6 +82,7 @@ export const ConversationScrollButton = ({
   className,
   ...props
 }: ConversationScrollButtonProps) => {
+  const copy = useI18n().messageUi;
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
 
   const handleScrollToBottom = useCallback(() => {
@@ -89,6 +97,7 @@ export const ConversationScrollButton = ({
           className
         )}
         onClick={handleScrollToBottom}
+        aria-label={copy.scrollBottom}
         size="icon"
         type="button"
         variant="outline"
@@ -115,9 +124,8 @@ export type ConversationDownloadProps = Omit<
   formatMessage?: (message: LhViewMessage, index: number) => string;
 };
 
-const defaultFormatMessage = (message: LhViewMessage): string => {
-  const roleLabel =
-    message.role.charAt(0).toUpperCase() + message.role.slice(1);
+const localizedFormatMessage = (message: LhViewMessage, catalog: LocaleCatalog): string => {
+  const roleLabel = message.role === "user" ? catalog.messageUi.userRole : catalog.messageUi.assistantRole;
   return `**${roleLabel}:** ${getMessageText(message)}`;
 };
 
@@ -126,19 +134,21 @@ export const messagesToMarkdown = (
   formatMessage: (
     message: LhViewMessage,
     index: number
-  ) => string = defaultFormatMessage
+  ) => string = (message) => localizedFormatMessage(message, catalogFor("en"))
 ): string => messages.map((msg, i) => formatMessage(msg, i)).join("\n\n");
 
 export const ConversationDownload = ({
   messages,
   filename = "conversation.md",
-  formatMessage = defaultFormatMessage,
+  formatMessage,
   className,
   children,
   ...props
 }: ConversationDownloadProps) => {
+  const catalog = useI18n();
+  const effectiveFormat = formatMessage ?? ((message: LhViewMessage) => localizedFormatMessage(message, catalog));
   const handleDownload = useCallback(() => {
-    const markdown = messagesToMarkdown(messages, formatMessage);
+    const markdown = messagesToMarkdown(messages, effectiveFormat);
     const blob = new Blob([markdown], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -148,7 +158,7 @@ export const ConversationDownload = ({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-  }, [messages, filename, formatMessage]);
+  }, [messages, filename, effectiveFormat]);
 
   return (
     <Button
@@ -157,6 +167,7 @@ export const ConversationDownload = ({
         className
       )}
       onClick={handleDownload}
+      aria-label={catalog.messageUi.downloadConversation}
       size="icon"
       type="button"
       variant="outline"
