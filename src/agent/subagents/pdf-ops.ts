@@ -52,15 +52,32 @@ export function standardFontsDir(): string {
 	return path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "node_modules", "pdfjs-dist", "standard_fonts") + "/";
 }
 
-async function openDocument(filePath: string) {
+async function openDocument(source: string | Uint8Array) {
 	const pdfjs = await loadPdfjs();
-	const data = new Uint8Array(await fs.readFile(filePath));
+	const data = typeof source === "string" ? new Uint8Array(await fs.readFile(source)) : new Uint8Array(source);
 	// The legacy build in plain node runs on a main-thread fake worker (no
 	// workerSrc needed); teardown is the loading task's destroy().
 	// verbosity 0 = errors only — scanned PDFs (JBIG2 XObjects) otherwise
 	// flood the log with per-page warnings (live-smoke finding 2026-09-19).
 	const task = pdfjs.getDocument({ data, standardFontDataUrl: standardFontsDir(), verbosity: 0 });
 	return { doc: await task.promise, task };
+}
+
+/** Stable page boundaries for document indexing, without formatted extraction headers.
+ * Copy byte input because pdfjs may transfer its backing buffer to the worker. */
+export async function pdfPageTexts(source: string | Uint8Array): Promise<Array<{ page: number; text: string }>> {
+	const { doc, task } = await openDocument(source);
+	try {
+		const pages: Array<{ page: number; text: string }> = [];
+		for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
+			const page = await doc.getPage(pageNumber);
+			const content = await page.getTextContent();
+			pages.push({ page: pageNumber, text: itemsToText(content.items as unknown[]) });
+		}
+		return pages;
+	} finally {
+		await task.destroy();
+	}
 }
 
 /** Concatenate a page's text items into a body string. */

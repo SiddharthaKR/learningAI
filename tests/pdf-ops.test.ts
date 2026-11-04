@@ -7,11 +7,21 @@
 import assert from "node:assert/strict";
 import * as path from "node:path";
 import { describe, it } from "node:test";
-import { parsePageSpec, pdfExtract, pdfInfo, pdfProbe, pdfSearch } from "../src/agent/subagents/pdf-ops.ts";
+import { parsePageSpec, pdfExtract, pdfInfo, pdfProbe, pdfSearch, pdfPageTexts } from "../src/agent/subagents/pdf-ops.ts";
+import { pdfFixture } from "./fixtures/knowledge/builders.ts";
 
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
 
 describe("pdf-ops — the pdfjs text layer", () => {
+	it("returns structured text pages from paths and bytes without formatted headers", async () => {
+		assert.deepEqual(await pdfPageTexts(pdfFixture(["Safety", null, "安全"])), [
+			{ page: 1, text: "Safety" }, { page: 2, text: "" }, { page: 3, text: "安全" },
+		]);
+		const fromPath = await pdfPageTexts(FIXTURE);
+		assert.deepEqual(fromPath.map((page) => page.page), [1, 2, 3]);
+		assert.match(fromPath[0]!.text, /Calculus/);
+	});
+
 	it("pdfInfo triages every page (count, text lengths, image counts, math density)", async () => {
 		const info = await pdfInfo(FIXTURE);
 		assert.equal(info.page_count, 3);

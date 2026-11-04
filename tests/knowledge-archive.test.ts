@@ -332,6 +332,26 @@ describe("secure selected ZIP extraction", () => {
 });
 
 describe("safe Office XML", () => {
+	it("preserves interleaved Office elements in opt-in ordered mode", () => {
+		assert.deepEqual(parseOfficeXml(encode('<a:p><a:r><a:t>First</a:t></a:r><a:fld><a:t>Second</a:t></a:fld><a:r><a:t>Third</a:t></a:r></a:p>'), { preserveOrder: true }), [
+			{ "a:p": [
+				{ "a:r": [{ "a:t": [{ "#text": "First" }] }] },
+				{ "a:fld": [{ "a:t": [{ "#text": "Second" }] }] },
+				{ "a:r": [{ "a:t": [{ "#text": "Third" }] }] },
+			] },
+		]);
+	});
+
+	it("retains declaration rejection in ordered mode", () => {
+		rejectsCode(() => parseOfficeXml(encode('<!DOCTYPE root><root/>'), { preserveOrder: true }), "XML_UNSAFE_DECLARATION");
+	});
+
+	it("retains distinct CDATA provenance in ordered mode", () => {
+		assert.deepEqual(parseOfficeXml(encode('<w:t>Before &amp; <![CDATA[&amp; &#65; 日本]]> after &lt;</w:t>'), { preserveOrder: true }), [
+			{ "w:t": [{ "#text": "Before &amp; " }, { "#cdata": [{ "#text": "&amp; &#65; 日本" }] }, { "#text": " after &lt;" }] },
+		]);
+	});
+
 	for (const declaration of ["<!DOCTYPE root>", "<!dOcTyPe root>", "<!  DOCTYPE root>", "<!ENTITY x 'unsafe'>", "<!eNtItY x 'unsafe'>", "<!\nENTITY x 'unsafe'>"]) {
 		it(`rejects declaration ${JSON.stringify(declaration)} before parsing`, () => {
 			rejectsCode(() => parseOfficeXml(encode(`${declaration}<root>&x;</root>`)), "XML_UNSAFE_DECLARATION");
