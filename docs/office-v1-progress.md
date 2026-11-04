@@ -2,15 +2,15 @@
 
 Plan: `docs/superpowers/plans/2026-11-02-office-v1-pilot.md`
 
-Last update: 2026-11-03. The implementation is in progress; no host acceptance has been performed.
+Last update: 2026-11-04. The implementation is in progress; no host acceptance has been performed.
 
 | Acceptance item | Status | Evidence / next gate |
 |---|---|---|
-| 1. Deployment | In progress | `npm test` 1,732/1,732, `npm run typecheck`, and `npm run build` pass locally. Build artifact check passes and the former dynamic filesystem tracing warning is gone. systemd and `.126` checks pending. |
+| 1. Deployment | In progress | `npm test` 1,733/1,733, `npm run typecheck`, and `npm run build` pass locally. Build artifact check passes and the former dynamic filesystem tracing warning is gone. systemd and `.126` checks pending. |
 | 2. Auth | Locally verified | Account/session/rate-limit tests pass; all API paths are checked by the proxy gate test. `/login`, `/signup`, and `/source` are public. Host acceptance pending. |
 | 3. Isolation | In progress | `storesForUser`, checked owner stores, owner-qualified events/turn/extraction/job registries, and approval ownership are in place. Focused graph and scope tests pass (29/29); the new focused auth/store/ownership tests also pass in the full run. Both maintenance scripts now require `--user <username>` and use `storesForUser()`. |
 | 4. Teaching and practice | In progress | Practice and prompt parser/stream adapter tests pass. Researcher, visual, and local PDF jobs have passing focused tests. Real LLM smoke and bilingual full session pending. |
-| 5. UI languages | Pending | Auth forms have initial English/Japanese copy; full localization and dynamic `<html lang>` pending. |
+| 5. UI languages | Locally verified | Reachable UI copy is catalog-backed in English and Japanese; both catalogs have the same 498 keys. Browser language selects the signup default, `<html lang>` follows the account UI language, and teaching language remains a separate session-fixed value. Encoding, catalog parity, preference/session independence, full-suite, typecheck, and production-build checks pass. Host bilingual acceptance remains pending. |
 | 6. Office knowledge | Pending | Indexing, upload, retrieval, and citation work pending. |
 | 7. Web research | In progress | Researcher background job re-enabled with explicit owner and checked per-user stores. URL-only mode registers `web_fetch` without `web_search`; learner and search-result URL provenance tests pass (3/3). Proxy and approval integration need further verification. Search deferred when provider is `none`. |
 | 8. Outbound traffic | Pending | Host observation pending. |
@@ -22,6 +22,8 @@ Latest local checks: `tsc --noEmit` passes. `npm run build` passes with the post
 2026-11-03 update: line endings were committed alone as `41bdd56` (`normalize line endings (no code changes)`). A later full run counted 1,783 tests: 1,709 passed, 74 failed. After that run, focused researcher/web tests pass (16/16), and owner-scoped import route tests pass (3/3); these changes have not yet been reflected in a new full-suite count. The original A/B/C table below remains the audit of the 87-failure baseline, not a reclassification of the 74-failure run.
 
 Latest gate after the researcher and test migration: **1,732/1,732 tests pass; typecheck passes; production build and artifact check pass without tracing warnings.** The 87-failure baseline remains classified A 48, B 36, C 3. The three C practice failures were fixed in production code. Research, visual, local PDF, import, model catalog, removed-tool registry, and UI expectation tests now pass under the fixed office design. The net test-count reduction includes cloud-provider matrix and removed demo/setup cases; focused fixed-office and URL-provenance tests were added. This green local gate does not establish the ten-item host acceptance checklist.
+
+2026-11-04 UI-language gate: commits through `3287052` localize the reachable interface and keep all user-facing copy in `locales/en.json` and `locales/ja.json`. The catalogs contain the same 498 flattened keys; the UTF-8/mojibake guard and known-Japanese round-trip checks pass. Fresh verification after the final localization slice: **1,733/1,733 tests pass, `npm run typecheck` passes, and `npm run build` passes with the post-build artifact check.** The build scanner found no `data/`, `knowledge/`, `index/`, `indexes/`, or JSONL content under `.next`. `.126` browser acceptance is still required before item 5 is host-complete.
 
 Maintenance script decision: `scripts/backfill-graph.ts` remains useful for manually re-extracting one user's graph; `scripts/replay-layout.ts` remains useful for manually regenerating one user's graph layout. Both require `--user <username>` and resolve all personal stores through `storesForUser()`.
 
