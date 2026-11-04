@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { after, it } from "node:test";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
+import fsPromises from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import os from "node:os";
 import path from "node:path";
 
@@ -51,6 +53,47 @@ it("rechecks a deleted owner in a delayed background continuation", async () => 
   await accounts.delete("delayed");
   resume();
   await assert.rejects(task, /Owner account no longer exists/u);
+});
+
+it("rechecks background ownership on each personal knowledge read and write", async () => {
+  const accounts = createAccountStore(root);
+  const owner = await accounts.create("knowledge_owner", "correct horse battery staple", "en");
+  const store = checkedStoresForUser(owner.id).knowledgeStore;
+  const value = { version: 1 as const, generatedAt: new Date().toISOString(), documents: [], chunks: [] };
+  await store.writeSnapshot(value);
+  assert.deepEqual((await store.readSnapshot()).documents, []);
+  await accounts.delete("knowledge_owner");
+  assert.throws(() => store.readSnapshot(), /Owner account no longer exists/u);
+  assert.throws(() => store.writeSnapshot(value), /Owner account no longer exists/u);
+  await assert.rejects(runAsBackgroundOwner(owner.id, async () => { await stores.knowledgeStore.readSnapshot(); }), /Owner account no longer exists/u);
+});
+
+it("rejects an in-flight personal knowledge write after its owner and directory are deleted", async (context) => {
+  const accounts = createAccountStore(root);
+  const owner = await accounts.create("pending_knowledge", "correct horse battery staple", "en");
+  const ownerStores = checkedStoresForUser(owner.id);
+  const knowledgeDir = path.join(ownerStores.root, "knowledge");
+  const originalMkdir = fsPromises.mkdir;
+  let reached!: () => void;
+  let resume!: () => void;
+  const paused = new Promise<void>((resolve) => { reached = resolve; });
+  const gate = new Promise<void>((resolve) => { resume = resolve; });
+  const intercepted = context.mock.method(fsPromises, "mkdir", async (...args: Parameters<typeof fsPromises.mkdir>) => {
+    if (String(args[0]) === knowledgeDir) { reached(); await gate; }
+    return originalMkdir(...args);
+  });
+  syncBuiltinESMExports();
+  context.after(() => { intercepted.mock.restore(); syncBuiltinESMExports(); });
+  const task = ownerStores.knowledgeStore.writeSnapshot({ version: 1, generatedAt: new Date().toISOString(), documents: [], chunks: [] });
+  const refused = assert.rejects(task, /Owner account no longer exists/u);
+  try {
+    await paused;
+    await accounts.delete("pending_knowledge");
+    await rm(ownerStores.root, { recursive: true, force: true });
+  } finally { resume(); }
+  await refused;
+  await assert.rejects(fsPromises.stat(path.join(knowledgeDir, "index.json")), { code: "ENOENT" });
+  assert.deepEqual(await readdir(knowledgeDir).catch(() => []), []);
 });
 
 it("graph extraction keeps its explicit owner and rechecks before reading or writing", async () => {

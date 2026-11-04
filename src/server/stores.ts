@@ -11,6 +11,7 @@ import { createGraphStore } from "../store/graph.ts";
 import { createJobStore } from "../store/jobs.ts";
 import { createSettingsStore } from "../store/settings.ts";
 import { createRenderSettingsStore } from "../store/render-settings.ts";
+import { createKnowledgeStore } from "../store/knowledge.ts";
 import { PATHS } from "../../config.ts";
 import path from "node:path";
 import { currentUserId, isBackgroundOwnerScope } from "./user-scope.ts";
@@ -22,6 +23,9 @@ import { resolveSettings, type EffectiveSettings } from "../core/settings-resolu
 import { fixedOfficeModelSpec } from "./office-config.ts";
 /** The only path constructor for personal stores. */
 const cache = new Map<string, ReturnType<typeof constructUserStores>>();
+function assertOwnerExists(userId: string): void {
+	if (!accountExistsSync(PATHS.data, userId)) throw new Error("Owner account no longer exists");
+}
 function constructUserStores(userId: string) {
 	if (!/^[A-Za-z0-9_-]+$/u.test(userId)) throw new Error("Invalid user ID");
 	const root = path.join(PATHS.data, "users", userId);
@@ -32,6 +36,7 @@ function constructUserStores(userId: string) {
 		graphStore: createGraphStore(root),
 		settingsStore: createSettingsStore(root),
 		renderSettingsStore: createRenderSettingsStore(root),
+		knowledgeStore: createKnowledgeStore(root, () => assertOwnerExists(userId)),
 	};
 }
 export function storesForUser(userId: string): ReturnType<typeof constructUserStores> {
@@ -50,7 +55,7 @@ export function checkedStoresForUser(userId: string): ReturnType<typeof storesFo
 				const value = Reflect.get(target, property);
 				if (typeof value !== "function") return value;
 				return (...args: unknown[]) => {
-					if (!accountExistsSync(PATHS.data, userId)) throw new Error("Owner account no longer exists");
+					assertOwnerExists(userId);
 					return Reflect.apply(value, target, args);
 				};
 			},
@@ -63,6 +68,7 @@ export function checkedStoresForUser(userId: string): ReturnType<typeof storesFo
 		jobStore: checked(base.jobStore),
 		settingsStore: checked(base.settingsStore),
 		renderSettingsStore: checked(base.renderSettingsStore),
+		knowledgeStore: checked(base.knowledgeStore),
 	};
 }
 

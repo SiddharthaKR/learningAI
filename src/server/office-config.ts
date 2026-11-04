@@ -10,7 +10,6 @@ export interface OfficeConfig {
   embeddingModel?: string;
   port: number;
   sessionSecret: string;
-  knowledgeDir: string;
   maxConcurrentLlm: number;
   llmToolMode: "native" | "prompt";
 }
@@ -59,7 +58,6 @@ export function officeConfig(): OfficeConfig {
     ...(process.env.EMBEDDING_MODEL?.trim() ? { embeddingModel: process.env.EMBEDDING_MODEL.trim() } : {}),
     port: positiveInt(process.env.PORT, 3000, 'PORT'),
     sessionSecret,
-    knowledgeDir: process.env.KNOWLEDGE_DIR?.trim() ?? '',
     maxConcurrentLlm: positiveInt(process.env.MAX_CONCURRENT_LLM, 4, 'MAX_CONCURRENT_LLM'),
     llmToolMode,
   };

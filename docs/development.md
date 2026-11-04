@@ -44,11 +44,16 @@ The Node server reads office settings from environment variables. Copy `.env.exa
 | `LLM_MODEL` | Model ID; the model must support tool calls |
 | `LLM_API_KEY` | Optional bearer token for the internal LLM |
 | `SESSION_SECRET` | Session signing secret, at least 32 characters |
-| `KNOWLEDGE_DIR` | Office knowledge storage path |
+| `KNOWLEDGE_SHARED_DIR` | Source folder for the authorized shared index command |
+| `KNOWLEDGE_INDEX_FILE` | Shared JSON snapshot; the runtime reopens it read-only for every retrieval |
 | `PORT` | Node web server port (default 3000) |
 | `NO_PROXY` | Must include the internal LLM host |
 
 Run `npm run smoke:llm` to check plain chat and tool-call support. Process environment variables override `.env`, which makes it possible to point the check at a local Ollama instance without editing the deployment template.
+
+Set both knowledge paths in the command environment and run `npm run index:shared` to recursively build the shared snapshot. The command uses these two variables independently of LLM configuration; export them in the shell or service environment (the standalone `tsx` command does not load `.env`). It skips hidden paths, symlinks, temporary files, and its own output. PDF, PPTX, DOCX, MD, and TXT files are extracted; unsupported or malformed files remain visible as rejected document records while other files continue indexing. The authorized writer replaces the snapshot atomically. The web process reads the snapshot with filesystem flag `r` and never creates or updates it.
+
+Personal indexes live at `data/users/<id>/knowledge/index.json` (or the same path beneath `LH_DATA_DIR`). Future document uploads belong in that owner's `knowledge/documents/` directory. Personal stores are constructed only by `storesForUser`; checked background stores recheck account existence on each operation.
 
 ## Architecture
 
