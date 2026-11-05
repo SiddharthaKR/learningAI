@@ -22,6 +22,7 @@ import { useServerEvent, useServerResync } from "@/components/server-events";
 import type { ChatListItem } from "@/src/core";
 import { kbdEventForAction } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
+import { KnowledgeNavigationLink } from "@/components/knowledge-navigation-link";
 import { catalogFor, type LocaleCatalog } from "@/src/i18n/catalog";
 
 /**
@@ -843,6 +844,7 @@ function SessionsSidebar() {
 					    New session — quiet, bottom-pinned, opens the centered
 					    dialog (also mod+, in the keyboard registry). */}
 					<div className="px-3 pb-3 pt-1">
+						<KnowledgeNavigationLink />
 						<Hint label={copy.sidebar.settings} action="open-settings" side="right">
 							<button
 								type="button"

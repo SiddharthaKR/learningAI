@@ -11,6 +11,7 @@ export interface KnowledgeDocumentRecord {
 	format?: KnowledgeFormat;
 	status: "ready" | "no_text_layer" | "rejected";
 	error?: string;
+	contentHash?: string;
 }
 export interface KnowledgeSnapshot {
 	version: 1;
@@ -37,7 +38,7 @@ const citationSchema = z.discriminatedUnion("format", [
 const snapshotSchema = z.strictObject({
 	version: z.literal(1),
 	generatedAt: z.string().min(1),
-	documents: z.array(z.strictObject({ id: idSchema, fileName: fileNameSchema, format: formatSchema.optional(), status: z.enum(["ready", "no_text_layer", "rejected"]), error: z.string().optional() }).refine((record) => record.status === "rejected" || record.format !== undefined)),
+	documents: z.array(z.strictObject({ id: idSchema, fileName: fileNameSchema, format: formatSchema.optional(), status: z.enum(["ready", "no_text_layer", "rejected"]), error: z.string().optional(), contentHash: idSchema.optional() }).refine((record) => record.status === "rejected" || record.format !== undefined)),
 	chunks: z.array(z.strictObject({ id: idSchema, sourceId: idSchema, text: z.string().min(1), citation: citationSchema })),
 });
 

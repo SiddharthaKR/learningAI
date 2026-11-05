@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
+import { MAX_KNOWLEDGE_MULTIPART_BYTES } from "./src/knowledge/upload.ts";
 
 const nextConfig: NextConfig = {
+	experimental: {
+		// Proxy clones the request body before the route can enforce file size.
+		proxyClientMaxBodySize: MAX_KNOWLEDGE_MULTIPART_BYTES,
+	},
 	// Runtime-loaded provider catalogs and native bindings need their own
 	// Node module resolution instead of route bundling.
 	serverExternalPackages: [

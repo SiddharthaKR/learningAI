@@ -1,4 +1,24 @@
 {
+  "knowledge": {
+    "title": "Knowledge",
+    "description": "Upload personal documents to use with office knowledge in your sessions.",
+    "chooseFile": "Choose a document",
+    "upload": "Upload",
+    "working": "Processing…",
+    "acceptedFormats": "PDF, PPTX, DOCX, MD, TXT. Maximum 25 MiB per document. Excel is not supported.",
+    "documents": "Your documents",
+    "empty": "No documents uploaded yet.",
+    "ready": "Ready",
+    "noTextLayer": "no text layer (OCR not supported)",
+    "rejected": "Rejected: extraction failed. Check that the document is valid and readable.",
+    "delete": "Delete",
+    "unsupported_format": "Unsupported format. Choose PDF, PPTX, DOCX, MD, or TXT. Excel is not supported.",
+    "too_large": "The document exceeds the 25 MiB limit.",
+    "invalid_upload": "Choose one valid document to upload.",
+    "invalid_file_name": "The document filename is invalid. Rename it and try again.",
+    "upload_failed": "The document could not be uploaded. Please try again.",
+    "delete_failed": "The document could not be deleted. Please try again."
+  },
   "common": {
     "english": "English",
     "japanese": "Japanese"

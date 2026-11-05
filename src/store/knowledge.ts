@@ -1,11 +1,64 @@
 import path from "node:path";
-import { readKnowledgeSnapshot, writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot } from "../knowledge/index-store.ts";
+import { createHash, randomUUID } from "node:crypto";
+import { renameSync } from "node:fs";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { readKnowledgeSnapshot, writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot, type KnowledgeDocumentRecord } from "../knowledge/index-store.ts";
+import { indexKnowledgeDocument } from "../knowledge/service.ts";
+import { validateKnowledgeUpload } from "../knowledge/upload.ts";
+
+// All route instances for an owner share one queue. Failed operations release it.
+const mutations = new Map<string, Promise<unknown>>();
+function serialized<T>(root: string, operation: () => Promise<T>): Promise<T> {
+  const previous = mutations.get(root) ?? Promise.resolve();
+  const current = previous.catch(() => {}).then(operation);
+  mutations.set(root, current);
+  void current.finally(() => { if (mutations.get(root) === current) mutations.delete(root); }).catch(() => {});
+  return current;
+}
 
 export function createKnowledgeStore(root: string, beforePublish: () => void) {
 	const indexFile = path.join(root, "knowledge", "index.json");
-	// Future uploaded bytes belong under root/knowledge/documents/.
+	const sourceDirectory = path.join(root, "knowledge", "documents");
 	return {
 		readSnapshot: () => readKnowledgeSnapshot(indexFile),
 		writeSnapshot: (snapshot: KnowledgeSnapshot) => writeKnowledgeSnapshotAtomic(indexFile, snapshot, beforePublish),
+		uploadDocument: async ({ fileName, data, contentType }: { fileName: string; data: Uint8Array; contentType?: string }): Promise<KnowledgeDocumentRecord> => {
+			validateKnowledgeUpload(fileName, data.byteLength, contentType);
+			return serialized(root, async () => {
+				beforePublish();
+				const snapshot = await readKnowledgeSnapshot(indexFile);
+				const contentHash = createHash("sha256").update(data).digest("hex");
+const existing = snapshot.documents.find((document) => document.contentHash === contentHash);
+				if (existing) return existing;
+				const indexed = await indexKnowledgeDocument({ fileName, data });
+				const document = { ...indexed.document, contentHash };
+				const sourceFile = path.join(sourceDirectory, document.id);
+				const temporary = path.join(sourceDirectory, `.${randomUUID()}.tmp`);
+				beforePublish();
+				await mkdir(sourceDirectory, { recursive: true });
+				let published = false;
+				try {
+					await writeFile(temporary, data, { mode: 0o600, flag: "wx" });
+					beforePublish();
+					renameSync(temporary, sourceFile);
+					published = true;
+					await writeKnowledgeSnapshotAtomic(indexFile, { ...snapshot, generatedAt: new Date().toISOString(), documents: [...snapshot.documents, document], chunks: [...snapshot.chunks, ...indexed.chunks] }, beforePublish);
+					return document;
+				} catch (error) {
+					if (published) await unlink(sourceFile).catch((cleanup: NodeJS.ErrnoException) => { if (cleanup.code !== "ENOENT") throw cleanup; });
+					throw error;
+				} finally {
+					await unlink(temporary).catch((cleanup: NodeJS.ErrnoException) => { if (cleanup.code !== "ENOENT") throw cleanup; });
+				}
+			});
+		},
+		deleteDocument: (id: string): Promise<boolean> => serialized(root, async () => {
+			beforePublish();
+			const snapshot = await readKnowledgeSnapshot(indexFile);
+if (!snapshot.documents.some((document) => document.id === id)) return false;
+			await writeKnowledgeSnapshotAtomic(indexFile, { ...snapshot, generatedAt: new Date().toISOString(), documents: snapshot.documents.filter((document) => document.id !== id), chunks: snapshot.chunks.filter((chunk) => chunk.sourceId !== id) }, beforePublish);
+			await unlink(path.join(sourceDirectory, id)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+			return true;
+		}),
 	};
 }
