@@ -11,10 +11,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { emit } from "../core/events.ts";
 import type { ChatStore } from "../core/ports.ts";
-import type { ChatRecord, ChatSettings, ChatSummary, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
+import type { ChatRecord, ChatSettings, ChatSummary, ExtractionRunUsage, PlanTree, SessionControls, SessionControlsChangedData, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
-import { activeProblemOf, danglingQuestionOf } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, newSessionControlsChangedMessage } from "../core/native-messages.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 
 export function createChatStore(root: string): ChatStore {
@@ -57,7 +57,26 @@ function createChat(title: string, kind?: "practice", teachingLanguage: "en" | "
  *  lazy migration means existing files only get stamped on their next write.
  *  A future-version guard lives on the read side (getChat). */
 function writeChat(record: ChatRecord): void {
-	fs.writeFileSync(chatFile(record.id), JSON.stringify({ ...record, version: CURRENT_CHAT_VERSION }, null, "\t"), "utf-8");
+	const destination = chatFile(record.id);
+	const temporary = path.join(chatDir, `.${record.id}.${crypto.randomUUID()}.tmp`);
+	let fd: number | undefined;
+	let created = false;
+	try {
+		fd = fs.openSync(temporary, "wx", 0o600);
+		created = true;
+		fs.writeFileSync(fd, JSON.stringify({ ...record, version: CURRENT_CHAT_VERSION }, null, "\t"), "utf-8");
+		fs.fsyncSync(fd);
+		fs.closeSync(fd);
+		fd = undefined;
+		fs.renameSync(temporary, destination);
+	} finally {
+		if (fd !== undefined) {
+			try { fs.closeSync(fd); } catch { /* Preserve the publication failure. */ }
+		}
+		if (created) {
+			try { fs.unlinkSync(temporary); } catch { /* Already renamed. */ }
+		}
+	}
 }
 
 function getChat(id: string): ChatRecord | null {
@@ -169,6 +188,32 @@ function saveSettings(id: string, settings: ChatSettings): void {
 	writeChat(record);
 }
 
+/** One fresh-record publication for the controls and their neutral audit. */
+function saveSessionControls(id: string, settings: SessionControls): { settings: SessionControls; changed: boolean } {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	const changes: SessionControlsChangedData["changes"] = [];
+	for (const field of ["webResearchEnabled", "officeKnowledgeEnabled"] as const) {
+		const from = record.settings?.[field] === true;
+		if (from !== settings[field]) changes.push({ field, from, to: settings[field] });
+	}
+	if (changes.length === 0) return { settings, changed: false };
+	record.settings = { webResearchEnabled: settings.webResearchEnabled, officeKnowledgeEnabled: settings.officeKnowledgeEnabled };
+	record.messages = [...record.messages, newSessionControlsChangedMessage({ at: new Date().toISOString(), changes })];
+	writeChat(record);
+	return { settings: record.settings as SessionControls, changed: true };
+}
+
+/** The only knowledge-use setter: no await between fresh read and publication. */
+function markKnowledgeUsed(id: string): boolean {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	if (record.knowledgeUsed === true) return false;
+	record.knowledgeUsed = true;
+	writeChat(record);
+	return true;
+}
+
 /** Rename a session (the header's click-to-edit title, 2026-09-17). Like
  * saveSettings, a rename is NOT conversation activity: updatedAt stays put
  * so sidebar order never churns. Same fallback as createChat — the empty
@@ -214,6 +259,8 @@ return {
 	saveMessages,
 	saveTree,
 	saveSettings,
+	saveSessionControls,
+	markKnowledgeUsed,
 	renameChat,
 	deleteChat,
 	appendTurnUsage,

@@ -323,7 +323,7 @@ export function serializeForSummary(messages: readonly LhMessage[]): string {
 			);
 		} else if (role === "custom") {
 			const marker = m as LhMarkerMessage;
-			if (marker.customType === "plan-block") continue; // UI-only
+			if (marker.customType === "plan-block" || marker.customType === "session-controls-changed") continue; // UI-only
 			lines.push(`[SYSTEM NOTE] ${marker.content}`);
 		}
 	}

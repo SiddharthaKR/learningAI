@@ -14,6 +14,7 @@ import type {
 	ChatRecord,
 	ChatSettings,
 	ChatSummary,
+	SessionControls,
 	GraphChain,
 	GraphNode,
 	JobKind,
@@ -54,6 +55,11 @@ export interface ChatStore {
 	/** Persist the per-chat model/thinking settings (the model control).
 	 *  Replace-whole: the picker sends the complete settings object. */
 	saveSettings(id: string, settings: ChatSettings): void;
+	/** Replace office controls and append their UI-only audit in one publication.
+	 * No semantic change performs no write; neither operation bumps activity. */
+	saveSessionControls(id: string, settings: SessionControls): { settings: SessionControls; changed: boolean };
+	/** Persist the monotonic knowledge-use transition synchronously, once. */
+	markKnowledgeUsed(id: string): boolean;
 	/** Rename a session (the header's click-to-edit title, 2026-09-17).
 	 * Like saveSettings: a rename is NOT conversation activity — updatedAt
 	 * stays put, so sidebar order never churns on a rename. */

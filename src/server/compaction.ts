@@ -223,7 +223,11 @@ async function compact(deps: CompactionDeps, chatId: string): Promise<void> {
 			at: new Date().toISOString(),
 		};
 		const marker = newCompactionMarker(trimmed, details);
-		deps.chatStore.saveMessages(chatId, [...messages, marker]);
+		// Controls audits and other history may append while summarization awaits.
+		// Keep the summarized snapshot's cut, but publish onto the latest history.
+		const fresh = deps.chatStore.getChat(chatId);
+		if (!fresh) throw new Error(`Chat not found: ${chatId}`);
+		deps.chatStore.saveMessages(chatId, [...fresh.messages, marker]);
 		// The money channel: the summary is a real model call on the
 		// session's own engine — its usage keys to the marker (provenance:
 		// the transcript shows the compaction divider at the marker).

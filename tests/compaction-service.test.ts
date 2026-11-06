@@ -22,7 +22,7 @@ import { after, describe, it } from "node:test";
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-compaction-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 
-const { chatStore } = await import("./support/test-stores.ts");
+const { chatStore, TEST_USER_ROOT } = await import("./support/test-stores.ts");
 const {
 	ensureCompacted,
 	kickCompaction,
@@ -30,9 +30,9 @@ const {
 	effectiveThresholdTokens,
 	projectedContextTokens,
 } = await import("../src/server/compaction.ts");
-import type { CompactionDeps } from "../src/server/compaction.ts";
+import type { CompactionDeps, Summarizer } from "../src/server/compaction.ts";
 const { subscribe } = await import("../src/core/events.ts");
-const { activeCompactionOf, newUserMessage, COMPACTED_HISTORY_HEADER } = await import("../src/core/index.ts");
+const { activeCompactionOf, newUserMessage, toLlmMessages, COMPACTED_HISTORY_HEADER } = await import("../src/core/index.ts");
 import type { LhMessage } from "../src/core/index.ts";
 
 after(() => {
@@ -71,9 +71,82 @@ const depsOf = (chatId: string, thresholdTokens: number): CompactionDeps => ({
 	},
 });
 
+function deferredSummarizer() {
+	let entered!: () => void;
+	let release!: () => void;
+	const started = new Promise<void>((resolve) => { entered = resolve; });
+	const gate = new Promise<void>((resolve) => { release = resolve; });
+	const summarize: Summarizer = async () => {
+		entered();
+		await gate;
+		return {
+			summary: "Deferred summary of the original transcript span.",
+			usage: { input: 1_000, output: 500, cacheRead: 0, cacheWrite: 0, totalTokens: 1_500, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+		};
+	};
+	return { started, release, summarize };
+}
+
 // ── the laws ────────────────────────────────────────────────────────────────
 
 describe("the compaction service", () => {
+	it("preserves ordered audit markers and messages added during a deferred summary without duplicates or moving the cut", async () => {
+		const chatId = overThresholdChat("compact: concurrent session controls");
+		chatStore.saveSessionControls(chatId, { webResearchEnabled: true, officeKnowledgeEnabled: false });
+		const original = chatStore.getChat(chatId)!;
+		const deferred = deferredSummarizer();
+		const run = ensureCompacted({ ...depsOf(chatId, 40_000), summarize: deferred.summarize }, chatId);
+		await deferred.started;
+		let during = original;
+		const lateMessage = newUserMessage("Message appended while the summary is pending");
+		try {
+			chatStore.saveSessionControls(chatId, { webResearchEnabled: true, officeKnowledgeEnabled: true });
+			chatStore.saveMessages(chatId, [...chatStore.getChat(chatId)!.messages, lateMessage]);
+			chatStore.saveSessionControls(chatId, { webResearchEnabled: false, officeKnowledgeEnabled: true });
+			chatStore.markKnowledgeUsed(chatId);
+			during = chatStore.getChat(chatId)!;
+		} finally { deferred.release(); }
+		await run;
+
+		const record = chatStore.getChat(chatId)!;
+		const audits = record.messages.filter((message) => message.role === "custom" && message.customType === "session-controls-changed");
+		assert.equal(audits.length, 3, "all pre-existing and mid-summary controls audits survive");
+		assert.deepEqual(record.messages.slice(0, -1), during.messages, "all history keeps its exact order and contents");
+		assert.equal(new Set(record.messages.map((message) => message.id)).size, record.messages.length, "nothing is duplicated");
+		assert.equal(record.messages.filter((message) => message.role === "custom" && message.customType === "compaction").length, 1);
+		const marker = activeCompactionOf(record.messages)!;
+		assert.equal(record.messages.at(-1)!.id, marker.id, "the summary marker follows all additions");
+		assert.equal(marker.details.firstKeptMessageId, original.messages[2]!.id, "the cut still names the original first kept message");
+		const wire = toLlmMessages(record.messages);
+		assert.deepEqual(wire.slice(1), toLlmMessages([original.messages[2]!, original.messages[3]!, lateMessage]), "the cut retains the original tail and later message, while audits remain UI-only");
+		assert.equal(record.knowledgeUsed, true);
+		assert.deepEqual(record.settings, { webResearchEnabled: false, officeKnowledgeEnabled: true });
+		assert.equal(record.turns?.filter((turn) => turn.messageId === marker.id).length, 1);
+	});
+
+	it("does not rewrite a record upgraded to a future version during a deferred summary", async () => {
+		const chatId = overThresholdChat("compact: future version during summary");
+		const deferred = deferredSummarizer();
+		const events: string[] = [];
+		const off = subscribe((event) => {
+			if (event.type === "record-changed" && event.chatId === chatId) events.push(event.type);
+		});
+		const run = ensureCompacted({ ...depsOf(chatId, 40_000), summarize: deferred.summarize }, chatId);
+		await deferred.started;
+		const file = path.join(TEST_USER_ROOT, "chats", `${chatId}.json`);
+		let futureBytes = "";
+		try {
+			const record = JSON.parse(fs.readFileSync(file, "utf8"));
+			futureBytes = JSON.stringify({ ...record, version: 99 });
+			fs.writeFileSync(file, futureBytes);
+		} finally { deferred.release(); }
+		try {
+			await run;
+			assert.equal(fs.readFileSync(file, "utf8"), futureBytes, "future-version data remains byte-identical");
+			assert.deepEqual(events, [], "no successful publication is announced");
+		} finally { off(); }
+	});
+
 	it("over-threshold record → marker appended, usage logged, both events emitted", async () => {
 		const chatId = overThresholdChat("compact: basic");
 		const events: string[] = [];

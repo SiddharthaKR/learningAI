@@ -88,6 +88,18 @@ export interface ChatSettings {
 	thinkingLevel?: ThinkingLevel;
 }
 
+/** Effective session controls: optional stored flags read as OFF. */
+export interface SessionControls {
+	webResearchEnabled: boolean;
+	officeKnowledgeEnabled: boolean;
+}
+
+/** Neutral, durable UI history; changes are ordered web first, knowledge second. */
+export interface SessionControlsChangedData {
+	at: string;
+	changes: Array<{ field: keyof SessionControls; from: boolean; to: boolean }>;
+}
+
 
 // ─── Background-extraction usage (the money channel, extraction side) ────────
 

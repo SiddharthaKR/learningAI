@@ -42,6 +42,7 @@ import {
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
+import type { SessionControlsChangedData } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
 import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
 
@@ -74,6 +75,7 @@ export interface LhMarkerMessage {
 		| "practice-thinking"
 		| "practice-next"
 		| "problem-dismissed"
+		| "session-controls-changed"
 		| "compaction";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
@@ -115,6 +117,19 @@ export function newUserMessage(text: string): LhMessage & UserMessage {
 		role: "user",
 		content: text,
 		timestamp: Date.now(),
+	};
+}
+
+/** Session controls are UI history only; never learner speech on the wire. */
+export function newSessionControlsChangedMessage(details: SessionControlsChangedData): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "session-controls-changed",
+		content: "",
+		display: true,
+		details,
+		timestamp: Date.parse(details.at),
 	};
 }
 
@@ -552,9 +567,9 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 		const role = (m as { role?: string }).role;
 		if (role === "custom") {
 			const marker = m as LhMarkerMessage;
-			// UI-only markers: plan blocks, and problem dismissals (the
-			// synthesized conclude pair carries the model's face).
-			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed") continue;
+			// UI-only markers: plan blocks, controls audits, and problem
+			// dismissals (the synthesized conclude pair carries the model's face).
+			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed" || marker.customType === "session-controls-changed") continue;
 			// The ACTIVE compaction marker already rendered as the head —
 			// never twice. (Stale markers before the cut are unreachable; a
 			// marker whose cut could not resolve has no head and renders as
