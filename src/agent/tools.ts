@@ -20,6 +20,7 @@ import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
 import { proberGraphTools } from "./tools/graph.ts";
 import { healToolRecord } from "./tools/heal.ts";
+import { createKnowledgeTool, type KnowledgeToolContext } from "./tools/knowledge.ts";
 import type { GraphStore } from "../core/ports.ts";
 
 export { jobTools };
@@ -273,6 +274,9 @@ export interface ProberToolContext extends ProbeDoneContext {
 	 *  master switch AND the agent.graphTools toggle (settings-resolution).
 	 *  Absent = the gate is closed, no map tools (tests drive this seam). */
 	graphStore?: GraphStore;
+	/** Knowledge tool context (Task 6B): present = officeKnowledgeEnabled is
+	 *  ON for this session; absent = OFF, no search_knowledge in the registry. */
+	knowledge?: KnowledgeToolContext;
 }
 
 /** The prober's tool set: probe quiz (no nodeId) + ask + the learner-fs
@@ -330,6 +334,7 @@ export function createProberTools(
 				...(ctx.graphStore
 					? proberGraphTools({ chatStore: ctx.chatStore, graphStore: ctx.graphStore })
 					: {}),
+				...(ctx.knowledge ? createKnowledgeTool(ctx.knowledge) : {}),
 				...done,
 			},
 				withoutMechanics(enabled),
@@ -393,6 +398,9 @@ export interface TeacherToolContext extends PlanToolContext {
 	 *  dispatch tool's honest-disable signal — no live engine = the tool
 	 *  drops from this registry (JobToolContext.searchAvailable). */
 	searchAvailable?: () => boolean;
+	/** Knowledge tool context (Task 6B): present = officeKnowledgeEnabled is
+	 *  ON for this session; absent = OFF, no search_knowledge in the registry. */
+	knowledge?: KnowledgeToolContext;
 }
 
 /**
@@ -452,6 +460,7 @@ export function createTeacherTools(
 			// always took its ?? true default. Threaded now: the live signal
 			// reaches jobTools' research gate.
 			...jobTools(ctx),
+			...(ctx.knowledge ? createKnowledgeTool(ctx.knowledge) : {}),
 		},
 		withoutMechanics(enabled),
 		),

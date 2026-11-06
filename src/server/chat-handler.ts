@@ -48,6 +48,9 @@ import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
 import { hasProbeDone, danglingQuestionOf } from "../core/native-messages.ts";
+import { Bm25Retriever } from "../knowledge/bm25.ts";
+import { loadKnowledgeChunks } from "../knowledge/service.ts";
+import type { KnowledgeToolContext } from "../agent/tools/knowledge.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
 import { catalogContextLimits } from "./model-catalog.ts";
@@ -391,6 +394,19 @@ export async function handleChatInput(
 		// point as the tool delta — the agent layer composes the system
 		// prompt fresh per turn, swapping in any enabled override segments.
 	};
+	// KNOWLEDGE TOOL (Task 6B): construct the retriever + sticky context
+	// ONLY when the session's officeKnowledgeEnabled flag is ON (teacher +
+	// prober only — practice sessions do not get search_knowledge).
+	const knowledgeCtx: KnowledgeToolContext | undefined =
+		record.settings?.officeKnowledgeEnabled === true
+			? {
+					ownerId: currentUserId(),
+					chatId,
+					retriever: new Bm25Retriever((userId) => loadKnowledgeChunks(userId)),
+					markKnowledgeUsed: (id) => stores.chatStore.markKnowledgeUsed(id),
+				}
+			: undefined;
+
 	// PRACTICE BRANCH (owner design, 2026-10-04): a kind:"practice"
 	// session builds the practitioner from turn 1 — no prober→teacher
 	// split, no plan/question/job tools; the whole registry is
@@ -431,6 +447,7 @@ export async function handleChatInput(
 						// The registry drop's signal (2026-09-20): no live engine
 						// = no research tool in the teacher's registry.
 						searchAvailable: () => researchAvailable(chatId),
+						knowledge: knowledgeCtx,
 					},
 					agentOpts,
 				)
@@ -449,6 +466,7 @@ export async function handleChatInput(
 						// knowledge graph through tools when the gate opens —
 						// graph master switch AND the agent.graphTools toggle.
 						...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
+						knowledge: knowledgeCtx,
 					},
 					agentOpts,
 				);
