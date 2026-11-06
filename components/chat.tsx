@@ -1321,6 +1321,27 @@ export function Chat({
 														Next problem
 													</div>
 												);
+											case "data-session-controls-changed": {
+												const audit = part.data as { at: string; changes: Array<{ field: string; from: boolean; to: boolean }> };
+												const fieldLabel = (f: string) =>
+													f === "webResearchEnabled" ? copy.activityUi.webResearch
+														: f === "officeKnowledgeEnabled" ? copy.activityUi.officeKnowledge
+															: f;
+												return (
+													<div
+														key={pi}
+														data-testid="controls-changed-line"
+														className="my-4 flex items-center justify-center gap-1.5 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground"
+													>
+														{audit.changes.map((c, ci) => (
+															<span key={ci}>
+																{ci > 0 && <span className="mx-1">·</span>}
+																{fieldLabel(c.field)} {c.to ? copy.chat.controlOn : copy.chat.controlOff}
+															</span>
+														))}
+													</div>
+												);
+											}
 											default:
 												return null;
 										}

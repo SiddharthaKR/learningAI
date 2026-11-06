@@ -239,3 +239,17 @@ Composition root (`src/server/chat-handler.ts`): imports `Bm25Retriever`, `loadK
 Decisions: knowledge is teacher + prober only (practice excluded). The prompt fragment is unconditionally loaded but uses conditional wording. The retriever is instantiated fresh per turn via the composition root. `markKnowledgeUsed` delegates directly to the store's synchronous monotonic operation.
 
 Focused tests (`tests/knowledge-tool.test.ts`): 10 behavioral tests covering tool existence, empty retrieval, sticky persist before return, persist failure withholding, all four citation formats (PDF/PPTX/DOCX/MD), and registry gating (absent when no knowledge context, present when provided). All 10 pass; TypeScript passes; 117 affected tests across 5 suites pass with zero failures.
+
+### Office knowledge Task 6C: controls UI, audit markers, and citation rendering
+
+Session controls UI: already implemented in `components/stats-bar.tsx` — checkboxes for `webResearchEnabled` and `officeKnowledgeEnabled` with locale-backed labels, PUT to `/api/chats/:id/settings`, loading/saving states, and error display. No changes needed; the Task 6A backend and existing stats-bar controls are already wired.
+
+Audit marker rendering (`components/chat.tsx`): added `data-session-controls-changed` case to the conversation's marker-card switch. Renders as a compact centered line (same style as practice-next) showing each changed control's display name and ON/OFF state. Uses `activityUi.webResearch` / `activityUi.officeKnowledge` for field names and `chat.controlOn` / `chat.controlOff` for toggle state.
+
+Locale keys: added `chat.controlOn` ("ON") and `chat.controlOff` ("OFF") to both `locales/en.json` and `locales/ja.json`. Parity confirmed: 518 keys in both catalogs.
+
+Citation rendering: per earlier ruling, citations are inline text produced by the `search_knowledge` tool's `formatCitation` function — `[fileName, page N]`, `[fileName, slide N: title]`, `[fileName, §heading, ¶N]`, `[fileName, §heading, lines N–M]`. They render as normal markdown text in assistant messages. No additional UI styling was applied (inline text ruling).
+
+Decisions: controls toggles reuse the existing stats-bar pattern rather than adding a separate header widget. Audit markers use the same chrome-line style as practice-next. Citation rendering stays as inline formatted text.
+
+Focused verification: TypeScript passes; locale parity passes (518 keys); 53 affected tests across 3 suites pass with zero failures.

@@ -98,6 +98,8 @@
     "renameSession": "セッション名を変更",
     "teachingLanguage": "授業言語",
     "containsOfficeDocuments": "社内文書を含む",
+    "controlOn": "ON",
+    "controlOff": "OFF",
     "openPlan": "学習プランを開く",
     "plan": "プラン",
     "practice": "練習",

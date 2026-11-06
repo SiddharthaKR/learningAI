@@ -98,6 +98,8 @@
     "renameSession": "Rename session",
     "teachingLanguage": "Teaching language",
     "containsOfficeDocuments": "contains office documents",
+    "controlOn": "ON",
+    "controlOff": "OFF",
     "openPlan": "Open the full plan",
     "plan": "Plan",
     "practice": "Practice",
