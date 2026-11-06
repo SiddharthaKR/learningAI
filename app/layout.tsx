@@ -20,7 +20,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	const accepted = incoming.get("accept-language")?.split(",")[0]?.trim().toLowerCase() ?? "";
 	const language = account?.uiLanguage ?? (accepted.startsWith("ja") ? "ja" : "en");
 	return (
-		<html lang={language} className="dark">
+		<html lang={language} suppressHydrationWarning>
+			<head>
+				<script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}}())` }} />
+			</head>
 			<body className="min-h-dvh antialiased">
 			<I18nProvider language={language}>
 			{/* The notification channel rides OUTSIDE everything: sidebar, dock,
