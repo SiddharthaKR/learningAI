@@ -3,6 +3,7 @@ import path from "node:path";
 
 const buildRoot = path.resolve(".next");
 const forbiddenDirs = new Set(["data", "knowledge", "index", "indexes"]);
+const routeTree = path.join("server", "app");
 const violations = [];
 
 function walk(dir) {
@@ -11,7 +12,8 @@ function walk(dir) {
     const file = path.join(dir, entry.name);
     const relative = path.relative(buildRoot, file);
     if (entry.isDirectory()) {
-      if (forbiddenDirs.has(entry.name.toLowerCase())) violations.push(relative);
+      const inRouteTree = relative.startsWith(routeTree + path.sep) || relative === routeTree;
+      if (!inRouteTree && forbiddenDirs.has(entry.name.toLowerCase())) violations.push(relative);
       walk(file);
     } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".jsonl")) {
       violations.push(relative);

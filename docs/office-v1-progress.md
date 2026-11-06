@@ -11,13 +11,13 @@ Last update: 2026-11-05. The implementation is in progress; no host acceptance h
 | 3. Isolation | In progress | `storesForUser`, checked owner stores, owner-qualified events/turn/extraction/job registries, and approval ownership are in place. Focused graph and scope tests pass (29/29); the new focused auth/store/ownership tests also pass in the full run. Both maintenance scripts now require `--user <username>` and use `storesForUser()`. |
 | 4. Teaching and practice | In progress | Practice and prompt parser/stream adapter tests pass. Researcher, visual, and local PDF jobs have passing focused tests. Real LLM smoke and bilingual full session pending. |
 | 5. UI languages | Locally verified | Reachable UI copy is catalog-backed in English and Japanese; both catalogs have the same 498 keys. Browser language selects the signup default, `<html lang>` follows the account UI language, and teaching language remains a separate session-fixed value. Encoding, catalog parity, preference/session independence, full-suite, typecheck, and production-build checks pass. Host bilingual acceptance remains pending. |
-| 6. Office knowledge | In progress | Secure archive/XML primitives, bilingual PDF/PPTX/DOCX/MD/TXT extraction with exact citations, pure chunking/BM25 retrieval, and isolated personal/shared snapshot indexing are implemented. Task 2 extraction/PDF focused tests pass 47/47; XML-focused tests pass 11/11; Task 3 retrieval tests pass 27/27; Task 4 indexing/store/ownership tests pass 26/26 after review round 1; typecheck and diff-check pass. PPTX uses one cumulative actual-output budget for slides, relationships, and notes. One validated central directory governs limits and exact selected compressed spans; bounded extraction enforces actual-byte limits, exact stream consumption, and central CRC integrity. The full item gate remains deferred until #6 is complete. Upload/UI, session tools, provenance, and host acceptance remain pending. Detailed implementation plan: `docs/superpowers/plans/2026-11-04-office-knowledge.md`. |
+| 6. Office knowledge | Locally verified | Tasks 1–7 complete. Secure archive/XML primitives, bilingual extraction, BM25 retrieval, isolated indexing, personal uploads, session controls (6A), knowledge tool + agent wiring (6B), controls/audit/citation UI (6C), and full gate (7) are implemented. 1,902/1,902 tests pass; typecheck clean; production build + artifact check pass; locale parity 518 keys. Host acceptance pending. Plan: `docs/superpowers/plans/2026-11-04-office-knowledge.md`. |
 | 7. Web research | In progress | Researcher background job re-enabled with explicit owner and checked per-user stores. URL-only mode registers `web_fetch` without `web_search`; learner and search-result URL provenance tests pass (3/3). Proxy and approval integration need further verification. Search deferred when provider is `none`. |
 | 8. Outbound traffic | Pending | Host observation pending. |
 | 9. `/source` | Pending | Archive route and inspection pending. |
 | 10. Concurrency | Pending | Three-user host exercise pending. |
 
-Latest local checks: `tsc --noEmit` passes. `npm run build` passes with the post-build artifact check and no graph tracing warnings. Full `npm test` ran 1,805 tests: 1,718 passed and 87 failed. Failures include stale configurable-provider/model and demo/research expectations, plus retained practice, import, and UI assertions that still need updating or repair. Focused graph/scope tests pass (29/29). The tests that pass include new auth, store-construction, user-store, background ownership, events ownership, and approval ownership coverage. `My background` has been added to the requested scope and is not implemented yet.
+Latest local checks (2026-11-06 Task 7 gate): `tsc --noEmit` passes. `npm run build` passes with the post-build artifact check (route-tree-aware scanner). Full `npm test`: **1,902/1,902 tests pass; 0 failures.** Locale parity: 518 keys in both EN and JA catalogs.
 
 2026-11-03 update: line endings were committed alone as `41bdd56` (`normalize line endings (no code changes)`). A later full run counted 1,783 tests: 1,709 passed, 74 failed. After that run, focused researcher/web tests pass (16/16), and owner-scoped import route tests pass (3/3); these changes have not yet been reflected in a new full-suite count. The original A/B/C table below remains the audit of the 87-failure baseline, not a reclassification of the 74-failure run.
 
@@ -253,3 +253,15 @@ Citation rendering: per earlier ruling, citations are inline text produced by th
 Decisions: controls toggles reuse the existing stats-bar pattern rather than adding a separate header widget. Audit markers use the same chrome-line style as practice-next. Citation rendering stays as inline formatted text.
 
 Focused verification: TypeScript passes; locale parity passes (518 keys); 53 affected tests across 3 suites pass with zero failures.
+
+### Office knowledge Task 7: full acceptance gate
+
+Prompt-overrides test fix: the pinned prober segment list in `tests/prompt-overrides.test.ts` was updated to include `prober/35-knowledge.md` (the new knowledge prompt fragment discovered by `listSourceSegments`).
+
+Build artifact scanner fix: `scripts/check-build-artifacts.mjs` now excludes the Next.js route tree (`server/app/`) from the forbidden-directory-name check. The `knowledge` API and page routes are compiled route bundles, not data files; the scanner continues to flag any `knowledge/` directory outside the route tree and any `.jsonl` files anywhere.
+
+Full gate results:
+- **`npm test`**: 1,902/1,902 tests pass (0 failures).
+- **`npm run typecheck`** (`tsc --noEmit`): passes clean.
+- **`npm run build`**: production build succeeds; build artifact check passes (no data/, knowledge/, index/ or JSONL files outside the route tree).
+- **Locale parity**: 518 keys, EN and JA catalogs match.
