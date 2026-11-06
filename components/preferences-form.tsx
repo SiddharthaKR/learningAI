@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SidebarToggle } from "@/components/sidebar";
 import { catalogFor, type UiLanguage } from "@/src/i18n/catalog";
 
 type Language = UiLanguage;
@@ -21,8 +22,12 @@ export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; 
     } catch (error) { setMessage(error instanceof Error ? error.message : copy.preferences.saveError); }
     finally { setSaving(false); }
   }
-  return <main className="mx-auto flex max-w-xl flex-col gap-5 p-6">
-    <h1 className="text-2xl font-semibold">{copy.preferences.title}</h1>
+  return <main className="flex min-w-0 flex-1 flex-col overflow-auto">
+    <header className="lh-drag flex items-center gap-3 border-b border-border px-6 py-4">
+      <SidebarToggle />
+      <h1 className="text-lg font-semibold">{copy.preferences.title}</h1>
+    </header>
+    <div className="mx-auto w-full max-w-xl flex-col gap-5 p-6">
     <label className="flex flex-col gap-1">{copy.preferences.uiLanguage}
       <select value={uiLanguage} onChange={(event) => setUiLanguage(event.target.value as Language)} className="rounded border bg-background p-2"><option value="en">{copy.common.english}</option><option value="ja">{copy.common.japanese}</option></select>
     </label>
@@ -34,5 +39,6 @@ export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; 
     </label>
     <button type="button" onClick={() => void save()} disabled={saving} className="self-start rounded bg-accent px-4 py-2 disabled:opacity-50">{copy.preferences.save}</button>
     {message && <p role="status">{message}</p>}
+    </div>
   </main>;
 }

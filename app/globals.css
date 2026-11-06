@@ -127,7 +127,7 @@
 	   fonts: `font-mono`/`font-sans` utilities would otherwise fall to the
 	   SYSTEM stacks — a fourth font the app never chose — and streamdown's
 	   code-block chrome + mermaid-error + demo-card all use them. */
-	--font-ui: ui-monospace, SFMono-Regular, Consolas, monospace;
+	--font-ui: ui-sans-serif, system-ui, -apple-system, sans-serif;
 	--font-prose: ui-sans-serif, system-ui, sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
 	--font-sans: ui-sans-serif, system-ui, sans-serif;
