@@ -29,10 +29,11 @@ export function normalizeKnowledgeFileName(fileName: string): string {
 
 const formatSchema = z.enum(["pdf", "pptx", "docx", "md", "txt"]);
 const positionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+const imageDescriptionSchema = z.boolean().optional();
 const citationSchema = z.discriminatedUnion("format", [
-	z.strictObject({ format: z.literal("pdf"), fileName: fileNameSchema, page: positionSchema }),
-	z.strictObject({ format: z.literal("pptx"), fileName: fileNameSchema, slide: positionSchema, title: z.string() }),
-	z.strictObject({ format: z.literal("docx"), fileName: fileNameSchema, paragraph: positionSchema, heading: z.string().optional() }),
+	z.strictObject({ format: z.literal("pdf"), fileName: fileNameSchema, page: positionSchema, imageDescription: imageDescriptionSchema }),
+	z.strictObject({ format: z.literal("pptx"), fileName: fileNameSchema, slide: positionSchema, title: z.string(), imageDescription: imageDescriptionSchema }),
+	z.strictObject({ format: z.literal("docx"), fileName: fileNameSchema, paragraph: positionSchema, heading: z.string().optional(), imageDescription: imageDescriptionSchema }),
 	z.strictObject({ format: z.enum(["md", "txt"]), fileName: fileNameSchema, lineStart: positionSchema, lineEnd: positionSchema, heading: z.string().optional() }).refine((citation) => citation.lineEnd >= citation.lineStart),
 ]);
 const snapshotSchema = z.strictObject({

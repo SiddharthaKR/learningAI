@@ -8,6 +8,9 @@ export interface OfficeConfig {
   llmReasoning: boolean;
   llmApiKey?: string;
   embeddingModel?: string;
+  visionBaseUrl?: string;
+  visionModel?: string;
+  visionApiKey?: string;
   port: number;
   sessionSecret: string;
   maxConcurrentLlm: number;
@@ -56,6 +59,9 @@ export function officeConfig(): OfficeConfig {
     llmReasoning: requiredBoolean(process.env.LLM_REASONING, "LLM_REASONING"),
     ...(process.env.LLM_API_KEY?.trim() ? { llmApiKey: process.env.LLM_API_KEY.trim() } : {}),
     ...(process.env.EMBEDDING_MODEL?.trim() ? { embeddingModel: process.env.EMBEDDING_MODEL.trim() } : {}),
+    ...(process.env.VISION_BASE_URL?.trim() ? { visionBaseUrl: process.env.VISION_BASE_URL.trim() } : {}),
+    ...(process.env.VISION_MODEL?.trim() ? { visionModel: process.env.VISION_MODEL.trim() } : {}),
+    ...(process.env.VISION_API_KEY?.trim() ? { visionApiKey: process.env.VISION_API_KEY.trim() } : {}),
     port: positiveInt(process.env.PORT, 3000, 'PORT'),
     sessionSecret,
     maxConcurrentLlm: positiveInt(process.env.MAX_CONCURRENT_LLM, 4, 'MAX_CONCURRENT_LLM'),

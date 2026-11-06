@@ -3,6 +3,7 @@ import type { KnowledgeChunk, KnowledgeFormat } from "./contracts.ts";
 import { chunkDocument } from "./chunk.ts";
 import { extractDocument } from "./extract.ts";
 import { normalizeKnowledgeFileName, readKnowledgeSnapshot, validateKnowledgeSnapshot, type KnowledgeDocumentRecord, type KnowledgeSnapshot } from "./index-store.ts";
+import { describeImages, type VisionConfig } from "./vision-job.ts";
 
 function acceptedFormat(fileName: string): KnowledgeFormat | undefined {
 	const extension = /\.([^.\/]+)$/u.exec(fileName)?.[1]?.toLowerCase();
@@ -17,7 +18,7 @@ export function unreadableKnowledgeDocument(fileName: string): KnowledgeDocument
 	return { id, fileName, ...(format ? { format } : {}), status: "rejected", error: "Document could not be read. Check that the source file exists and is readable." };
 }
 
-export async function indexKnowledgeDocument({ fileName, data }: { fileName: string; data: Uint8Array }): Promise<{ document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[] }> {
+export async function indexKnowledgeDocument({ fileName, data, visionConfig }: { fileName: string; data: Uint8Array; visionConfig?: VisionConfig }): Promise<{ document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[] }> {
 	fileName = normalizeKnowledgeFileName(fileName);
 	const contentHash = createHash("sha256").update(data).digest("hex");
 	const id = createHash("sha256").update(JSON.stringify([fileName, contentHash])).digest("hex");
@@ -25,9 +26,14 @@ export async function indexKnowledgeDocument({ fileName, data }: { fileName: str
 	if (!format) return { document: { id, fileName, status: "rejected", error: "Unsupported document format. Accepted formats: PDF, PPTX, DOCX, MD, TXT." }, chunks: [] };
 	try {
 		const extracted = await extractDocument({ fileName, data });
-		return { document: { id, fileName, format, status: extracted.status }, chunks: chunkDocument(extracted, id) };
+		const textChunks = chunkDocument(extracted, id);
+		let imageChunks: KnowledgeChunk[] = [];
+		if (visionConfig && extracted.images?.length) {
+			const imageBlocks = await describeImages(extracted.images, visionConfig);
+			if (imageBlocks.length) imageChunks = chunkDocument({ fileName, format, status: "ready", blocks: imageBlocks }, id + "-img");
+		}
+		return { document: { id, fileName, format, status: extracted.status }, chunks: [...textChunks, ...imageChunks] };
 	} catch {
-		// Parser/OS messages may contain absolute paths or document bytes.
 		return { document: { id, fileName, format, status: "rejected", error: "Document extraction failed. Check that the file is valid, readable, and within supported extraction limits." }, chunks: [] };
 	}
 }
