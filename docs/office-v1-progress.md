@@ -2,7 +2,7 @@
 
 Plan: `docs/superpowers/plans/2026-11-02-office-v1-pilot.md`
 
-Last update: 2026-11-05. The implementation is in progress; no host acceptance has been performed.
+Last update: 2026-11-07. The implementation is in progress; no host acceptance has been performed.
 
 | Acceptance item | Status | Evidence / next gate |
 |---|---|---|
@@ -285,3 +285,22 @@ Embedded images in PDF/PPTX/DOCX are extracted at indexing time and described by
 **Tests** (`tests/knowledge-image-understanding.test.ts`): 13 focused tests across 5 suites — PDF image extraction (function existence, min size filtering, return type), PPTX/DOCX extraction (function exports, empty input), vision description job (function export, imageDescription citation, best-effort skip), and image-derived chunks (chunking survival, snapshot validation, backward compat).
 
 **Gate** (2026-11-07): `npm test` **1,915/1,915 pass**; `tsc --noEmit` clean; `npm run build` + artifact check pass.
+
+### UI polish (2026-11-07, post-Task 8)
+
+Three commits after Task 8:
+
+1. **Light/dark theme support and auth + knowledge page redesign** (`1b88fd1`): restructured CSS tokens for light/dark mode with system auto-detection and manual toggle via localStorage. Redesigned auth forms as centered cards with proper visual hierarchy. Rebuilt knowledge page with drag-and-drop upload zone, format badges, status badges, and file size display. Added `.env` to `.gitignore`.
+
+2. **Sidebar icons, preferences toggle, and sans-serif UI font** (`67c3936`): added `BookOpenIcon` to Knowledge link and `SlidersHorizontalIcon` to Preferences link in sidebar (matching Settings/Logout). Added `SidebarToggle` to the preferences page header so the sidebar can be reopened from `/preferences`. Switched the UI chrome font from monospace (`ui-monospace, Consolas`) to system sans-serif for a cleaner look.
+
+These are UI polish changes. All acceptance items remain at their prior status; no acceptance gate was affected.
+
+### Remaining gaps
+
+| Item | Status | Notes |
+|---|---|---|
+| Web research | Partially wired | `SEARCH_PROVIDER` is not set; the AI can fetch URLs but cannot search the web. |
+| `/source` route | Not implemented | AGPL compliance route: unauthenticated archive download of the app source, excluding `.env`, `data/`, knowledge files, indexes, and secrets. |
+| Concurrency limits | Untested | `MAX_CONCURRENT_LLM=2` is set but not host-tested with multiple users. |
+| Shared knowledge index | Not wired | `KNOWLEDGE_SHARED_DIR` and `KNOWLEDGE_INDEX_FILE` are not pointed at real directories; only personal uploads work. |

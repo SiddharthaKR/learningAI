@@ -48,6 +48,15 @@ LearnHarness runs as a Node.js web application for an office. Copy `.env.example
 
 `npm run build` creates the production build; `npm run start` serves it. Put the Node server behind your office's HTTPS reverse proxy.
 
+### Current status
+
+The office v1 pilot (Tasks 1–8) is feature-complete for single-user local use. See [office-v1-progress.md](docs/office-v1-progress.md) for detailed status. Remaining gaps before full deployment:
+
+- **Web search**: the AI can fetch URLs but cannot search the web (`SEARCH_PROVIDER` not configured).
+- **`/source` route**: AGPL compliance archive download — not yet implemented.
+- **Concurrency**: `MAX_CONCURRENT_LLM=2` is set but untested with multiple simultaneous users.
+- **Shared knowledge**: only personal document uploads work; shared team-wide knowledge directory is not wired.
+
 ## Your keys, your data
 
 The server keeps chats, graph data, and configuration in the office deployment. Model requests go to the configured internal LLM endpoint. Restrict access to the app and storage according to your office's deployment policy.
