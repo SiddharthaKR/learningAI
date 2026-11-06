@@ -265,3 +265,7 @@ Full gate results:
 - **`npm run typecheck`** (`tsc --noEmit`): passes clean.
 - **`npm run build`**: production build succeeds; build artifact check passes (no data/, knowledge/, index/ or JSONL files outside the route tree).
 - **Locale parity**: 518 keys, EN and JA catalogs match.
+
+### Planned: Task 8 — image understanding via Gemma 4 vision model
+
+Decision (2026-11-06): embedded images in PDF/PPTX/DOCX will be extracted at indexing time and described by the Gemma 4 vision model in a background job. Descriptions are stored as searchable text chunks with the same citation metadata. No vision call at retrieval time. Plan added to `docs/superpowers/plans/2026-11-04-office-knowledge.md`.

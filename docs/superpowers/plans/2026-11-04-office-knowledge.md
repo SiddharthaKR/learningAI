@@ -115,3 +115,26 @@
 - [ ] Run `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build` with artifact scanning.
 - [ ] Record #6 evidence and remaining host-only checks in the progress ledger.
 - [ ] Commit the gate documentation or any test-proven defect fixes separately.
+
+### Task 8: Image understanding via vision model (Gemma 4)
+
+**Goal:** Extract embedded images from PDF, PPTX, and DOCX at indexing time, generate text descriptions via the Gemma 4 vision model in a background job, and store those descriptions as searchable chunks alongside the existing text chunks. No vision model call at retrieval time — BM25 searches the pre-generated descriptions like any other text.
+
+**Files:** Modify extraction pipeline (`src/knowledge/extract.ts`), create image extraction helpers for each format (PDF via `pdfjs-dist` image objects, PPTX/DOCX via ZIP media entries), create a background vision-description job, modify `src/knowledge/service.ts` and `src/knowledge/contracts.ts` for image-derived chunks, and add focused tests.
+
+**Interfaces:** Image-derived chunks carry the same `KnowledgeCitation` structure as text chunks (e.g., `{ format: "pptx", fileName, slide, title }` with an `imageDescription: true` discriminator). The vision model endpoint is injected via configuration (model ID, base URL), not hardcoded. The background job runs per-document at upload/indexing time, not per-query.
+
+**Constraints:**
+- Only process images above a minimum size threshold (skip icons, bullets, decorative elements).
+- Respect the existing per-document and per-user storage isolation.
+- The vision job is best-effort: a failed description does not block text indexing.
+- Image bytes are never stored in the chunk index — only the generated text description.
+- The Gemma 4 model must be reachable from the server (local or API endpoint).
+
+**Steps:**
+- [ ] Add image extraction from PDF pages (pdfjs-dist image objects or rendered page snapshots).
+- [ ] Add image extraction from PPTX/DOCX (ZIP media/ entries for selected slides/pages).
+- [ ] Create a vision-description background job that sends images to the Gemma 4 endpoint and returns text descriptions.
+- [ ] Store image-derived description chunks with citation metadata and an `imageDescription` flag.
+- [ ] Write focused tests for image extraction, description generation (with a mock vision endpoint), and retrieval of image-derived chunks.
+- [ ] Run focused tests RED→GREEN, typecheck, and commit.
