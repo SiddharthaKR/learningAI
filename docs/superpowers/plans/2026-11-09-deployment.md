@@ -1,7 +1,7 @@
 # Office v1 deployment plan (DRAFT, not yet approved)
 
 Date: 2026-11-09. Status: stored for later; no implementation started.
-Scope: acceptance item 1 (Deployment) on `172.20.1.126`. Web search is out of scope: `SEARCH_PROVIDER` stays `none` (URL-only mode).
+Scope: acceptance item 1 (Deployment) on `172.20.1.126`, preceded by Phase 1 (SearXNG web search, see the section below). Order decided 2026-11-09: SearXNG first, then deployment.
 
 ## Decisions made
 
@@ -24,9 +24,9 @@ Scope: acceptance item 1 (Deployment) on `172.20.1.126`. Web search is out of sc
 - `MAX_CONCURRENT_LLM`: `.env.example` says 4, progress doc says 2. Which value?
 - Still unknown: LLM model ID, `LLM_CONTEXT_WINDOW`, `LLM_MAX_TOKENS`, `LLM_VISION`, `LLM_REASONING` values.
 
-## Optional, deferred: SearXNG web search
+## Phase 1 (before deployment): SearXNG web search
 
-Not part of the pilot deployment. Revisit if colleagues ask the AI to look things up. Without it, `SEARCH_PROVIDER=none` gives URL-only mode (`web_fetch` for pasted links).
+Decision 2026-11-09: do this BEFORE the DEPLOY.md/systemd work, so deployment docs and acceptance cover search from the start. Steps 1 and 5 run on `.126`; steps 3 and 4 are local code changes. `DEPLOY.md` deliverable 1 then sets `SEARCH_PROVIDER=searxng` instead of leaving it unset, and deliverable 3 keeps the SearXNG entries in `.env.example`.
 
 ### Answers so far
 
