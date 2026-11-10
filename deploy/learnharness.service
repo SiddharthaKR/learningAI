@@ -1,0 +1,18 @@
+# Template: replace <USER> before installing to /etc/systemd/system/learnharness.service
+[Unit]
+Description=LearnHarness Office
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<USER>
+WorkingDirectory=/home/<USER>/app
+EnvironmentFile=/home/<USER>/app/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
