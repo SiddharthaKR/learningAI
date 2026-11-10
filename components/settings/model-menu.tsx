@@ -24,7 +24,7 @@ import type { ModelCatalogEntry } from "@/src/core";
 import { fuzzyScore } from "@/src/core";
 import { formatTokens } from "@/components/usage-format";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 function priceLabel(cost: ModelCatalogEntry["cost"]): string {
 	const fmt = (n: number) => `$${n < 1 ? n.toFixed(2).replace(/0$/, "") : n.toFixed(2)}`;

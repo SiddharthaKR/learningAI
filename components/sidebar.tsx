@@ -23,7 +23,7 @@ import type { ChatListItem } from "@/src/core";
 import { kbdEventForAction } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
 import { KnowledgeNavigationLink } from "@/components/knowledge-navigation-link";
-import { catalogFor, type LocaleCatalog } from "@/src/i18n/catalog";
+import { catalogFor, type LocaleCatalog } from "@/src/core";
 
 /**
  * Toggleable sidebar — NOT a modal drawer: no backdrop, no focus theft. It

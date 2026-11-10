@@ -1,6 +1,6 @@
-import { withOfficeUser } from "@/src/server/route-scope";
-import { currentUserId } from "@/src/server/user-scope";
-import { createAccountStore } from "@/src/server/accounts";
+import { withOfficeUser } from "@/src/server";
+import { currentUserId } from "@/src/server";
+import { createAccountStore } from "@/src/server";
 import { PATHS } from "@/config";
 import { chainsForSelection, formatChainLine } from "@/src/core";
 import { newGraphContextMessage, type GraphContextPick } from "@/src/core";

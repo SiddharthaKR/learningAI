@@ -18,7 +18,7 @@ import { type ModelRole } from "../../config.ts";
 import { DEFAULT_THINKING_ORDER, type UserSettings } from "../core/settings.ts";
 import type { LocalProviderSnapshot } from "./local-providers.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
-import { officeConfig } from "../server/office-config.ts";
+import { officeConfig } from "../core/office-config.ts";
 import { createLlmLimiter } from "./llm-concurrency.ts";
 import { promptToolStream } from "./prompt-tool-stream.ts";
 

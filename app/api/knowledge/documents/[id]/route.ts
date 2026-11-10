@@ -1,6 +1,6 @@
-import { withOfficeUser } from "@/src/server/route-scope";
-import { currentUserId } from "@/src/server/user-scope";
-import { checkedStoresForUser } from "@/src/server/stores";
+import { withOfficeUser } from "@/src/server";
+import { currentUserId } from "@/src/server";
+import { checkedStoresForUser } from "@/src/server";
 
 export const runtime = "nodejs";
 export const DELETE = withOfficeUser(async (_request: Request, context: { params: Promise<{ id: string }> }) => {

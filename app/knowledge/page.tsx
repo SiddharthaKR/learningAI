@@ -1,6 +1,6 @@
-import { withOfficePageUser } from "@/src/server/page-scope";
-import { currentUserId } from "@/src/server/user-scope";
-import { checkedStoresForUser } from "@/src/server/stores";
+import { withOfficePageUser } from "@/src/server";
+import { currentUserId } from "@/src/server";
+import { checkedStoresForUser } from "@/src/server";
 import { KnowledgePage } from "@/components/knowledge-page";
 
 export const dynamic = "force-dynamic";

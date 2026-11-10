@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 /**
  * GET /api/keys — the auth page's key list (auth-keys wave, 2026-09-19;
  * providers added by the provider-keys interlude same wave).

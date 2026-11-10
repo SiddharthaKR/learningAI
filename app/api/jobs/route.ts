@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 import { isTurnRunning, listJobs } from "@/src/server";
 
 export const dynamic = "force-dynamic";

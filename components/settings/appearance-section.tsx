@@ -43,7 +43,7 @@ import { useAppearance } from "./appearance.tsx";
 import { FontMenuList } from "./model-menu";
 import { CommitInput, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */

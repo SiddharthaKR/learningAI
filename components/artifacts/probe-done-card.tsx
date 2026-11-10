@@ -3,7 +3,7 @@
 import { ClipboardCheckIcon } from "lucide-react";
 import { parseProbeDoneInput, type ProbeDoneResult } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /**
  * The probe conclusion card (docs/probe-teach-split.md §2): renders the

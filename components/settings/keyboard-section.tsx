@@ -28,7 +28,7 @@ import {
 } from "@/src/core";
 import { SettingsRow } from "./controls.tsx";
 import { useI18n } from "@/components/i18n-provider";
-import { keyboardActionLabel } from "@/src/i18n/catalog";
+import { keyboardActionLabel } from "@/src/core";
 
 /** The overrides map after ONE change (pure — exported for tests):
  *  binding null = reset the action to its default (key removed). */

@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { DumbbellIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /** Home and the draft share one wrapping action row. Picker controls lead;
  * setup is centered only when it is the sole action. */

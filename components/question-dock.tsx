@@ -36,7 +36,7 @@ import {
 } from "@/src/core";
 import { CONFIDENCE_COLORS, confidenceRailStyle } from "@/components/confidence-rail";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /**
  * The question dock — a pending quiz/ask REPLACES the chat composer: the

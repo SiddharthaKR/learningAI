@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 /**
  * POST /api/graph/import — the format-agnostic front door's transport
  * (vision §1, 2026-09-13): raw personal-notes files in, one extraction run

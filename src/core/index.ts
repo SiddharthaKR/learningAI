@@ -75,3 +75,8 @@ export * from "./coverage.ts";
 // ONE session→markdown formatter — the extractor's view and the user-facing
 // export share it. Pure, browser-safe.
 export * from "./session-markdown.ts";
+
+// Browser-safe helpers/types the shell needs (import-law cleanup).
+export * from "../i18n/catalog.ts";
+export * from "../knowledge/upload.ts";
+export type { KnowledgeDocumentRecord } from "../knowledge/index-store.ts";

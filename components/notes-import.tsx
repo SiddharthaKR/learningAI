@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useI18n } from "@/components/i18n-provider";
-import { catalogFor, formatMessage, type LocaleCatalog } from "@/src/i18n/catalog";
+import { catalogFor, formatMessage, type LocaleCatalog } from "@/src/core";
 
 // Transport-only types: never import the server's extraction/agent module here.
 export interface NotesImportResult {

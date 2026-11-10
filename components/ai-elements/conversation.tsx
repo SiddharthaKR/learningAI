@@ -8,7 +8,7 @@ import type { ComponentProps } from "react";
 import { useCallback } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useI18n } from "@/components/i18n-provider";
-import { catalogFor, type LocaleCatalog } from "@/src/i18n/catalog";
+import { catalogFor, type LocaleCatalog } from "@/src/core";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 

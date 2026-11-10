@@ -44,3 +44,12 @@ export * from "./office-config.ts";
 
 export * from "./web-approvals.ts";
 export * from "./search.ts";
+
+// Modules app/ routes and pages used to import directly (import-law cleanup).
+export * from "./route-scope.ts";
+export * from "./user-scope.ts";
+export * from "./page-scope.ts";
+export * from "./accounts.ts";
+export * from "./office-auth.ts";
+export * from "./session-auth.ts";
+export * from "./source-archive.ts";

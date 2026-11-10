@@ -1,6 +1,6 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 import { getChat, parseSettingsBody, stores } from "@/src/server";
-import { emit } from "@/src/core/events";
+import { emit } from "@/src/core";
 
 /** Owner-scoped office controls, replace-whole: absent flags mean OFF.
  * Agent composition adopts the persisted controls on the next run.

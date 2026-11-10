@@ -37,7 +37,7 @@ import {
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { useI18n } from "@/components/i18n-provider";
-import { keyboardActionLabel } from "@/src/i18n/catalog";
+import { keyboardActionLabel } from "@/src/core";
 
 // Re-exported for the contract pin (tests/keyboard-toggle-sidebar.test.ts):
 // the dispatcher composes event names through the ONE helper — a second

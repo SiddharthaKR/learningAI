@@ -5,7 +5,7 @@ import { contextWindow, sessionCost, turnCost, type ChatSettings, type TurnUsage
 import { formatTokens, formatUsd, prettyModel } from "@/components/usage-format";
 import { catalogLimits, useModelCatalog } from "@/components/model-picker";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /**
  * The below-composer stats bar (wave 4 observability): the session's

@@ -1,6 +1,6 @@
-import { withOfficePageUser } from "@/src/server/page-scope";
-import { currentUserId } from "@/src/server/user-scope";
-import { createAccountStore } from "@/src/server/accounts";
+import { withOfficePageUser } from "@/src/server";
+import { currentUserId } from "@/src/server";
+import { createAccountStore } from "@/src/server";
 import { PreferencesForm } from "@/components/preferences-form";
 import { PATHS } from "@/config";
 

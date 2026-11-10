@@ -8,7 +8,7 @@ import { isModelsRefusal, isProviderKeyRefusal, jobCost } from "@/src/core";
 import { formatTokens, formatUsd } from "@/components/usage-format";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /**
  * THE BACKGROUND-AGENTS SECTION (owner, sidebar round — the successor of

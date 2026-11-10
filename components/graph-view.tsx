@@ -77,8 +77,8 @@ import { DeleteNodeDialog } from "@/components/delete-node-dialog.tsx";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { Hint } from "@/components/ui/hint";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
-import type { LocaleCatalog } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
+import type { LocaleCatalog } from "@/src/core";
 import {
 	ARROW_LENGTH_LADDER,
 	CHARGE_RANGE,

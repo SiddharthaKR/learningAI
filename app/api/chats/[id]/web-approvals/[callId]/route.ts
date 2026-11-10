@@ -1,5 +1,5 @@
-import { withOfficeUser } from "@/src/server/route-scope";
-import { currentUserId } from "@/src/server/user-scope";
+import { withOfficeUser } from "@/src/server";
+import { currentUserId } from "@/src/server";
 ﻿import { decideWebApproval } from "@/src/server";
 
 async function POSTImpl(request: Request, { params }: { params: Promise<{ id: string; callId: string }> }) {

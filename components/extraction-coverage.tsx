@@ -9,7 +9,7 @@ import { Hint } from "@/components/ui/hint";
 import { localizedTimeAgo } from "@/components/sidebar";
 import { resolveSettings } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /**
  * The extraction-coverage surfaces (extraction-UX redesign, owner-locked

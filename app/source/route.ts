@@ -1,4 +1,4 @@
-import { sourceArchiveResponse } from "@/src/server/source-archive";
+import { sourceArchiveResponse } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 

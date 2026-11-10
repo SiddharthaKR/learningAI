@@ -2,7 +2,7 @@
 
 import type { Phase3 } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /**
  * The in-session phase presentation (owner, minimal-color round —

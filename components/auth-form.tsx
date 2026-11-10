@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { catalogFor } from "@/src/i18n/catalog";
+import { catalogFor } from "@/src/core";
 
 export function AuthForm({ mode, initialLanguage }: { mode: "login" | "signup"; initialLanguage: "en" | "ja" }) {
   const [language, setLanguage] = useState(initialLanguage);

@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 import { handleChatRequest } from "@/src/server";
 
 async function POSTImpl(req: Request) {

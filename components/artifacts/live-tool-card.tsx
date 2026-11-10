@@ -5,7 +5,7 @@ import { BrailleSpinner } from "@/components/braille-spinner";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import type { ArtifactPartProps } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /**
  * The LIVE tool-input card (owner, streaming round 2026-10-01): what a

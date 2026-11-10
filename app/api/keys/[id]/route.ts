@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 ﻿/** Office deployment owns credentials through its environment. */
 async function PUTImpl() {
 	return Response.json({ error: "API keys are managed by the server environment" }, { status: 403 });

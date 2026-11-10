@@ -1,8 +1,8 @@
-import { withOfficeUser } from "@/src/server/route-scope";
-import { currentUserId } from "@/src/server/user-scope";
-import { checkedStoresForUser } from "@/src/server/stores";
-import { MAX_KNOWLEDGE_MULTIPART_BYTES, validateKnowledgeUpload } from "@/src/knowledge/upload";
-import type { KnowledgeDocumentRecord } from "@/src/knowledge/index-store";
+import { withOfficeUser } from "@/src/server";
+import { currentUserId } from "@/src/server";
+import { checkedStoresForUser } from "@/src/server";
+import { MAX_KNOWLEDGE_MULTIPART_BYTES, validateKnowledgeUpload } from "@/src/core";
+import type { KnowledgeDocumentRecord } from "@/src/core";
 
 export const runtime = "nodejs";
 

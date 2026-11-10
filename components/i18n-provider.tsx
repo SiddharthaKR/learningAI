@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import { catalogFor, type LocaleCatalog, type UiLanguage } from "@/src/i18n/catalog";
+import { catalogFor, type LocaleCatalog, type UiLanguage } from "@/src/core";
 
 const I18nContext = createContext<LocaleCatalog>(catalogFor("en"));
 

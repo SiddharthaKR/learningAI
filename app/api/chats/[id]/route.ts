@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 import { compactionInFlight, deleteChatSession, getChat, isTurnRunning, sessionCoverage, stores, type ChatDeleteMode } from "@/src/server";
 
 async function GETImpl(_req: Request, { params }: { params: Promise<{ id: string }> }) {

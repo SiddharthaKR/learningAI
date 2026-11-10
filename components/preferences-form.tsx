@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SidebarToggle } from "@/components/sidebar";
-import { catalogFor, type UiLanguage } from "@/src/i18n/catalog";
+import { catalogFor, type UiLanguage } from "@/src/core";
 
 type Language = UiLanguage;
 export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; teachingLanguage: Language; background: string } }) {

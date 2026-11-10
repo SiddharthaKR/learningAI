@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 /**
  * GET /api/settings — THE user settings record (settings-storage wave,
  * 2026-09-19): the whole delta record at data/settings.json (config.

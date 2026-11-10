@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
-import { withOfficePageUser } from "@/src/server/page-scope";
+import { withOfficePageUser } from "@/src/server";
 import { compactionInFlight, getChat, isTurnRunning } from "@/src/server";
 
 export const dynamic = "force-dynamic";

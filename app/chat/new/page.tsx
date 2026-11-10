@@ -1,7 +1,7 @@
 import { NewSession } from "@/components/new-session";
-import { withOfficePageUser } from "@/src/server/page-scope";
-import { currentUserId } from "@/src/server/user-scope";
-import { createAccountStore } from "@/src/server/accounts";
+import { withOfficePageUser } from "@/src/server";
+import { currentUserId } from "@/src/server";
+import { createAccountStore } from "@/src/server";
 import { PATHS } from "@/config";
 
 export const dynamic = "force-dynamic";

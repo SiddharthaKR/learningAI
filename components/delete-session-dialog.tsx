@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import type { ChatDeleteMode, ChatListItem } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
-import { catalogFor } from "@/src/i18n/catalog";
+import { catalogFor } from "@/src/core";
 
 /** The graph-traces checkbox copy (owner, 2026-09-24 flow rework — was
  *  the delete-nodes option's body in the two-button design): the

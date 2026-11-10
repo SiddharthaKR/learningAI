@@ -1,5 +1,5 @@
-import { withOfficeUser } from "@/src/server/route-scope";
-import { officeAuthHandlers } from "@/src/server/office-auth";
+import { withOfficeUser } from "@/src/server";
+import { officeAuthHandlers } from "@/src/server";
 
 async function POSTImpl(): Promise<Response> {
   return officeAuthHandlers().logout();

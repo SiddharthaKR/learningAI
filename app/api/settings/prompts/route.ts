@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 /**
  * GET /api/settings/prompts — the system-prompt segment view
  * (settings-storage wave, 2026-09-19): the effective prompt segments for

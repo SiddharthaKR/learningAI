@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 /**
  * POST /api/activity/abort — the dock's END/ABORT control, uniform across
  * process kinds (user-decided contract): body {kind: "job"|"extraction"|"turn", id}

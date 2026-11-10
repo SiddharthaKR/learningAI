@@ -3,7 +3,7 @@
 import { ChevronRight } from "lucide-react";
 import type { ArtifactPartProps } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage, type LocaleCatalog } from "@/src/i18n/catalog";
+import { formatMessage, type LocaleCatalog } from "@/src/core";
 
 /**
  * The generic tool-call card (sources v1, 2026-09-19): a quiet, collapsed

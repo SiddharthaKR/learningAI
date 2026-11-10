@@ -2,7 +2,7 @@
 
 import type { CompactionDetails } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
-import { formatMessage } from "@/src/i18n/catalog";
+import { formatMessage } from "@/src/core";
 
 /** What one divider carries: the marker's full model-facing content (the
  *  [SESSION HISTORY COMPACTED] header + the summary) and its details.

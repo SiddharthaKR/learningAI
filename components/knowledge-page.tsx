@@ -3,8 +3,8 @@
 import { useState, useRef, useCallback, type FormEvent, type DragEvent } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { SidebarToggle } from "@/components/sidebar";
-import type { KnowledgeDocumentRecord } from "@/src/knowledge/index-store";
-import { validateKnowledgeUpload } from "@/src/knowledge/upload";
+import type { KnowledgeDocumentRecord } from "@/src/core";
+import { validateKnowledgeUpload } from "@/src/core";
 
 const FORMAT_LABELS: Record<string, string> = { pdf: "PDF", pptx: "PPTX", docx: "DOCX", md: "MD", txt: "TXT" };
 

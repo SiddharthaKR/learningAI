@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server/route-scope";
+import { withOfficeUser } from "@/src/server";
 /**
  * POST /api/graph/coverage/extract — the manual extraction affordance
  * (vision-extraction-coverage.md): run the pipeline over ONE session's

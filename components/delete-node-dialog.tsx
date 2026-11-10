@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useI18n } from "@/components/i18n-provider";
-import { catalogFor, formatMessage } from "@/src/i18n/catalog";
+import { catalogFor, formatMessage } from "@/src/core";
 
 /** The 409 extraction_running line (owner phrasing, node interlude):
  *  the server's error names the extraction; the ACTIVITY DOCK is the
