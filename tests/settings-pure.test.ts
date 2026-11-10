@@ -11,7 +11,6 @@ import { appearanceVars, derivedPalette, resolveAppearance, staleVarNames } from
 import {
 	PROMPT_IN_USE_HINT,
 	composePromptSwitch,
-	composeSearchEngine,
 	composeSlotModel,
 	composeTool,
 	composeQuizMechanics,
@@ -184,18 +183,6 @@ describe("agent section compose helpers — the replace-whole PUT body", () => {
 		assert.deepEqual(after2.strong, { model: { provider: "zai", id: "glm-4.7-flash" } }, "thinking dropped, model kept");
 	});
 
-	it("composeSearchEngine: null REMOVES the pin (auto-activation's resting state)", () => {
-		const withPin: AgentSettings = { search: { engine: "tavily" } };
-		const cleared = composeSearchEngine(withPin, null);
-		assert.equal(cleared.search, undefined);
-		// no pin to begin with → carried verbatim
-		assert.deepEqual(composeSearchEngine({ tools: { demo: true } }, null).tools, { demo: true });
-	});
-
-	it("composeSearchEngine: the explicit preference writes agent.search.engine", () => {
-		assert.deepEqual(composeSearchEngine(undefined, "brave").search, { engine: "brave" });
-	});
-
 	it("composePromptSwitch: on = explicit true, off = key REMOVED (absent = off)", () => {
 		assert.deepEqual(composePromptSwitch({ prompts: { a: true } }, "b", true).prompts, { a: true, b: true });
 		assert.deepEqual(composePromptSwitch({ prompts: { a: true, b: true } }, "b", false).prompts, { a: true });
@@ -252,12 +239,9 @@ describe("classifyKeys — the Keys section's two-group projection", () => {
 		const out = classifyKeys([synth("DEEPGRAM_API_KEY", true)], undefined);
 		assert.deepEqual(out.toolRows.map((r) => r.id), [
 			"DEEPGRAM_API_KEY",
-			"TAVILY_API_KEY",
-			"BRAVE_API_KEY",
 		]);
 		assert.ok(out.toolRows[0]!.present);
-		assert.ok(!out.toolRows[1]!.present);
-	});
+			});
 
 	it("unknown file vars surface read-only, out of the provider rows", () => {
 		const out = classifyKeys([synth("PLANS_LOGIN_TOKEN", true)], providers);

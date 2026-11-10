@@ -27,7 +27,7 @@ const fetchDeps = {
 
 function stubProvider(hits: SearchHit[] = [{ title: "t", url: "https://e.com/", snippet: "s" }]): SearchProvider {
 	return {
-		id: "tavily",
+		id: "searxng",
 		async search() {
 			return hits;
 		},
@@ -43,7 +43,7 @@ describe("web_search on the injected port (web.ts)", () => {
 	it("a live provider returns its hits (count defaults to 5)", async () => {
 		const seen: Array<{ query: string; count: number }> = [];
 		const provider: SearchProvider = {
-			id: "tavily",
+			id: "searxng",
 			async search(query, count) {
 				seen.push({ query, count });
 				return [{ title: "sigma.js", url: "https://www.sigmajs.org/", snippet: "v3 released" }];
@@ -57,7 +57,7 @@ describe("web_search on the injected port (web.ts)", () => {
 
 	it("provider errors surface as error strings, never thrown", async () => {
 		const provider: SearchProvider = {
-			id: "brave",
+			id: "searxng",
 			async search() {
 				throw new Error("Brave search API 429: rate limited");
 			},
