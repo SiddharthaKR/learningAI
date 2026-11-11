@@ -300,7 +300,8 @@ These are UI polish changes. All acceptance items remain at their prior status; 
 
 | Item | Status | Notes |
 |---|---|---|
-| Web research | Partially wired | `SEARCH_PROVIDER` is not set; the AI can fetch URLs but cannot search the web. |
-| `/source` route | Not implemented | AGPL compliance route: unauthenticated archive download of the app source, excluding `.env`, `data/`, knowledge files, indexes, and secrets. |
+| Web research | Code done, host-untested | SearXNG is called directly (Tavily/Brave removed). Needs `SEARCH_PROVIDER=searxng` and SearXNG in Docker on .126; see `DEPLOY.md` section 5. |
+| `/source` route | Implemented, host-untested | AGPL compliance route: unauthenticated archive download of the app source, excluding `.env`, `data/`, knowledge files, indexes, and secrets. |
+| Deployment on .126 | Pending | `DEPLOY.md` and `deploy/learnharness.service` are written; the host run and acceptance checks have not been done. |
 | Concurrency limits | Untested | `MAX_CONCURRENT_LLM=2` is set but not host-tested with multiple users. |
-| Shared knowledge index | Not wired | `KNOWLEDGE_SHARED_DIR` and `KNOWLEDGE_INDEX_FILE` are not pointed at real directories; only personal uploads work. |
+| Shared knowledge index | Operator-configured | Paths are set in the host `.env` by the operator (decided 2026-11-11); empty means off. Currently not wired: `KNOWLEDGE_SHARED_DIR` and `KNOWLEDGE_INDEX_FILE` are not pointed at real directories; only personal uploads work. |

@@ -1,6 +1,6 @@
-# Office v1 deployment plan (DRAFT, not yet approved)
+# Office v1 deployment plan
 
-Date: 2026-11-09. Status: stored for later; no implementation started.
+Date: 2026-11-09. Status: Phase 1 code, `DEPLOY.md` and the unit file are implemented; the .126 host run and acceptance checks are pending. Shared knowledge (`KNOWLEDGE_SHARED_DIR` / `KNOWLEDGE_INDEX_FILE`): decided 2026-11-11 to leave the paths in `.env` for the operator to configure on the host.
 Scope: acceptance item 1 (Deployment) on `172.20.1.126`, preceded by Phase 1 (SearXNG web search, see the section below). Order decided 2026-11-09: SearXNG first, then deployment.
 
 ## Decisions made
