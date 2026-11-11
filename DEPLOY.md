@@ -50,6 +50,15 @@ journalctl -u learnharness -f      # logs
 ```
 It restarts on failure and starts at boot.
 
+## Helper scripts (check first, confirm before changing)
+```bash
+deploy/start.sh      # checks env/build/port, installs the unit if missing, starts the app
+deploy/stop.sh       # stops the app (stays enabled for boot)
+deploy/remove.sh     # stops, disables and deletes the unit; keeps code, data/, .env
+deploy/searxng.sh start|stop|remove   # the 'searxng' container only; keeps image and ~/searxng
+```
+They only touch the `learnharness` service and the `searxng` container, and ask y/N before each change.
+
 ## 7. Upgrade
 ```bash
 cd ~/app && git pull && npm ci && npm run build && npm run build:source
