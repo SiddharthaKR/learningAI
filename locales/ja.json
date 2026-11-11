@@ -26,6 +26,7 @@
   "auth": {
     "loginTitle": "ログイン",
     "signupTitle": "アカウント作成",
+    "tagline": "あなたの理解を覚えているAIチューターと、どんなテーマでも学べます。",
     "language": "表示言語",
     "username": "ユーザー名",
     "password": "パスワード",

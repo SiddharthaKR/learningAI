@@ -23,19 +23,21 @@ export function AuthForm({ mode, initialLanguage }: { mode: "login" | "signup"; 
       window.location.assign("/");
     } catch (cause) { setError(cause instanceof Error ? cause.message : copy.auth.requestFailed); setPending(false); }
   }
-  return <main className="flex min-h-dvh items-center justify-center p-6">
-    <div className="w-full max-w-sm space-y-6">
+  return <main className="relative flex min-h-dvh flex-1 items-center justify-center overflow-hidden p-6">
+    <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,color-mix(in_oklab,var(--color-primary)_14%,transparent),transparent_70%)]" />
+    <div className="relative w-full max-w-md space-y-8">
       <div className="text-center">
-        <h1 className="text-2xl font-bold tracking-tight">{signup ? copy.auth.signupTitle : copy.auth.loginTitle}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Learning Harness</p>
+        <h1 className="text-3xl font-bold tracking-tight">{signup ? copy.auth.signupTitle : copy.auth.loginTitle}</h1>
+        <p className="mt-2 text-sm font-medium text-muted-foreground">Learning Harness</p>
+        <p className="mx-auto mt-3 max-w-xs text-sm text-muted-foreground">{copy.auth.tagline}</p>
       </div>
-      <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        {signup && <label className="mb-4 flex flex-col gap-1.5 text-sm font-medium">{copy.auth.language}<select value={language} onChange={(event) => setLanguage(event.target.value as "en" | "ja")} className="rounded-lg border border-input bg-background px-3 py-2 text-sm transition-colors focus:border-ring">{<><option value="en">{copy.common.english}</option><option value="ja">{copy.common.japanese}</option></>}</select></label>}
-        <form onSubmit={submit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1.5 text-sm font-medium">{copy.auth.username}<input name="username" autoComplete="username" required minLength={3} maxLength={32} className="rounded-lg border border-input bg-background px-3 py-2 text-sm transition-colors focus:border-ring" /></label>
-          <label className="flex flex-col gap-1.5 text-sm font-medium">{copy.auth.password}<input name="password" type="password" autoComplete={signup ? "new-password" : "current-password"} required minLength={signup ? 12 : undefined} className="rounded-lg border border-input bg-background px-3 py-2 text-sm transition-colors focus:border-ring" /></label>
+      <div className="rounded-2xl border border-border bg-card/80 p-8 shadow-lg backdrop-blur">
+        {signup && <label className="mb-4 flex flex-col gap-1.5 text-sm font-medium">{copy.auth.language}<select value={language} onChange={(event) => setLanguage(event.target.value as "en" | "ja")} className="h-11 rounded-lg border border-input bg-background px-3.5 text-sm transition-[border-color,box-shadow] focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30">{<><option value="en">{copy.common.english}</option><option value="ja">{copy.common.japanese}</option></>}</select></label>}
+        <form onSubmit={submit} className="flex flex-col gap-5">
+          <label className="flex flex-col gap-1.5 text-sm font-medium">{copy.auth.username}<input name="username" autoComplete="username" required minLength={3} maxLength={32} className="h-11 rounded-lg border border-input bg-background px-3.5 text-sm transition-[border-color,box-shadow] focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30" /></label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium">{copy.auth.password}<input name="password" type="password" autoComplete={signup ? "new-password" : "current-password"} required minLength={signup ? 12 : undefined} className="h-11 rounded-lg border border-input bg-background px-3.5 text-sm transition-[border-color,box-shadow] focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30" /></label>
           {error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
-          <button type="submit" disabled={pending} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">{pending ? copy.auth.pending : signup ? copy.auth.signup : copy.auth.login}</button>
+          <button type="submit" disabled={pending} className="mt-1 h-11 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">{pending ? copy.auth.pending : signup ? copy.auth.signup : copy.auth.login}</button>
         </form>
       </div>
       <p className="text-center text-sm text-muted-foreground"><a href={signup ? "/login" : "/signup"} className="font-medium text-foreground underline underline-offset-2 hover:no-underline">{signup ? copy.auth.toLogin : copy.auth.toSignup}</a></p>
