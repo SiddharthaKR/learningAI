@@ -102,9 +102,17 @@ export function asAgentMessages(messages: readonly LhMessage[]): AgentMessage[] 
 
 // ─── id minting ──────────────────────────────────────────────────────────────
 
+/** 8 random hex chars. Uses getRandomValues, not randomUUID: this module runs in
+ *  the browser too, and randomUUID is undefined outside secure contexts (the
+ *  office deployment is served over plain http://<ip>, not https/localhost). */
+export function randomSuffix(): string {
+	const bytes = crypto.getRandomValues(new Uint8Array(4));
+	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /** The app-wide message id shape (same as the UIMessage-era mint). */
 export function newMessageId(): string {
-	return `msg_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
+	return `msg_${Date.now().toString(36)}_${randomSuffix()}`;
 }
 
 // ─── constructors (the input-event → native append mapping lives in
@@ -189,7 +197,7 @@ export function newPlanBlockMessage(
 	block: unknown,
 ): LhMarkerMessage {
 	return {
-		id: `pb_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
+		id: `pb_${Date.now().toString(36)}_${randomSuffix()}`,
 		role: "custom",
 		customType: "plan-block",
 		content: "",
