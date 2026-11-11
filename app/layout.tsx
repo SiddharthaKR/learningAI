@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { Inter } from "next/font/google";
 import { authenticatedAccount } from "@/src/server";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -8,6 +9,8 @@ import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
 import { I18nProvider } from "@/components/i18n-provider";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
 	title: "Learning Harness",
@@ -20,7 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	const accepted = incoming.get("accept-language")?.split(",")[0]?.trim().toLowerCase() ?? "";
 	const language = account?.uiLanguage ?? (accepted.startsWith("ja") ? "ja" : "en");
 	return (
-		<html lang={language} suppressHydrationWarning>
+		<html lang={language} className={inter.variable} suppressHydrationWarning>
 			<head>
 				<script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}}())` }} />
 			</head>

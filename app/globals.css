@@ -15,42 +15,48 @@
  *     future settings UI reassigns them (configurable per the owner).
  */
 
-/* The no-ring law (owner, UI round 2026-10-01): the browser's default
-   focus/focus-visible outline appears NOWHERE in the app. Pointer focus
-   never showed it; any keypress while a clicked element still held focus
-   DID (:focus-visible re-evaluates on key input — a clicked sidebar
-   session lit up when the quiz's ←/→ were pressed). Surfaces carry their
-   own hover/active/selected affordances; the dock's keyboard walk uses
-   its own ring utilities, unaffected by an outline reset. */
+/* Owner decision 2026-11-11: soft indigo ring on keyboard focus and text
+   inputs; still no outline on mouse focus. The browser's default outline
+   stays off everywhere (pointer focus never showed it; a clicked sidebar
+   session used to light up when the quiz's ←/→ were pressed, which is why
+   the ring is :focus-visible only, plus text-entry fields). */
 *:focus,
 *:focus-visible {
 	outline: none;
 }
+:focus-visible {
+	box-shadow: 0 0 0 3px var(--ring);
+}
+input:focus,
+textarea:focus,
+select:focus {
+	box-shadow: 0 0 0 3px var(--ring);
+}
 
 /* Light palette: clean warm neutrals.
    Dark palette (owner's hexes): main #141414, raised #1C1C1C, edges #434343.
-   Mono chrome = JetBrains Mono; prose = Source Sans 3; titles = CMU Serif. */
+   UI chrome = Inter; prose = Source Sans 3; titles = CMU Serif. */
 :root {
 	color-scheme: light;
-	--radius: 8px;
+	--radius: 10px;
 	--background: #ffffff;
 	--foreground: #0f0f0f;
 	--card: #f7f7f6;
 	--card-foreground: #0f0f0f;
 	--popover: #ffffff;
 	--popover-foreground: #0f0f0f;
-	--primary: #0f0f0f;
+	--primary: #4f46e5;
 	--primary-foreground: #ffffff;
 	--secondary: #f2f2f1;
 	--secondary-foreground: #0f0f0f;
 	--muted: #f2f2f1;
 	--muted-foreground: #717171;
-	--accent: #ebebea;
+	--accent: #eef0ff;
 	--accent-foreground: #0f0f0f;
 	--destructive: oklch(0.577 0.245 27.325);
 	--border: #e2e2e0;
 	--input: #e2e2e0;
-	--ring: #a1a1a1;
+	--ring: rgb(99 102 241 / 0.4);
 	--lh-ink-strong: var(--foreground);
 	--lh-ink-italic: var(--foreground);
 	--lh-prose-size: 16px;
@@ -67,18 +73,18 @@
 		--card-foreground: #e6e6e6;
 		--popover: #1c1c1c;
 		--popover-foreground: #e6e6e6;
-		--primary: #e6e6e6;
-		--primary-foreground: #141414;
+		--primary: #818cf8;
+		--primary-foreground: #0f0f1a;
 		--secondary: #1c1c1c;
 		--secondary-foreground: #e6e6e6;
 		--muted: #1c1c1c;
 		--muted-foreground: #8d8d8d;
-		--accent: #2a2a2a;
+		--accent: #232340;
 		--accent-foreground: #e6e6e6;
 		--destructive: oklch(0.704 0.191 22.216);
 		--border: #434343;
 		--input: #434343;
-		--ring: #8d8d8d;
+		--ring: rgb(129 140 248 / 0.4);
 		--lh-ink-strong: var(--foreground);
 		--lh-ink-italic: var(--foreground);
 	}
@@ -92,18 +98,18 @@
 	--card-foreground: #e6e6e6;
 	--popover: #1c1c1c;
 	--popover-foreground: #e6e6e6;
-	--primary: #e6e6e6;
-	--primary-foreground: #141414;
+	--primary: #818cf8;
+	--primary-foreground: #0f0f1a;
 	--secondary: #1c1c1c;
 	--secondary-foreground: #e6e6e6;
 	--muted: #1c1c1c;
 	--muted-foreground: #8d8d8d;
-	--accent: #2a2a2a;
+	--accent: #232340;
 	--accent-foreground: #e6e6e6;
 	--destructive: oklch(0.704 0.191 22.216);
 	--border: #434343;
 	--input: #434343;
-	--ring: #8d8d8d;
+	--ring: rgb(129 140 248 / 0.4);
 	--lh-ink-strong: var(--foreground);
 	--lh-ink-italic: var(--foreground);
 	--lh-prose-size: 16px;
@@ -127,7 +133,7 @@
 	   fonts: `font-mono`/`font-sans` utilities would otherwise fall to the
 	   SYSTEM stacks — a fourth font the app never chose — and streamdown's
 	   code-block chrome + mermaid-error + demo-card all use them. */
-	--font-ui: ui-sans-serif, system-ui, -apple-system, sans-serif;
+	--font-ui: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
 	--font-prose: ui-sans-serif, system-ui, sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
 	--font-sans: ui-sans-serif, system-ui, sans-serif;
