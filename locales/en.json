@@ -71,6 +71,7 @@
   },
   "preferences": {
     "title": "Preferences",
+    "subtitle": "How the tutor teaches you and how the app looks.",
     "uiLanguage": "UI language",
     "teachingLanguage": "Teaching language for new sessions",
     "background": "My background",
@@ -82,7 +83,7 @@
   "newSession": {
     "title": "New session",
     "practiceTitle": "New practice session",
-    "description": "The teacher will open by probing what you already know.",
+    "description": "Tell the tutor what you want to learn. It will teach, quiz you, and remember your progress.",
     "practiceDescription": "Pick nodes from your knowledge graph, describe what you want to practice, or bring your own problem.",
     "teachingLanguage": "Teaching language",
     "learnPlaceholder": "What do you want to learn?",
@@ -281,6 +282,7 @@
   },
   "settingsUi": {
     "title": "Settings",
+    "subtitle": "Models, keys and app options.",
     "close": "Close",
     "closeSettings": "Close settings",
     "sections": "Settings sections",

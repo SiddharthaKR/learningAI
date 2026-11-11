@@ -25,7 +25,10 @@ export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; 
   return <main className="flex min-w-0 flex-1 flex-col overflow-auto">
     <header className="lh-drag flex items-center gap-3 border-b border-border px-6 py-4">
       <SidebarToggle />
-      <h1 className="text-lg font-semibold">{copy.preferences.title}</h1>
+      <div className="flex flex-col">
+        <h1 className="text-lg font-semibold">{copy.preferences.title}</h1>
+        <p className="text-sm text-muted-foreground">{copy.preferences.subtitle}</p>
+      </div>
     </header>
     <div className="mx-auto w-full max-w-xl flex-col gap-5 p-6">
     <label className="flex flex-col gap-1">{copy.preferences.uiLanguage}

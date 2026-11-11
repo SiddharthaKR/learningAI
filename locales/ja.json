@@ -71,6 +71,7 @@
   },
   "preferences": {
     "title": "設定",
+    "subtitle": "チューターの教え方とアプリの見た目。",
     "uiLanguage": "表示言語",
     "teachingLanguage": "新しいセッションの授業言語",
     "background": "私の専門分野",
@@ -82,7 +83,7 @@
   "newSession": {
     "title": "新しいセッション",
     "practiceTitle": "新しい練習セッション",
-    "description": "まず、先生があなたの現在の理解を確認します。",
+    "description": "学びたいことをチューターに伝えてください。教えて、クイズを出し、進み具合を覚えています。",
     "practiceDescription": "知識グラフから項目を選ぶか、練習したい内容や問題を入力してください。",
     "teachingLanguage": "授業言語",
     "learnPlaceholder": "何を学びたいですか？",
@@ -281,6 +282,7 @@
   },
   "settingsUi": {
     "title": "設定",
+    "subtitle": "モデル、APIキー、アプリの設定。",
     "close": "閉じる",
     "closeSettings": "設定を閉じる",
     "sections": "設定項目",

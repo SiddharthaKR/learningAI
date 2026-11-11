@@ -275,8 +275,11 @@ export function SettingsDialogBody({
 			onClick={(e) => e.stopPropagation()}
 		>
 			{/* Header — the app's quiet CMU title language. */}
-			<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
-				<h2 className="font-title text-2xl tracking-tight">{copy.title}</h2>
+			<header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3">
+				<div className="flex flex-col">
+					<h2 className="font-title text-2xl tracking-tight">{copy.title}</h2>
+					<p className="text-xs text-muted-foreground">{copy.subtitle}</p>
+				</div>
 				<Hint
 						// Esc closes the dialog (its own listener) — surface it.
 						label={copy.close}
