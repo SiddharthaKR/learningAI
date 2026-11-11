@@ -47,14 +47,14 @@ Focus rule replaces the current `*:focus, *:focus-visible { outline: none }`:
 ## Section 2: per-surface polish
 
 - **Sidebar** (`components/sidebar.tsx`): active session = `bg-accent` + 2px
-  indigo left marker; section headers ("Teaching", "Practice") become
-  `text-xs uppercase tracking-wide text-muted-foreground`; row padding +1 step.
-- **Home** (`app/page.tsx`) and **New chat** (`app/chat/new/page.tsx`): title + subtitle.
+  indigo left marker; section headers are already small uppercase muted labels (unchanged); row padding +1 step.
+- **Home** (`app/page.tsx`): no subtitle (full-bleed graph; owner 2026-11-11).
+- **New chat** (`components/new-session.tsx`): its existing empty state (`newSession.title` / `description`) is the subtitle; only the description copy changes (see New copy).
 - **Chat** (`components/chat.tsx`, `components/composer.tsx`): composer gets a
-  raised card look (`bg-card`, border, `shadow-sm`); send button uses
-  `bg-primary text-primary-foreground` (replaces the hard-coded grey at
-  `composer.tsx:142`); message spacing re-checked with Inter.
-- **Knowledge / Settings / Preferences**: title + subtitle; cards, inputs and
+  the new-session composer already has a raised card; the in-chat composer gets the same (`rounded-2xl border bg-card shadow-lg`); the send button uses
+  `bg-primary text-primary-foreground`. The green "Next problem" button at
+  `composer.tsx:142` stays green (it is a semantic action, not grey); message spacing re-checked with Inter.
+- **Knowledge** keeps its existing `knowledge.description`. **Settings** (a dialog, not a page) gets a subtitle under its `<h2>` in `components/settings/settings-dialog.tsx`. **Preferences** gets a subtitle under its `<h1>` in `components/preferences-form.tsx`. All three: cards, inputs and
   buttons inherit tokens, with any remaining hard-coded neutrals switched to tokens.
 - **Login / Signup** (`components/auth-form.tsx`): keep the 2026-11-11 redesign;
   picks up indigo automatically.
@@ -68,11 +68,9 @@ Focus rule replaces the current `*:focus, *:focus-visible { outline: none }`:
 
 | Key | English |
 |---|---|
-| `pages.homeSubtitle` | Pick up a session or start learning something new. |
-| `pages.newChatSubtitle` | Tell the tutor what you want to learn. It will teach, quiz you, and remember your progress. |
-| `pages.knowledgeSubtitle` | Everything you've learned, as a graph. |
-| `pages.settingsSubtitle` | Models, keys and app options. |
-| `pages.preferencesSubtitle` | How the tutor teaches you and how the app looks. |
+| `newSession.description` (replaces current text) | Tell the tutor what you want to learn. It will teach, quiz you, and remember your progress. |
+| `settingsUi.subtitle` | Models, keys and app options. |
+| `preferences.subtitle` | How the tutor teaches you and how the app looks. |
 
 Japanese strings are written in the implementation and listed in the PR for the
 owner to check. Tooltip strings are listed in the implementation plan once the
