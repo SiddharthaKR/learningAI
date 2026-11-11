@@ -50,7 +50,9 @@ it("shows localized upload errors and updates the list after upload and deletion
   try {
     for (const language of ["en", "ja"] as const) {
       await act(async () => { root.render(<I18nProvider language={language}><KnowledgePage key={language} initialDocuments={[]} /></I18nProvider>); });
-      const submit = async () => { await act(async () => { host.querySelector("form")!.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); }); };
+      // The page reads the chosen file from its hidden file input (not FormData(form)),
+      // so expose the current selection on that input before submitting.
+      const submit = async () => { await act(async () => { Object.defineProperty(host.querySelector('input[type="file"]')!, "files", { configurable: true, get: () => [selected] }); host.querySelector("form")!.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); }); };
       selected = new File(["sheet"], "sheet.xlsx");
       await submit();
       assert.equal(host.querySelector('[role="alert"]')?.textContent, catalogFor(language).knowledge.unsupported_format);
