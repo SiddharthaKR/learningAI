@@ -314,6 +314,7 @@ export function CoverageRing({ chatId, refreshKey = 0 }: { chatId: string; refre
 				<button
 					type="button"
 					data-testid="coverage-ring"
+					aria-label={copy.coverage.hint}
 					onClick={() => setOpen((o) => !o)}
 					aria-expanded={open}
 					className="relative flex size-5 cursor-pointer items-center justify-center transition-opacity hover:opacity-80"
