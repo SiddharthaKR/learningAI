@@ -12,4 +12,5 @@ export async function proxy(request: NextRequest) {
   return NextResponse.redirect(new URL("/login", request.url));
 }
 
-export const config = { matcher: ["/((?!_next/|favicon.ico).*)"] };
+// icon.svg (app/icon.svg, the tab icon) is public so the login page shows it too.
+export const config = { matcher: ["/((?!_next/|favicon.ico|icon.svg).*)"] };
