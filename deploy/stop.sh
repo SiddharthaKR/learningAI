@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stop LearnHarness Office. Checks state and active connections first and asks
-# before stopping. The unit stays installed and enabled (it will start at next boot).
+# before stopping. The unit stays installed; it never starts at boot (run start.sh).
 set -u
 # shellcheck source=common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/common.sh"
@@ -20,7 +20,7 @@ if [ "$N" -gt 0 ]; then warn "$N established connection(s) on port $PORT; users 
 else ok "no established connections on port $PORT"; fi
 
 step "Will do"
-info "stop $SERVICE only (stays enabled for boot; use remove.sh to take it down fully)"
+info "stop $SERVICE only (stays installed; start again with start.sh; remove.sh takes it down fully)"
 info "Other services on this host are not touched."
 confirm "Proceed?" || { info "Aborted, nothing changed."; exit 1; }
 

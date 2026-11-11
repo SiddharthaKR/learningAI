@@ -37,7 +37,7 @@ search:
   formats: [html, json]
 # Optionally restrict `engines:` to ones confirmed reachable from this host.
 YML
-docker run -d --name searxng --restart unless-stopped -p 127.0.0.1:8080:8080 \
+docker run -d --name searxng --restart no -p 127.0.0.1:8080:8080 \
   -v ~/searxng:/etc/searxng searxng/searxng
 curl 'http://127.0.0.1:8080/search?q=test&format=json' | head -c 300
 ```
@@ -45,15 +45,16 @@ curl 'http://127.0.0.1:8080/search?q=test&format=json' | head -c 300
 ## 6. systemd service
 ```bash
 sed 's/<USER>/'"$USER"'/g' deploy/learnharness.service | sudo tee /etc/systemd/system/learnharness.service
-sudo systemctl daemon-reload && sudo systemctl enable --now learnharness
+sudo systemctl daemon-reload && sudo systemctl start learnharness
 journalctl -u learnharness -f      # logs
 ```
-It restarts on failure and starts at boot.
+Manual start only: neither the app nor SearXNG starts at boot, and a crash stays down until you start it again (`deploy/start.sh`, `deploy/searxng.sh start`).
+If an older install enabled it, `start.sh` disables boot start; or run `sudo systemctl disable learnharness` and `docker update --restart no searxng` once.
 
 ## Helper scripts (check first, confirm before changing)
 ```bash
 deploy/start.sh      # checks env/build/port, installs the unit if missing, starts the app
-deploy/stop.sh       # stops the app (stays enabled for boot)
+deploy/stop.sh       # stops the app (start again with start.sh)
 deploy/remove.sh     # stops, disables and deletes the unit; keeps code, data/, .env
 deploy/searxng.sh start|stop|remove   # the 'searxng' container only; keeps image and ~/searxng
 ```

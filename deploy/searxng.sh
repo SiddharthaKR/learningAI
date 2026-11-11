@@ -67,14 +67,17 @@ start)
   step "Will do"
   if [ -n "$STATE" ]; then info "docker start $CONTAINER (existing container, $STATE)"
   else
-    info "create and start: docker run -d --name $CONTAINER --restart unless-stopped -p 127.0.0.1:$PORT:8080 -v $CONF_DIR:/etc/searxng $IMAGE"
+    info "create and start: docker run -d --name $CONTAINER --restart no -p 127.0.0.1:$PORT:8080 -v $CONF_DIR:/etc/searxng $IMAGE"
   fi
   info "Other containers are not touched."
   confirm "Proceed?" || { info "Aborted, nothing changed."; exit 1; }
 
   step "Applying"
-  if [ -n "$STATE" ]; then $D start "$CONTAINER" >/dev/null || die "docker start failed"
-  else $D run -d --name "$CONTAINER" --restart unless-stopped \
+  if [ -n "$STATE" ]; then
+    # Manual start only: clear a restart policy an older install may have set.
+    $D update --restart no "$CONTAINER" >/dev/null || die "docker update --restart no failed"
+    $D start "$CONTAINER" >/dev/null || die "docker start failed"
+  else $D run -d --name "$CONTAINER" --restart no \
          -p "127.0.0.1:$PORT:8080" -v "$CONF_DIR:/etc/searxng" "$IMAGE" >/dev/null || die "docker run failed"; fi
   wait_ready
   ;;

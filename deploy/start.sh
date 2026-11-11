@@ -55,13 +55,13 @@ sed -e "s#/home/<USER>/app#$APP_DIR#g" -e "s#<USER>#$(id -un)#g" \
 
 ACTION=""
 if ! unit_exists; then
-  ACTION="install the unit, enable it at boot, and start it"
+  ACTION="install the unit and start it (manual start only, never at boot)"
   step "Unit to be installed at $UNIT_PATH"; cat "$NEW_UNIT"
 elif ! diff -q "$UNIT_PATH" "$NEW_UNIT" >/dev/null; then
-  ACTION="overwrite the changed unit, enable it at boot, and start it"
+  ACTION="overwrite the changed unit and start it (manual start only, never at boot)"
   step "Installed unit differs from the template"; diff "$UNIT_PATH" "$NEW_UNIT"
 else
-  ACTION="enable it at boot and start it (unit already installed and unchanged)"
+  ACTION="start it (unit already installed and unchanged; manual start only, never at boot)"
 fi
 
 step "Will do"
@@ -75,7 +75,11 @@ if ! unit_exists || ! diff -q "$UNIT_PATH" "$NEW_UNIT" >/dev/null; then
   $SUDO systemctl daemon-reload
   ok "unit written"
 fi
-$SUDO systemctl enable --now "$SERVICE" || die "systemctl enable --now failed"
+# Manual start only: never enable at boot, and undo an older install that did.
+if systemctl is-enabled --quiet "$SERVICE" 2>/dev/null; then
+  $SUDO systemctl disable "$SERVICE" >/dev/null 2>&1 && ok "boot auto-start disabled (left over from an older install)"
+fi
+$SUDO systemctl start "$SERVICE" || die "systemctl start failed"
 
 for _ in $(seq 1 30); do
   if curl -s -o /dev/null -m 2 "http://127.0.0.1:$PORT/"; then

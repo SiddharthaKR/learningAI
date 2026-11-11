@@ -11,8 +11,5 @@ WorkingDirectory=/home/<USER>/app
 EnvironmentFile=/home/<USER>/app/.env
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/npm run start
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
+# Manual start only (owner, 2026-11-11): no Restart= (a crash stays down) and no
+# [Install] section (it can never be enabled to start at boot). Start with deploy/start.sh.
