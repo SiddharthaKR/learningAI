@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { authenticatedAccount } from "@/src/server";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -10,7 +10,7 @@ import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
 import { I18nProvider } from "@/components/i18n-provider";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const inter = localFont({ src: "./fonts/inter-latin-wght.woff2", variable: "--font-inter", display: "swap", weight: "100 900" });
 
 export const metadata: Metadata = {
 	title: "Learning Harness",

@@ -24,13 +24,13 @@
 *:focus-visible {
 	outline: none;
 }
-:focus-visible {
-	box-shadow: 0 0 0 3px var(--ring);
-}
-input:focus,
-textarea:focus,
-select:focus {
-	box-shadow: 0 0 0 3px var(--ring);
+/* Inside @layer base and wrapped in :where() (zero specificity) so any
+   component utility (focus-visible:ring-*, shadow-*) still wins. */
+@layer base {
+	:where(:focus-visible),
+	:where(input:focus, textarea:focus, select:focus) {
+		box-shadow: 0 0 0 3px var(--ring);
+	}
 }
 
 /* Light palette: clean warm neutrals.
@@ -127,8 +127,8 @@ select:focus {
 }
 
 @theme inline {
-	/* Fonts: chrome = JetBrains Mono, prose = Source Sans 3, titles = CMU
-	   Serif bold. The JetBrains/SourceSans variables attach in app/layout.tsx.
+	/* Fonts: UI chrome = Inter, prose = Source Sans 3, titles = CMU
+	   Serif bold. The Inter variable attaches in app/layout.tsx.
 	   (owner, typography round) The Tailwind defaults are ALIASED to the app
 	   fonts: `font-mono`/`font-sans` utilities would otherwise fall to the
 	   SYSTEM stacks — a fourth font the app never chose — and streamdown's
