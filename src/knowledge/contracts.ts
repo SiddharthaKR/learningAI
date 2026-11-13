@@ -1,7 +1,7 @@
 export type KnowledgeFormat = "pdf" | "pptx" | "docx" | "md" | "txt";
 
 export type KnowledgeCitation =
-	| { format: "pdf"; fileName: string; page: number; imageDescription?: boolean }
+	| { format: "pdf"; fileName: string; page: number; imageDescription?: boolean; ocr?: boolean }
 	| { format: "pptx"; fileName: string; slide: number; title: string; imageDescription?: boolean }
 	| { format: "docx"; fileName: string; heading?: string; paragraph: number; imageDescription?: boolean }
 	| { format: "md" | "txt"; fileName: string; heading?: string; lineStart: number; lineEnd: number };
@@ -9,6 +9,10 @@ export type KnowledgeCitation =
 export interface ExtractedBlock {
 	text: string;
 	citation: KnowledgeCitation;
+	/** Heading path, outermost first (e.g. ["Chapter 5", "AXI Interface"]). */
+	section?: string[];
+	/** "table": keep whole when possible (the chunker avoids splitting it). */
+	kind?: "table";
 }
 
 export interface ExtractedImage {
@@ -24,6 +28,10 @@ export interface KnowledgeChunk {
 	sourceId: string;
 	text: string;
 	citation: KnowledgeCitation;
+	/** Heading path of the block this chunk came from (absent on old indexes). */
+	section?: string[];
+	/** 0-based reading-order position within its source (absent on old indexes). */
+	ordinal?: number;
 }
 
 export interface KnowledgeResult extends KnowledgeChunk {
