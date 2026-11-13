@@ -7,9 +7,10 @@ import { parseHTML } from "linkedom";
 import { I18nProvider } from "../components/i18n-provider.tsx";
 import { KnowledgePage } from "../components/knowledge-page.tsx";
 import { catalogFor } from "../src/i18n/catalog.ts";
+import type { KnowledgeDocumentRecord } from "../src/knowledge/index-store.ts";
 
 const copy = catalogFor("en").knowledge;
-type Doc = { id: string; fileName: string; format: string; status: string };
+type Doc = KnowledgeDocumentRecord;
 type Call = { url: string; method: string; destination: FormDataEntryValue | null; hasDestination: boolean };
 
 async function withPage(

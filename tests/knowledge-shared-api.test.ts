@@ -112,7 +112,7 @@ it("GET /api/knowledge/audit is 403 unless the caller is the configured admin", 
     assert.ok(events.length >= 2);
     assert.deepEqual(events, await readSharedKnowledgeAudit());
     const times = events.map((e: { at: string }) => Date.parse(e.at));
-    for (let i = 1; i < times.length; i++) assert.ok(times[i - 1] >= times[i], "newest first");
+    for (let i = 1; i < times.length; i++) assert.ok(times[i - 1]! >= times[i]!, "newest first");
   } finally {
     if (originalAdmin === undefined) delete process.env.LH_ADMIN_USERNAME;
     else process.env.LH_ADMIN_USERNAME = originalAdmin;
