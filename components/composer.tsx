@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef as useReactRef } from "react";
-import { ArrowRightIcon, CornerDownLeftIcon, PaperclipIcon, SquareIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, ChevronDownIcon, CornerDownLeftIcon, FileTextIcon, PaperclipIcon, SquareIcon, XIcon } from "lucide-react";
 import type { AttachmentDestination, ChatDocument } from "./chat-attachments";
 import { cn } from "@/lib/utils";
 import { Hint } from "@/components/ui/hint";
@@ -127,23 +127,39 @@ export function Composer({
 	return (
 		<div>
 			{documents?.map(({ file, destination }, index) => (
-				<div key={index} className="flex flex-wrap items-center gap-2 px-3 pt-2 text-sm">
-					<span className="break-all">{file.name}</span>
-					<select
-						aria-label={`${copy.composer.attachmentDestination}: ${file.name}`}
-						value={destination}
+				<div key={index} className="mx-3 mt-2 w-auto max-w-sm space-y-2 rounded-xl border border-border bg-background/60 p-2.5 text-sm">
+					<div className="flex min-w-0 items-center gap-2 px-1">
+						<FileTextIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+						<span className="truncate font-medium" title={file.name}>{file.name}</span>
+					</div>
+					<div className="flex items-center gap-2">
+					<div className="relative min-w-0 flex-1">
+						<select
+							aria-label={`${copy.composer.attachmentDestination}: ${file.name}`}
+							value={destination}
+							disabled={uploading}
+							onChange={(event) => {
+								const next = event.target.value as AttachmentDestination;
+								onDocumentsChange?.(documents.map((document, i) => i === index ? { ...document, destination: next } : document));
+							}}
+							className="h-9 w-full appearance-none truncate rounded-lg border border-border bg-card pl-2.5 pr-8 text-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
+						>
+							<option value="chat">{copy.composer.chatOnly}</option>
+							<option value="personal">{copy.composer.personalKnowledge}</option>
+							<option value="shared">{copy.composer.sharedKnowledge}</option>
+						</select>
+						<ChevronDownIcon aria-hidden className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+					</div>
+					<button
+						type="button"
 						disabled={uploading}
-						onChange={(event) => {
-							const next = event.target.value as AttachmentDestination;
-							onDocumentsChange?.(documents.map((document, i) => i === index ? { ...document, destination: next } : document));
-						}}
-						className="rounded border bg-card px-1"
+						aria-label={`${copy.composer.removeAttachment}: ${file.name}`}
+						onClick={() => onDocumentsChange?.(documents.filter((_, i) => i !== index))}
+						className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
 					>
-						<option value="chat">{copy.composer.chatOnly}</option>
-						<option value="personal">{copy.composer.personalKnowledge}</option>
-						<option value="shared">{copy.composer.sharedKnowledge}</option>
-					</select>
-					<button type="button" disabled={uploading} aria-label={`${copy.composer.removeAttachment}: ${file.name}`} onClick={() => onDocumentsChange?.(documents.filter((_, i) => i !== index))}><XIcon className="size-4" /></button>
+						<XIcon aria-hidden className="size-4" />
+					</button>
+					</div>
 				</div>
 			))}
 			{uploading && <p role="status" className="px-3 pt-2 text-sm">{copy.composer.uploadingAttachments}</p>}
