@@ -1,6 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-const scope = new AsyncLocalStorage<{ userId: string; background: boolean }>();
+// globalThis-backed (like the event bus in src/core/events.ts): Next.js
+// bundles each route separately, so a module-level store would give every
+// route its own copy — the events route's owner resolver would then never
+// see the scope /api/chat runs under, and every event would drop as unowned.
+type UserScope = AsyncLocalStorage<{ userId: string; background: boolean }>;
+const g = globalThis as typeof globalThis & { __lhUserScope?: UserScope };
+const scope: UserScope = (g.__lhUserScope ??= new AsyncLocalStorage());
 
 export function runAsUser<T>(userId: string, work: () => T): T {
   if (!/^[A-Za-z0-9_-]+$/u.test(userId)) throw new Error("Invalid user ID");
