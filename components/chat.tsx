@@ -1534,6 +1534,7 @@ export function Chat({
 														return null;
 													}
 													default: {
+												if (part.type === "tool-problem" && activeProblem && part.toolCallId === activeProblem.toolCallId) return null;
 														// A tool call being WRITTEN (owner, streaming round 2026-10-01):
 														// input-streaming spans the whole execution, and the live card —
 														// spinner + shimmered activity label, the input watchable on expand
