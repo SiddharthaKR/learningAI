@@ -83,6 +83,10 @@ export interface CanvasNode {
 	x: number;
 	y: number;
 	label: string;
+	/** Optional per-node disc color (#rrggbb); absent = colors.node. */
+	color?: string;
+	/** Optional disc radius multiplier on settings.nodeSize; absent = 1. */
+	radius?: number;
 }
 
 /** One directed edge of the DERIVED view (chains-primary, 2026-09-30):
@@ -548,11 +552,12 @@ function drawNameLines(
 	lines: string[],
 	world: WorldSizes,
 	color: string,
+	radiusScale = 1,
 ): void {
 	context.fillStyle = color;
 	context.textAlign = "center";
 	context.textBaseline = "top";
-	const firstTop = y + world.nodeR + world.labelGap;
+	const firstTop = y + world.nodeR * radiusScale + world.labelGap;
 	for (let i = 0; i < lines.length; i++) {
 		context.fillText(lines[i]!, x, firstTop + i * world.labelSize * LABEL_LINE_HEIGHT);
 	}
@@ -584,6 +589,11 @@ export class GraphCanvasRenderer {
 	private nodeById = new Map<string, CanvasNode>();
 	private settings: GraphRenderSettings | null = null;
 	private visible: ReadonlySet<string> | null = null;
+	private lockLayout = false;
+	private selectedId: string | null = null;
+	/** Node discs grouped by color (null = colors.node); one Path2D each. */
+	private nodeGroups: { color: string | null; path: Path2D }[] = [];
+	private maxRadiusScale = 1;
 
 	// ── Live physics ──
 	// One d3-force sim shared with the server settle (createGraphSimulation
@@ -662,7 +672,12 @@ export class GraphCanvasRenderer {
 		 *  where the user left it (2026-09-15: a default zoom exists only
 		 *  on first open, ever). Invalid shapes fall back to fit. */
 		initialCamera?: { k: number; x: number; y: number } | null,
+		/** lockLayout: nodes cannot be dragged (a node press pans/clicks
+		 *  instead of pinning and reheating the sim) — for views whose
+		 *  positions are computed outside (the knowledge map). */
+		options?: { lockLayout?: boolean },
 	) {
+		this.lockLayout = options?.lockLayout === true;
 		this.canvas = canvas;
 		const ctx = canvas.getContext("2d");
 		if (!ctx) throw new Error("2d context unavailable");
@@ -860,6 +875,25 @@ export class GraphCanvasRenderer {
 		if (changed) this.markDirty();
 	}
 
+	/** Highlight one node with a ring (null clears). */
+	setSelected(id: string | null): void {
+		this.selectedId = id;
+		this.markDirty();
+	}
+
+	/** Pan (keeping the zoom) so the node sits at the viewport center. */
+	centerOn(id: string): void {
+		const n = this.nodeById.get(id);
+		if (!n) return;
+		const { k } = this.transform;
+		select(this.canvas).call(
+			this.zoomBehavior.transform,
+			zoomIdentity
+				.translate(this.canvas.clientWidth / 2 - n.x * k, this.canvas.clientHeight / 2 - n.y * k)
+				.scale(k),
+		);
+	}
+
 	setVisible(visible: ReadonlySet<string> | null): void {
 		this.visible = visible;
 		this.geoVersion++; // member visibility changes hulls + paths
@@ -964,7 +998,7 @@ export class GraphCanvasRenderer {
 		if (e.button !== 0) return;
 		const pos = this.eventPos(e);
 		const node = this.pickAt(pos.x, pos.y);
-		if (node && this.sim) {
+		if (node && this.sim && !this.lockLayout) {
 			// Node press: pin the node (at ITS OWN position — the cursor
 			// may be inside the pick pad, off-center). preventDefault kills
 			// the compatibility mousedown, so d3-zoom never starts a pan.
@@ -1061,7 +1095,7 @@ export class GraphCanvasRenderer {
 		// nodeSize is world units now (2026-09-15): the on-screen hit radius
 		// is the disc's world radius × the camera zoom, plus the constant
 		// screen pad — the whole halo stays hit-testable.
-		const maxDist = this.settings.nodeSize * k + PICKING_PAD;
+		const maxDist = this.settings.nodeSize * this.maxRadiusScale * k + PICKING_PAD;
 		const projected: { id: string; x: number; y: number }[] = [];
 		for (const n of this.data.nodes) {
 			if (this.visible && !this.visible.has(n.id)) continue;
@@ -1239,11 +1273,22 @@ export class GraphCanvasRenderer {
 		// Node discs: one Path2D, one fill() per frame. Implication nodes
 		// are pure geometry — never a disc, never a label, never picked.
 		const nodesPath = new Path2D();
+		const groups = new Map<string | null, Path2D>();
+		let maxScale = 1;
 		for (const n of data.nodes) {
 			if (!isVisible(n.id) || isImpNodeId(n.id)) continue;
-			nodesPath.moveTo(n.x + nodeR, n.y);
-			nodesPath.arc(n.x, n.y, nodeR, 0, Math.PI * 2);
+			const r = nodeR * (n.radius ?? 1);
+			if ((n.radius ?? 1) > maxScale) maxScale = n.radius ?? 1;
+			let group = groups.get(n.color ?? null);
+			if (!group) {
+				group = new Path2D();
+				groups.set(n.color ?? null, group);
+			}
+			group.moveTo(n.x + r, n.y);
+			group.arc(n.x, n.y, r, 0, Math.PI * 2);
 		}
+		this.nodeGroups = [...groups].map(([color, path]) => ({ color, path }));
+		this.maxRadiusScale = maxScale;
 		this.nodesPath = nodesPath;
 
 		// Edge shafts + arrowheads (rendering arc, owner 2026-09-30): all
@@ -1264,7 +1309,13 @@ export class GraphCanvasRenderer {
 			if (!a || !b) continue;
 			const intoImp = isImpNodeId(e.to);
 			const outOfImp = isImpNodeId(e.from);
-			const g = arrowGeometry(a, b, outOfImp ? 0 : nodeR, intoImp ? 0 : nodeR, arrowLen);
+			const g = arrowGeometry(
+				a,
+				b,
+				outOfImp ? 0 : nodeR * (a.radius ?? 1),
+				intoImp ? 0 : nodeR * (b.radius ?? 1),
+				arrowLen,
+			);
 			if (!g) continue;
 			shafts.moveTo(g.shaftFrom.x, g.shaftFrom.y);
 			if (intoImp) {
@@ -1662,8 +1713,22 @@ export class GraphCanvasRenderer {
 		}
 
 		// 4. Nodes: one cached Path2D, one fill.
-		ctx.fillStyle = data.colors.node;
-		ctx.fill(this.nodesPath);
+		for (const group of this.nodeGroups) {
+			ctx.fillStyle = group.color ?? data.colors.node;
+			ctx.fill(group.path);
+		}
+
+		// 4b. Selection ring (view-owned selection; no-op when none).
+		if (this.selectedId) {
+			const sel = this.nodeById.get(this.selectedId);
+			if (sel && (!this.visible || this.visible.has(sel.id))) {
+				ctx.strokeStyle = data.colors.hoverText;
+				ctx.lineWidth = 2 / k;
+				ctx.beginPath();
+				ctx.arc(sel.x, sel.y, nodeR * (sel.radius ?? 1) + 2 / k, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+		}
 
 		// 6. Node labels — one global gate, faded together. World-scaled
 		// with the graph (they grow as you zoom in, Obsidian-style).
@@ -1674,7 +1739,7 @@ export class GraphCanvasRenderer {
 			for (const [id, lines] of this.labelLines) {
 				const n = this.nodeById.get(id);
 				if (!n) continue;
-				drawNameLines(ctx, n.x, n.y, lines, this.world, data.colors.label);
+				drawNameLines(ctx, n.x, n.y, lines, this.world, data.colors.label, n.radius ?? 1);
 			}
 			ctx.restore();
 		}
@@ -1688,18 +1753,19 @@ export class GraphCanvasRenderer {
 				? null // filtered out by search — no glow on hidden nodes
 				: this.hoverNode;
 			if (n) {
-				const glow = ctx.createRadialGradient(n.x, n.y, nodeR, n.x, n.y, glowOuter);
-				glow.addColorStop(0, rgbaFromHex(data.colors.node, GLOW_ALPHA * this.hoverFade));
-				glow.addColorStop(1, rgbaFromHex(data.colors.node, 0));
+				const glowColor = n.color ?? data.colors.node;
+				const glow = ctx.createRadialGradient(n.x, n.y, nodeR * (n.radius ?? 1), n.x, n.y, glowOuter * (n.radius ?? 1));
+				glow.addColorStop(0, rgbaFromHex(glowColor, GLOW_ALPHA * this.hoverFade));
+				glow.addColorStop(1, rgbaFromHex(glowColor, 0));
 				ctx.fillStyle = glow;
 				ctx.beginPath();
-				ctx.arc(n.x, n.y, glowOuter, 0, Math.PI * 2);
-				ctx.arc(n.x, n.y, nodeR, 0, Math.PI * 2, true);
+				ctx.arc(n.x, n.y, glowOuter * (n.radius ?? 1), 0, Math.PI * 2);
+				ctx.arc(n.x, n.y, nodeR * (n.radius ?? 1), 0, Math.PI * 2, true);
 				ctx.fill("evenodd");
 				ctx.save();
 				ctx.globalAlpha = this.hoverFade;
 				ctx.font = this.worldLabelFont;
-				drawNameLines(ctx, n.x, n.y, this.labelLines.get(n.id) ?? [], this.world, data.colors.hoverText);
+				drawNameLines(ctx, n.x, n.y, this.labelLines.get(n.id) ?? [], this.world, data.colors.hoverText, n.radius ?? 1);
 				ctx.restore();
 			}
 		}

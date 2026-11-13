@@ -26,7 +26,22 @@
     "sharedActivity": "Shared activity",
     "added": "Added",
     "deleted": "Deleted",
-    "noActivity": "No activity yet."
+    "noActivity": "No activity yet.",
+    "tabDocuments": "Documents",
+    "tabMap": "Map",
+    "filterShared": "Shared",
+    "filterPersonal": "Your documents",
+    "findSection": "Find a section",
+    "mapCounts": "{documents} documents · {sections} sections",
+    "mapEmpty": "No documents yet.",
+    "mapLoadFailed": "The map could not be loaded.",
+    "sectionLoading": "Loading…",
+    "sectionNotFound": "This section is no longer available.",
+    "sectionTruncated": "Showing the first 12,000 characters.",
+    "closePanel": "Close",
+    "citationPage": "page {n}",
+    "citationSlide": "slide {n}",
+    "citationLines": "lines {from}–{to}"
   },
   "common": {
     "english": "English",

@@ -26,7 +26,22 @@
     "sharedActivity": "共有アクティビティ",
     "added": "追加",
     "deleted": "削除",
-    "noActivity": "アクティビティはまだありません。"
+    "noActivity": "アクティビティはまだありません。",
+    "tabDocuments": "ドキュメント",
+    "tabMap": "マップ",
+    "filterShared": "共有",
+    "filterPersonal": "自分のドキュメント",
+    "findSection": "セクションを検索",
+    "mapCounts": "{documents} 件のドキュメント · {sections} 件のセクション",
+    "mapEmpty": "ドキュメントはまだありません。",
+    "mapLoadFailed": "マップを読み込めませんでした。",
+    "sectionLoading": "読み込み中…",
+    "sectionNotFound": "このセクションは見つかりません。",
+    "sectionTruncated": "最初の12,000文字を表示しています。",
+    "closePanel": "閉じる",
+    "citationPage": "{n} ページ",
+    "citationSlide": "スライド {n}",
+    "citationLines": "{from}–{to} 行"
   },
   "common": {
     "english": "英語",

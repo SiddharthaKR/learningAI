@@ -3,12 +3,14 @@
 import { useState, useRef, useCallback, useEffect, type FormEvent, type DragEvent } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { SidebarToggle } from "@/components/sidebar";
+import { KnowledgeMap } from "@/components/knowledge-map";
 import type { KnowledgeDocumentRecord } from "@/src/core";
 import { validateKnowledgeUpload } from "@/src/core";
 
 const FORMAT_LABELS: Record<string, string> = { pdf: "PDF", pptx: "PPTX", docx: "DOCX", md: "MD", txt: "TXT" };
 
 type Destination = "personal" | "shared";
+type Tab = "documents" | "map";
 type AuditEvent = { at: string; userId: string; username: string; action: "add" | "delete"; fileName: string; documentId: string };
 
 function FormatBadge({ format }: { format?: string }) {
@@ -33,6 +35,16 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
   const [dragOver, setDragOver] = useState(false);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<Tab>("documents");
+  const [mapOpened, setMapOpened] = useState(false);
+  const [mapRevision, setMapRevision] = useState(0);
+  const firstLists = useRef(true);
+
+  // The Map refetches when either document list changes (add/delete).
+  useEffect(() => {
+    if (firstLists.current) { firstLists.current = false; return; }
+    setMapRevision((n) => n + 1);
+  }, [documents, shared]);
 
   function message(code: string): string {
     const errors: Record<string, string> = { unsupported_format: copy.unsupported_format, too_large: copy.too_large, invalid_upload: copy.invalid_upload, invalid_file_name: copy.invalid_file_name, upload_failed: copy.upload_failed, delete_failed: copy.delete_failed, no_readable_text: copy.no_readable_text };
@@ -133,9 +145,21 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
     <header className="lh-drag flex items-center gap-3 border-b border-border px-6 py-4">
       <SidebarToggle />
       <h1 className="text-lg font-semibold">{copy.title}</h1>
+      <div role="tablist" className="lh-no-drag ml-auto inline-flex rounded-lg border border-border p-1 text-sm">
+        {(["documents", "map"] as const).map((option) => <button
+          key={option}
+          type="button"
+          role="tab"
+          aria-selected={tab === option}
+          onClick={() => { setTab(option); if (option === "map") setMapOpened(true); }}
+          className={`rounded-md px-3 py-1.5 transition-colors ${tab === option ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >{option === "documents" ? copy.tabDocuments : copy.tabMap}</button>)}
+      </div>
     </header>
 
-    <div className="mx-auto w-full max-w-2xl space-y-8 p-6 pb-16">
+    {mapOpened && <div hidden={tab !== "map"} className="flex min-h-0 flex-1 flex-col"><KnowledgeMap revision={mapRevision} /></div>}
+
+    <div hidden={tab !== "documents"} className="mx-auto w-full max-w-2xl space-y-8 p-6 pb-16">
       <p className="text-muted-foreground">{copy.description}</p>
 
       {/* Upload destination */}
