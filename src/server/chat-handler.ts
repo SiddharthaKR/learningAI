@@ -404,14 +404,16 @@ export async function handleChatInput(
 	// KNOWLEDGE TOOL (Task 6B): construct the retriever + sticky context
 	// ONLY when the session's officeKnowledgeEnabled flag is ON (teacher +
 	// prober only — practice sessions do not get search_knowledge).
+	const knowledgeScope = record.settings?.knowledgeScope ?? "all";
 	const knowledgeCtx: KnowledgeToolContext | undefined =
 		record.settings?.officeKnowledgeEnabled === true
 			? {
 					ownerId: currentUserId(),
 					chatId,
-					retriever: new KnowledgeSearch((userId) => loadKnowledgeChunks(userId), [bm25Ranker]),
+					scope: knowledgeScope,
+					retriever: new KnowledgeSearch((userId) => loadKnowledgeChunks(userId, { scope: knowledgeScope }), [bm25Ranker]),
 					markKnowledgeUsed: (id) => stores.chatStore.markKnowledgeUsed(id),
-					openSection: (userId, fileName, section) => openKnowledgeSection(userId, fileName, section),
+					openSection: (userId, fileName, section) => openKnowledgeSection(userId, fileName, section, { scope: knowledgeScope }),
 				}
 			: undefined;
 

@@ -79,6 +79,8 @@ export interface ChatSettings {
 	webResearchEnabled?: boolean;
 	/** Session opt-in to shared/personal office documents. */
 	officeKnowledgeEnabled?: boolean;
+	/** Which knowledge the agent may search; absent = "all". */
+	knowledgeScope?: KnowledgeSearchScope;
 	/** pi-ai catalog coordinates: the provider that owns the model. Only
 	 *  "openrouter" is configured today; the field exists so a second
 	 *  provider needs no schema change. */
@@ -88,16 +90,25 @@ export interface ChatSettings {
 	thinkingLevel?: ThinkingLevel;
 }
 
+/** Knowledge the agent may search: shared + personal, shared only, or personal only. */
+export type KnowledgeSearchScope = "all" | "shared" | "personal";
+export const KNOWLEDGE_SEARCH_SCOPES: readonly KnowledgeSearchScope[] = ["all", "shared", "personal"];
+
 /** Effective session controls: optional stored flags read as OFF. */
 export interface SessionControls {
 	webResearchEnabled: boolean;
 	officeKnowledgeEnabled: boolean;
+	/** Absent = "all" (old sessions keep today's behavior). */
+	knowledgeScope?: KnowledgeSearchScope;
 }
 
 /** Neutral, durable UI history; changes are ordered web first, knowledge second. */
 export interface SessionControlsChangedData {
 	at: string;
-	changes: Array<{ field: keyof SessionControls; from: boolean; to: boolean }>;
+	changes: Array<
+		| { field: "webResearchEnabled" | "officeKnowledgeEnabled"; from: boolean; to: boolean }
+		| { field: "knowledgeScope"; from: KnowledgeSearchScope; to: KnowledgeSearchScope }
+	>;
 }
 
 

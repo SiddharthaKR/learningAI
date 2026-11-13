@@ -20,6 +20,7 @@ import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import type { Retriever } from "../../knowledge/retriever.ts";
+import type { KnowledgeSearchScope } from "../../core/contracts/chat.ts";
 import type { KnowledgeResult } from "../../knowledge/contracts.ts";
 import { MAX_SECTION_CHARS, type KnowledgeSectionResponse } from "../../knowledge/map-contracts.ts";
 
@@ -50,6 +51,8 @@ function normalizeSectionPath(section: string[] | string): string[] {
 export interface KnowledgeToolContext {
 	/** The session owner's user ID — retrieval resolves only their personal + shared chunks. */
 	ownerId: string;
+	/** Search scope for the no-results hint; absent = "all". */
+	scope?: KnowledgeSearchScope;
 	/** The session's chat ID — for the sticky persist. */
 	chatId: string;
 	/** The retriever port (injected from the composition root). */
@@ -100,7 +103,9 @@ export function createKnowledgeTool(ctx: KnowledgeToolContext): Record<string, A
 				// but the retriever also validates (defense in depth).
 				const results = await ctx.retriever.search(queries, ctx.ownerId);
 				if (!results.length) {
-					return "No matching documents found for your queries. Try different terms or phrasing.";
+					const hint = ctx.scope === "shared" ? " (searching shared knowledge only)"
+						: ctx.scope === "personal" ? " (searching your personal documents only)" : "";
+					return `No matching documents found for your queries${hint}. Try different terms or phrasing.`;
 				}
 				// STICKY PERSIST: set knowledgeUsed BEFORE returning chunks.
 				// A persist failure withholds the chunks — the web approval

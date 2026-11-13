@@ -15,7 +15,7 @@ async function PUTImpl(req: Request, { params }: { params: Promise<{ id: string 
 	if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 
 	for (const field of Object.keys(body)) {
-		if (field !== "webResearchEnabled" && field !== "officeKnowledgeEnabled") {
+		if (field !== "webResearchEnabled" && field !== "officeKnowledgeEnabled" && field !== "knowledgeScope") {
 			return Response.json({ error: `Unsupported session setting: ${field}` }, { status: 400 });
 		}
 	}
@@ -24,6 +24,7 @@ async function PUTImpl(req: Request, { params }: { params: Promise<{ id: string 
 	const { settings, changed } = stores.chatStore.saveSessionControls(id, {
 		webResearchEnabled: parsed.settings.webResearchEnabled === true,
 		officeKnowledgeEnabled: parsed.settings.officeKnowledgeEnabled === true,
+		knowledgeScope: parsed.settings.knowledgeScope,
 	});
 	if (changed) emit("record-changed", { chatId: id });
 	return Response.json({ settings });

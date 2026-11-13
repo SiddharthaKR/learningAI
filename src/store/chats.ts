@@ -197,8 +197,15 @@ function saveSessionControls(id: string, settings: SessionControls): { settings:
 		const from = record.settings?.[field] === true;
 		if (from !== settings[field]) changes.push({ field, from, to: settings[field] });
 	}
+	const scopeFrom = record.settings?.knowledgeScope ?? "all";
+	const scopeTo = settings.knowledgeScope ?? "all";
+	if (scopeFrom !== scopeTo) changes.push({ field: "knowledgeScope", from: scopeFrom, to: scopeTo });
 	if (changes.length === 0) return { settings, changed: false };
-	record.settings = { webResearchEnabled: settings.webResearchEnabled, officeKnowledgeEnabled: settings.officeKnowledgeEnabled };
+	record.settings = {
+		webResearchEnabled: settings.webResearchEnabled,
+		officeKnowledgeEnabled: settings.officeKnowledgeEnabled,
+		...(scopeTo !== "all" ? { knowledgeScope: scopeTo } : {}),
+	};
 	record.messages = [...record.messages, newSessionControlsChangedMessage({ at: new Date().toISOString(), changes })];
 	writeChat(record);
 	return { settings: record.settings as SessionControls, changed: true };

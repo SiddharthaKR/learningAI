@@ -437,6 +437,10 @@
     "readLinkedPages": "Read linked pages",
     "webResearch": "Web research",
     "officeKnowledge": "Use office knowledge",
+    "knowledgeScope": "Knowledge scope",
+    "knowledgeScopeAll": "All knowledge",
+    "knowledgeScopeShared": "Shared only",
+    "knowledgeScopePersonal": "Personal only",
     "loadControlsError": "Session controls could not be loaded.",
     "saveControlsError": "Could not save session controls."
   },

@@ -437,6 +437,10 @@
     "readLinkedPages": "リンク先ページを読む",
     "webResearch": "ウェブ調査",
     "officeKnowledge": "社内ナレッジを使う",
+    "knowledgeScope": "ナレッジの範囲",
+    "knowledgeScopeAll": "すべてのナレッジ",
+    "knowledgeScopeShared": "共有のみ",
+    "knowledgeScopePersonal": "個人のみ",
     "loadControlsError": "セッション設定を読み込めませんでした。",
     "saveControlsError": "セッション設定を保存できませんでした。"
   },

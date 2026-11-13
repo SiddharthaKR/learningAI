@@ -334,3 +334,29 @@ it("publishes all chat mutations only inside the owner's chat directory and chec
   assert.throws(() => checked.markKnowledgeUsed(ownedChat.id), /no longer exists/);
   assert.throws(() => checked.saveSessionControls(ownedChat.id, { webResearchEnabled: true, officeKnowledgeEnabled: false }), /no longer exists/);
 });
+
+it("persists knowledgeScope, absent = all, with a scope audit entry and no marker for a no-op", async () => {
+  const chat = chatStore.createChat("Scope controls");
+  assert.equal(chatStore.getChat(chat.id)!.settings?.knowledgeScope, undefined);
+  const base = { webResearchEnabled: false, officeKnowledgeEnabled: true };
+  // explicit "all" on an absent scope is not a change
+  await put(chat.id, base);
+  const n = markers(chatStore, chat.id).length;
+  assert.equal((await put(chat.id, { ...base, knowledgeScope: "all" })).status, 200);
+  assert.equal(markers(chatStore, chat.id).length, n);
+  const res = await put(chat.id, { ...base, knowledgeScope: "shared" });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).settings.knowledgeScope, "shared");
+  assert.equal(chatStore.getChat(chat.id)!.settings?.knowledgeScope, "shared");
+  assert.deepEqual((markers(chatStore, chat.id).at(-1)!.details as { changes: unknown[] }).changes,
+    [{ field: "knowledgeScope", from: "all", to: "shared" }]);
+  await put(chat.id, { ...base, knowledgeScope: "personal" });
+  assert.deepEqual((markers(chatStore, chat.id).at(-1)!.details as { changes: unknown[] }).changes,
+    [{ field: "knowledgeScope", from: "shared", to: "personal" }]);
+  // omitted scope on replace-whole PUT resets to all
+  await put(chat.id, base);
+  assert.equal(chatStore.getChat(chat.id)!.settings?.knowledgeScope, undefined);
+  assert.deepEqual((markers(chatStore, chat.id).at(-1)!.details as { changes: unknown[] }).changes,
+    [{ field: "knowledgeScope", from: "personal", to: "all" }]);
+  for (const bad of ["everything", 3, null]) assert.equal((await put(chat.id, { ...base, knowledgeScope: bad })).status, 400);
+});

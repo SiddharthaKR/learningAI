@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { KnowledgeSearchScope } from "../core/contracts/chat.ts";
 import type { KnowledgeChunk, KnowledgeFormat } from "./contracts.ts";
 import { chunkDocument } from "./chunk.ts";
 import { extractDocument } from "./extract.ts";
@@ -40,6 +41,8 @@ export async function indexKnowledgeDocument({ fileName, data, visionConfig }: {
 }
 
 export interface KnowledgeLoaderOptions {
+	/** Which knowledge is visible; absent = "all". */
+	scope?: KnowledgeSearchScope;
 	sharedIndexFile?: string;
 	loadPersonalSnapshot?: (userId: string) => KnowledgeSnapshot | Promise<KnowledgeSnapshot>;
 }
@@ -47,26 +50,28 @@ export interface KnowledgeLoaderOptions {
 /** open_section port implementation: owner's personal docs + shared uploads + optional admin index. */
 export async function openKnowledgeSection(userId: string, fileName: string, section: string[], options: KnowledgeLoaderOptions = {}): Promise<OpenSectionResult> {
 	const sharedIndexFile = options.sharedIndexFile ?? process.env.KNOWLEDGE_INDEX_FILE?.trim();
+	const scope = options.scope ?? "all";
 	const stores = await import("../server/stores.ts");
-	const personal = options.loadPersonalSnapshot
+	const personal = scope === "shared" ? undefined : options.loadPersonalSnapshot
 		? validateKnowledgeSnapshot(await options.loadPersonalSnapshot(userId))
 		: await stores.checkedStoresForUser(userId).knowledgeStore.readSnapshot();
-	const uploaded = await stores.sharedKnowledgeStore.readSnapshot();
-	const admin = sharedIndexFile ? await readKnowledgeSnapshot(sharedIndexFile) : undefined;
+	const uploaded = scope === "personal" ? undefined : await stores.sharedKnowledgeStore.readSnapshot();
+	const admin = sharedIndexFile && scope !== "personal" ? await readKnowledgeSnapshot(sharedIndexFile) : undefined;
 	return resolveOpenSection([
-		{ scope: "personal", label: "personal", snapshot: personal },
-		{ scope: "shared", label: "shared", snapshot: uploaded },
+		...(personal ? [{ scope: "personal" as const, label: "personal", snapshot: personal }] : []),
+		...(uploaded ? [{ scope: "shared" as const, label: "shared", snapshot: uploaded }] : []),
 		...(admin ? [{ scope: "shared" as const, label: "shared index", snapshot: admin }] : []),
 	], fileName, section);
 }
 
 /** Retriever loader seam: reload shared state and resolve only the explicit owner. */
 export async function loadKnowledgeChunks(userId: string, options: KnowledgeLoaderOptions = {}): Promise<KnowledgeChunk[]> {
+	const scope = options.scope ?? "all";
 	const sharedIndexFile = options.sharedIndexFile ?? process.env.KNOWLEDGE_INDEX_FILE?.trim();
-	const shared = sharedIndexFile ? await readKnowledgeSnapshot(sharedIndexFile) : undefined;
-	const personal = options.loadPersonalSnapshot
+	const shared = sharedIndexFile && scope !== "personal" ? await readKnowledgeSnapshot(sharedIndexFile) : undefined;
+	const personal = scope === "shared" ? undefined : options.loadPersonalSnapshot
 		? validateKnowledgeSnapshot(await options.loadPersonalSnapshot(userId))
 		: await (await import("../server/stores.ts")).checkedStoresForUser(userId).knowledgeStore.readSnapshot();
-	const uploaded = await (await import("../server/stores.ts")).sharedKnowledgeStore.readSnapshot();
-	return [...(shared?.chunks ?? []), ...uploaded.chunks, ...personal.chunks];
+	const uploaded = scope === "personal" ? undefined : await (await import("../server/stores.ts")).sharedKnowledgeStore.readSnapshot();
+	return [...(shared?.chunks ?? []), ...(uploaded?.chunks ?? []), ...(personal?.chunks ?? [])];
 }

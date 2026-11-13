@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { contextWindow, sessionCost, turnCost, type ChatSettings, type TurnUsage } from "@/src/core";
+import { contextWindow, sessionCost, turnCost, type ChatSettings, type KnowledgeSearchScope, type TurnUsage } from "@/src/core";
 import { formatTokens, formatUsd, prettyModel } from "@/components/usage-format";
 import { catalogLimits, useModelCatalog } from "@/components/model-picker";
 import { useI18n } from "@/components/i18n-provider";
@@ -28,6 +28,30 @@ import { formatMessage } from "@/src/core";
  * settings, else config's pin), while the left-side figures still fold the
  * turn log's actual billed models.
  */
+/** Scope select beside "Use office knowledge"; rendered only while that is ON. */
+export function KnowledgeScopeSelect({ settings, disabled, onChange }: {
+ settings: ChatSettings | null;
+ disabled: boolean;
+ onChange: (scope: KnowledgeSearchScope) => void;
+}) {
+ const copy = useI18n().activityUi;
+ if (settings?.officeKnowledgeEnabled !== true) return null;
+ return (
+  <select
+   aria-label={copy.knowledgeScope}
+   value={settings.knowledgeScope ?? "all"}
+   disabled={disabled}
+   onChange={(event) => onChange(event.target.value as KnowledgeSearchScope)}
+   className="cursor-pointer rounded border border-border bg-background px-1 py-0.5 text-inherit"
+   data-testid="knowledge-scope-select"
+  >
+   <option value="all">{copy.knowledgeScopeAll}</option>
+   <option value="shared">{copy.knowledgeScopeShared}</option>
+   <option value="personal">{copy.knowledgeScopePersonal}</option>
+  </select>
+ );
+}
+
 export function StatsBar({
 	turns,
 	dictationSlot,
@@ -108,13 +132,14 @@ export function StatsBar({
    .catch(() => { if (!cancelled) setSettingError(copy.loadControlsError); });
   return () => { cancelled = true; };
  }, [chatId]);
- const saveFlag = async (field: "webResearchEnabled" | "officeKnowledgeEnabled", value: boolean) => {
+ const saveFlag = async (field: "webResearchEnabled" | "officeKnowledgeEnabled" | "knowledgeScope", value: boolean | KnowledgeSearchScope) => {
   if (!chatId || !sessionSettings || saving) return;
   setSaving(true);
   setSettingError(null);
   const next = {
    webResearchEnabled: sessionSettings.webResearchEnabled ?? false,
    officeKnowledgeEnabled: sessionSettings.officeKnowledgeEnabled ?? false,
+   knowledgeScope: sessionSettings.knowledgeScope ?? "all",
    [field]: value,
   };
   try {
@@ -249,6 +274,7 @@ export function StatsBar({
        <span>{field === "webResearchEnabled" ? (webMode === "search" ? copy.webResearch : copy.readLinkedPages) : copy.officeKnowledge}</span>
       </label>
      ))}
+     <KnowledgeScopeSelect settings={sessionSettings} disabled={saving} onChange={(scope) => void saveFlag("knowledgeScope", scope)} />
      {settingError && <span role="alert" className="text-red-400">{settingError}</span>}
     </div>
    )}

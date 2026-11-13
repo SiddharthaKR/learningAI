@@ -12,7 +12,7 @@
  */
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { isHexColor, type ChatSettings } from "../core";
+import { isHexColor, KNOWLEDGE_SEARCH_SCOPES, type ChatSettings, type KnowledgeSearchScope } from "../core";
 import type {
 	AgentSettings,
 	AppearanceSettings,
@@ -42,6 +42,7 @@ export function parseSettingsBody(body: unknown): SettingsBodyResult<ChatSetting
 		thinkingLevel?: unknown;
 		webResearchEnabled?: unknown;
 		officeKnowledgeEnabled?: unknown;
+		knowledgeScope?: unknown;
 	};
 	const settings: ChatSettings = {};
 	if (raw.model !== undefined) {
@@ -66,6 +67,12 @@ export function parseSettingsBody(body: unknown): SettingsBodyResult<ChatSetting
 			if (typeof raw[field] !== "boolean") return { ok: false, error: `${field} must be a boolean` };
 			settings[field] = raw[field];
 		}
+	}
+	if (raw.knowledgeScope !== undefined) {
+		if (typeof raw.knowledgeScope !== "string" || !(KNOWLEDGE_SEARCH_SCOPES as readonly string[]).includes(raw.knowledgeScope)) {
+			return { ok: false, error: "knowledgeScope must be \"all\", \"shared\" or \"personal\"" };
+		}
+		settings.knowledgeScope = raw.knowledgeScope as KnowledgeSearchScope;
 	}
 	// Wave 7 killed the graph-context injection (owner: zero configuration
 	// beyond chat models — the prober reads its map through tools now); its
