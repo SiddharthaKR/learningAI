@@ -5,6 +5,7 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { readKnowledgeSnapshot, writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot, type KnowledgeDocumentRecord } from "../knowledge/index-store.ts";
 import { indexKnowledgeDocument } from "../knowledge/service.ts";
 import { validateKnowledgeUpload } from "../knowledge/upload.ts";
+import { writeKnowledgeVault } from "../knowledge/vault.ts";
 
 // All route instances for an owner share one queue. Failed operations release it.
 const mutations = new Map<string, Promise<unknown>>();
@@ -19,6 +20,10 @@ function serialized<T>(root: string, operation: () => Promise<T>): Promise<T> {
 export function createKnowledgeStore(root: string, beforePublish: () => void) {
 	const indexFile = path.join(root, "knowledge", "index.json");
 	const sourceDirectory = path.join(root, "knowledge", "documents");
+	const refreshVault = async (snapshot: KnowledgeSnapshot): Promise<void> => {
+		try { await writeKnowledgeVault(root, snapshot); }
+		catch (error) { console.error("knowledge vault rebuild failed", error); }
+	};
 	return {
 		readSnapshot: () => readKnowledgeSnapshot(indexFile),
 		writeSnapshot: (snapshot: KnowledgeSnapshot) => writeKnowledgeSnapshotAtomic(indexFile, snapshot, beforePublish),
@@ -42,7 +47,9 @@ const existing = snapshot.documents.find((document) => document.contentHash === 
 					beforePublish();
 					renameSync(temporary, sourceFile);
 					published = true;
-					await writeKnowledgeSnapshotAtomic(indexFile, { ...snapshot, generatedAt: new Date().toISOString(), documents: [...snapshot.documents, document], chunks: [...snapshot.chunks, ...indexed.chunks] }, beforePublish);
+					const next = { ...snapshot, generatedAt: new Date().toISOString(), documents: [...snapshot.documents, document], chunks: [...snapshot.chunks, ...indexed.chunks] };
+						await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);
+						await refreshVault(next);
 					return document;
 				} catch (error) {
 					if (published) await unlink(sourceFile).catch((cleanup: NodeJS.ErrnoException) => { if (cleanup.code !== "ENOENT") throw cleanup; });
@@ -56,8 +63,10 @@ const existing = snapshot.documents.find((document) => document.contentHash === 
 			beforePublish();
 			const snapshot = await readKnowledgeSnapshot(indexFile);
 if (!snapshot.documents.some((document) => document.id === id)) return false;
-			await writeKnowledgeSnapshotAtomic(indexFile, { ...snapshot, generatedAt: new Date().toISOString(), documents: snapshot.documents.filter((document) => document.id !== id), chunks: snapshot.chunks.filter((chunk) => chunk.sourceId !== id) }, beforePublish);
+			const next = { ...snapshot, generatedAt: new Date().toISOString(), documents: snapshot.documents.filter((document) => document.id !== id), chunks: snapshot.chunks.filter((chunk) => chunk.sourceId !== id) };
+			await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);
 			await unlink(path.join(sourceDirectory, id)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+			await refreshVault(next);
 			return true;
 		}),
 	};
