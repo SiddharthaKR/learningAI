@@ -115,8 +115,8 @@ it("rejects unsupported extensions and mismatched MIME types before storing", as
   }
 });
 
-it("enforces exactly 25 MiB on actual bytes, even when reported size lies", async () => {
-  assert.equal(MAX_KNOWLEDGE_UPLOAD_BYTES, 26_214_400);
+it("enforces exactly 100 MiB on actual bytes, even when reported size lies", async () => {
+  assert.equal(MAX_KNOWLEDGE_UPLOAD_BYTES, 104_857_600);
   const store = checkedStoresForUser(a.id).knowledgeStore;
   // Whitespace keeps extraction/chunking cheap while exercising real byte-length enforcement.
   const bytes = new Uint8Array(MAX_KNOWLEDGE_UPLOAD_BYTES + 1).fill(32);
@@ -130,10 +130,10 @@ it("enforces exactly 25 MiB on actual bytes, even when reported size lies", asyn
   assert.equal(snapshot.documents.some((document) => document.fileName === "over.txt" || document.fileName === "oversized.txt"), false);
 });
 
-it("preserves the supported 25 MiB multipart upload envelope through the Next proxy configuration", () => {
-  assert.equal(MAX_KNOWLEDGE_UPLOAD_BYTES, 26_214_400);
+it("preserves the supported 100 MiB multipart upload envelope through the Next proxy configuration", () => {
+  assert.equal(MAX_KNOWLEDGE_UPLOAD_BYTES, 104_857_600);
   const supportedMultipartEnvelope = MAX_KNOWLEDGE_UPLOAD_BYTES + 65_536;
-  assert.equal(supportedMultipartEnvelope, 26_279_936);
+  assert.equal(supportedMultipartEnvelope, 104_923_136);
   const configuredProxyLimit = nextConfig.experimental?.proxyClientMaxBodySize;
   assert.equal(typeof configuredProxyLimit, "number", "Next proxy must have an explicit numeric body-buffer limit");
   assert.ok((configuredProxyLimit as number) >= supportedMultipartEnvelope, "Next proxy must preserve the complete supported multipart envelope");

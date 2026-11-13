@@ -31,7 +31,7 @@ const formatSchema = z.enum(["pdf", "pptx", "docx", "md", "txt"]);
 const positionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const imageDescriptionSchema = z.boolean().optional();
 const citationSchema = z.discriminatedUnion("format", [
-	z.strictObject({ format: z.literal("pdf"), fileName: fileNameSchema, page: positionSchema, imageDescription: imageDescriptionSchema }),
+	z.strictObject({ format: z.literal("pdf"), fileName: fileNameSchema, page: positionSchema, imageDescription: imageDescriptionSchema, ocr: z.boolean().optional() }),
 	z.strictObject({ format: z.literal("pptx"), fileName: fileNameSchema, slide: positionSchema, title: z.string(), imageDescription: imageDescriptionSchema }),
 	z.strictObject({ format: z.literal("docx"), fileName: fileNameSchema, paragraph: positionSchema, heading: z.string().optional(), imageDescription: imageDescriptionSchema }),
 	z.strictObject({ format: z.enum(["md", "txt"]), fileName: fileNameSchema, lineStart: positionSchema, lineEnd: positionSchema, heading: z.string().optional() }).refine((citation) => citation.lineEnd >= citation.lineStart),
@@ -40,7 +40,7 @@ const snapshotSchema = z.strictObject({
 	version: z.literal(1),
 	generatedAt: z.string().min(1),
 	documents: z.array(z.strictObject({ id: idSchema, fileName: fileNameSchema, format: formatSchema.optional(), status: z.enum(["ready", "no_text_layer", "rejected"]), error: z.string().optional(), contentHash: idSchema.optional() }).refine((record) => record.status === "rejected" || record.format !== undefined)),
-	chunks: z.array(z.strictObject({ id: idSchema, sourceId: idSchema, text: z.string().min(1), citation: citationSchema })),
+	chunks: z.array(z.strictObject({ id: idSchema, sourceId: idSchema, text: z.string().min(1), citation: citationSchema, section: z.array(z.string()).optional(), ordinal: z.number().int().nonnegative().optional() })),
 });
 
 function deepFreeze<T>(value: T): T {

@@ -44,18 +44,23 @@ export interface KnowledgeToolContext {
 	markKnowledgeUsed: (chatId: string) => boolean;
 }
 
-function formatCitation(result: KnowledgeResult): string {
+export function formatCitation(result: KnowledgeResult): string {
 	const c = result.citation;
+	const path = result.section?.length ? result.section.join(" › ") : undefined;
 	switch (c.format) {
 		case "pdf":
-			return `[${c.fileName}, page ${c.page}]`;
+			return `[${c.fileName}, page ${c.page}${path ? `, §${path}` : ""}]${c.ocr ? " (OCR)" : ""}`;
 		case "pptx":
-			return `[${c.fileName}, slide ${c.slide}${c.title ? `: ${c.title}` : ""}]`;
-		case "docx":
-			return `[${c.fileName}${c.heading ? `, §${c.heading}` : ""}, ¶${c.paragraph}]`;
+			return `[${c.fileName}, slide ${c.slide}${c.title ? `: ${c.title}` : ""}${path ? `, §${path}` : ""}]`;
+		case "docx": {
+			const where = path ?? c.heading;
+			return `[${c.fileName}${where ? `, §${where}` : ""}, ¶${c.paragraph}]`;
+		}
 		case "md":
-		case "txt":
-			return `[${c.fileName}${c.heading ? `, §${c.heading}` : ""}, lines ${c.lineStart}–${c.lineEnd}]`;
+		case "txt": {
+			const where = path ?? c.heading;
+			return `[${c.fileName}${where ? `, §${where}` : ""}, lines ${c.lineStart}–${c.lineEnd}]`;
+		}
 	}
 }
 

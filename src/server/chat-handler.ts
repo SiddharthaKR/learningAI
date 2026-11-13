@@ -51,7 +51,8 @@ import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
 import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, planRetryOwed } from "../core/native-messages.ts";
-import { Bm25Retriever } from "../knowledge/bm25.ts";
+import { bm25Ranker } from "../knowledge/bm25.ts";
+import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeChunks } from "../knowledge/service.ts";
 import type { KnowledgeToolContext } from "../agent/tools/knowledge.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
@@ -408,7 +409,7 @@ export async function handleChatInput(
 			? {
 					ownerId: currentUserId(),
 					chatId,
-					retriever: new Bm25Retriever((userId) => loadKnowledgeChunks(userId)),
+					retriever: new KnowledgeSearch((userId) => loadKnowledgeChunks(userId), [bm25Ranker]),
 					markKnowledgeUsed: (id) => stores.chatStore.markKnowledgeUsed(id),
 				}
 			: undefined;

@@ -1,21 +1,23 @@
 import { createHash } from "node:crypto";
-import type { ExtractedDocument, KnowledgeChunk, KnowledgeCitation } from "./contracts.ts";
+import type { ExtractedBlock, ExtractedDocument, KnowledgeChunk, KnowledgeCitation } from "./contracts.ts";
 
 const MAX_POINTS = 1200;
 const MIN_BOUNDARY_POINTS = 900;
 const OVERLAP_POINTS = 200;
+const MIN_BODY_POINTS = 400;
+const TABLE_MAX_POINTS = 4000;
 
 function canonicalCitation(citation: KnowledgeCitation): string {
 	return JSON.stringify(citation, Object.keys(citation).sort());
 }
 
-function chunkEnd(points: string[], start: number): number {
-	const maximum = Math.min(start + MAX_POINTS, points.length);
+function chunkEnd(points: string[], start: number, maxPoints: number, minBoundary: number): number {
+	const maximum = Math.min(start + maxPoints, points.length);
 	if (maximum === points.length) return maximum;
 	let paragraph = 0;
 	let newline = 0;
 	let whitespace = 0;
-	for (let end = start + MIN_BOUNDARY_POINTS; end <= maximum; end++) {
+	for (let end = start + minBoundary; end <= maximum; end++) {
 		const last = points[end - 1]!;
 		if (last === "\n" && points[end - 2] === "\n") paragraph = end;
 		if (last === "\n") newline = end;
@@ -24,21 +26,73 @@ function chunkEnd(points: string[], start: number): number {
 	return paragraph || newline || whitespace || maximum;
 }
 
+/** First line of every chunk that has a section path: "§ A › B › C" + newline. */
+export function sectionPrefix(section: string[] | undefined): string {
+	return section?.length ? `§ ${section.join(" › ")}\n` : "";
+}
+
+/** Split a table at row boundaries only; a single over-long row is hard-split as a last resort. */
+function splitTable(text: string, budget: number): string[] {
+	const pieces: string[] = [];
+	let current: string[] = [];
+	let currentLength = 0;
+	const flush = () => {
+		if (current.length) pieces.push(current.join("\n"));
+		current = [];
+		currentLength = 0;
+	};
+	for (const row of text.split("\n")) {
+		const rowPoints = Array.from(row);
+		const rowLength = rowPoints.length;
+		if (rowLength > budget) {
+			flush();
+			for (let i = 0; i < rowLength; i += budget) pieces.push(rowPoints.slice(i, i + budget).join(""));
+			continue;
+		}
+		const added = rowLength + (current.length ? 1 : 0);
+		if (currentLength + added > budget) flush();
+		currentLength += rowLength + (current.length ? 1 : 0);
+		current.push(row);
+	}
+	flush();
+	return pieces;
+}
+
 export function chunkDocument(document: ExtractedDocument, sourceId: string): KnowledgeChunk[] {
 	if (document.status === "no_text_layer") return [];
 	const chunks: KnowledgeChunk[] = [];
 	let ordinal = 0;
+	const emit = (text: string, block: ExtractedBlock, citationJson: string, prefix: string) => {
+		const hashed: unknown[] = [sourceId, citationJson, ordinal, text];
+		if (block.section?.length) hashed.push(block.section);
+		const id = createHash("sha256").update(JSON.stringify(hashed)).digest("hex");
+		const chunk: KnowledgeChunk = { id, sourceId, text: prefix + text, citation: block.citation, ordinal };
+		if (block.section?.length) chunk.section = [...block.section];
+		chunks.push(chunk);
+		ordinal++;
+	};
 	for (const block of document.blocks) {
-		const points = Array.from(block.text);
+		const prefix = sectionPrefix(block.section);
+		const prefixLength = Array.from(prefix).length;
 		const citationJson = canonicalCitation(block.citation);
-		for (let start = 0; start < points.length;) {
-			const end = chunkEnd(points, start);
-			const text = points.slice(start, end).join("");
-			if (text.trim()) {
-				const id = createHash("sha256").update(JSON.stringify([sourceId, citationJson, ordinal, text])).digest("hex");
-				chunks.push({ id, sourceId, text, citation: block.citation });
-				ordinal++;
+		if (block.kind === "table") {
+			if (!block.text.trim()) continue;
+			if (Array.from(block.text).length <= TABLE_MAX_POINTS) {
+				emit(block.text, block, citationJson, prefix);
+				continue;
 			}
+			for (const piece of splitTable(block.text, Math.max(MIN_BODY_POINTS, TABLE_MAX_POINTS - prefixLength))) {
+				if (piece.trim()) emit(piece, block, citationJson, prefix);
+			}
+			continue;
+		}
+		const points = Array.from(block.text);
+		const maxPoints = Math.max(MIN_BODY_POINTS, MAX_POINTS - prefixLength);
+		const minBoundary = Math.min(MIN_BOUNDARY_POINTS, Math.floor(maxPoints * 0.75));
+		for (let start = 0; start < points.length;) {
+			const end = chunkEnd(points, start, maxPoints, minBoundary);
+			const text = points.slice(start, end).join("");
+			if (text.trim()) emit(text, block, citationJson, prefix);
 			if (end === points.length) break;
 			start = Math.max(start + 1, end - OVERLAP_POINTS);
 		}

@@ -24,7 +24,7 @@ for (const language of ["en", "ja"] as const) {
     assert.ok(html.includes('accept=".pdf,.pptx,.docx,.md,.txt"'));
     assert.ok(!html.includes("undefined"));
     assert.ok(copy.unsupported_format.length > 0);
-    assert.ok(copy.too_large.includes("25"));
+    assert.ok(copy.too_large.includes("100"));
     if (language === "en") assert.equal(copy.noTextLayer, "no text layer (OCR not supported)");
     else assert.equal(copy.noTextLayer, "テキストレイヤーがありません（OCRはサポートされていません）");
   });

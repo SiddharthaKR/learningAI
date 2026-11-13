@@ -1,6 +1,6 @@
 import type { KnowledgeFormat } from "./contracts.ts";
 
-export const MAX_KNOWLEDGE_UPLOAD_BYTES = 26_214_400;
+export const MAX_KNOWLEDGE_UPLOAD_BYTES = 104_857_600;
 export const MAX_KNOWLEDGE_MULTIPART_BYTES = MAX_KNOWLEDGE_UPLOAD_BYTES + 65_536;
 const mimeTypes: Record<KnowledgeFormat, string[]> = {
   pdf: ["application/pdf"],
