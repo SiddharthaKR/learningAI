@@ -133,7 +133,11 @@ it("shared traversal sorts relative paths, skips hidden/temp/output/symlinks, an
 	await mkdir(path.join(source, ".hidden"));
 	for (const [name, data] of Object.entries({ "z.txt": "fire safety", "a.txt": "fire safety", "nested/guide.md": "# Guide\nSafety", "bad.docx": "broken zip", "binary.xlsx": "unsupported", ".secret.txt": "hidden", ".hidden/guide.txt": "hidden", "~$lock.txt": "temp", "draft.txt~": "temp", "draft.tmp": "temp", "draft.part": "temp", "draft.swp": "temp", [process.platform === "win32" ? "INDEX.JSON" : "index.json"]: "old output" })) await writeFile(path.join(source, name), data);
 	// A directory junction is available to unprivileged Windows users and is still a symlink Dirent.
-	await symlink(path.join(source, "nested"), path.join(source, "linked"), process.platform === "win32" ? "junction" : "dir");
+	try {
+		await symlink(path.join(source, "nested"), path.join(source, "linked"), process.platform === "win32" ? "junction" : "dir");
+	} catch (error) {
+		if (process.platform !== "win32" || (error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+	}
 	const first = await indexSharedKnowledge({ sourceDir: source, indexFile: output });
 	assert.deepEqual(first.documents.map((d) => d.fileName), ["a.txt", "bad.docx", "binary.xlsx", "nested/guide.md", "z.txt"]);
 	assert.deepEqual(first.documents.map((d) => d.status), ["ready", "rejected", "rejected", "ready", "ready"]);

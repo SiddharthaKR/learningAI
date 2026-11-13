@@ -41,15 +41,10 @@ describe("read tool — text semantics", () => {
 	it("resolves relative paths against the learner's home (sources v1 anchoring)", async () => {
 		// sources v1: the harness has no meaningful cwd — "find my notes" must
 		// work from a bare relative path, so the home directory is the anchor
-		// (fs-shared resolveSourcePath). Scratch file in home, cleaned up.
-		const rel = `lh-read-rel-test-${process.pid}.txt`;
-		const homeFile = path.join(os.homedir(), rel);
-		fs.writeFileSync(homeFile, "rel", "utf-8");
-		try {
-			assert.equal((await run({ path: rel })).text, "rel");
-		} finally {
-			fs.unlinkSync(homeFile);
-		}
+		// (fs-shared resolveSourcePath). Keep the fixture in the test directory.
+		const fixture = write("relative.txt", "rel");
+		const rel = path.relative(os.homedir(), fixture);
+		assert.equal((await run({ path: rel })).text, "rel");
 	});
 
 	it("honors offset (1-indexed) and limit", async () => {
