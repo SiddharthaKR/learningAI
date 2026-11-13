@@ -199,13 +199,7 @@ export function DraftShell({
 						<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 						<div className="bg-background pb-4">
 							<div className={DOCK}>
-								{teachingLanguage && mode !== "chat" && <label className="pointer-events-auto mb-2 flex items-center gap-2 text-xs">
-									{copy.newSession.teachingLanguage}
-									<select aria-label={copy.newSession.teachingLanguage} value={teachingLanguage} onChange={(event) => onTeachingLanguageChange?.(event.target.value as "en" | "ja")} className="rounded border bg-background p-1">
-										<option value="en">{copy.common.english}</option><option value="ja">{copy.common.japanese}</option>
-									</select>
-								</label>}
-								<ComposerActions
+																<ComposerActions
 									picker={(picks.length > 0 || mode === "practice") && (
 										<NodePickerControl count={picks.length} onOpen={onOpenPicker} onClear={onClearPicks} />
 									)}
