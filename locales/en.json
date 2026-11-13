@@ -122,6 +122,7 @@
     "compactingContext": "Compacting context",
     "compacting": "COMPACTING CONTEXT…",
     "thinking": "Thinking",
+    "planRejected": "Plan rejected",
     "askOrNext": "Ask anything, or press Enter for the next one.",
     "contextCompacted": "Context compacted",
     "historyCompacted": "History compacted",

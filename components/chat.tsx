@@ -1519,6 +1519,26 @@ export function Chat({
 																onOpen={() => setPlanOpen(true)}
 															/>
 														);
+													case "tool-plan_init":
+														// A rejected plan (cycle, unparseable line) comes back as a
+														// normal result with ok:false — no output-error, so the
+														// retry line above never fires. Owner ruling 2026-11-13:
+														// mark it with a label-only line so a failed plan is
+														// visible instead of silent.
+														if (
+															part.state === "output-available" &&
+															(part.output as { ok?: boolean } | undefined)?.ok === false
+														) {
+															return (
+																<SystemLine key={`plan-rejected-${pi}`} testId="plan-rejected">
+																	{copy.chat.planRejected}
+																</SystemLine>
+															);
+														}
+														if (part.state === "input-streaming") {
+															return <LiveToolCard key={pi} part={part as ArtifactPartProps["part"]} />;
+														}
+														return null;
 													case "tool-quiz":
 													case "tool-probe":
 													case "tool-ask_user_question":
