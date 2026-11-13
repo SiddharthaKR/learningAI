@@ -30,7 +30,7 @@ export default async function NewSessionPage({
 			initialConfigured={true}
 			initialLanguage={account?.teachingLanguage ?? "en"}
 			uiLanguage={account?.uiLanguage ?? "en"}
-			mode={mode === "practice" ? "practice" : "teach"}
+			mode={mode === "practice" ? "practice" : mode === "chat" ? "chat" : "teach"}
 		/>
 		);
 	});
