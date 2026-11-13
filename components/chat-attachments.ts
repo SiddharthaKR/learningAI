@@ -20,6 +20,7 @@ export async function prepareAttachmentText(prompt: string, documents: ChatDocum
 		if (!response.ok || !result.text) throw new Error(`${file.name}: ${result.error ?? "upload_failed"}`);
 		attachments.push(`Attached document: ${file.name}\n${result.text}${result.truncated ? "\n[Attachment text truncated]" : ""}`);
 	}
-	return [prompt, ...attachments].filter(Boolean).join("\n\n");
+	if (attachments.length === 0) return prompt;
+	return [prompt, "Extracted attachment content", ...attachments].join("\n\n");
 }
 

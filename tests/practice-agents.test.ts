@@ -235,6 +235,20 @@ describe("the practice agent", () => {
 		assert.equal(typeof agent.steer, "function");
 		assert.equal(typeof agent.waitForIdle, "function");
 	});
+
+	it("keeps the problem tool and omits the PDF reader for extracted attachments", () => {
+		const engine = {
+			model: { api: "faux", provider: "faux", id: "faux-model", contextWindow: 8192 } as never,
+			streamFn: (() => { throw new Error("not streamed in this test"); }) as never,
+		};
+		const tools = { ...practiceTools(ctxOf([])), pdf: { name: "pdf" } as never };
+		const agent = createPracticeAgent(ctxOf([]), {
+			engine, tools,
+			messages: [{ role: "user", content: "Quiz me\n\nExtracted attachment content\n\nSlide 1", timestamp: 1 }],
+		});
+		assert.ok(agent.state.tools.some((tool) => tool.name === "problem"));
+		assert.ok(!agent.state.tools.some((tool) => tool.name === "pdf"));
+	});
 });
 
 // ── persistent nudges (shipped defaults, no model calls) ──────────────────────

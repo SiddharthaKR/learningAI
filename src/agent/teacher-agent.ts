@@ -181,8 +181,15 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	const basePrompt = opts.promptSwitches
 		? composeInstructions(kind, opts.promptSwitches)
 		: composedInstructions[kind]!;
+	const lastUserMessage = opts.messages?.findLast((message) => message.role === "user");
+	const attachedText = lastUserMessage?.role === "user" && (
+		typeof lastUserMessage.content === "string"
+			? lastUserMessage.content.includes("\n\nExtracted attachment content\n\n")
+			: lastUserMessage.content.some((part) => part.type === "text" && part.text.includes("\n\nExtracted attachment content\n\n"))
+	);
 	const systemPrompt = [
 		basePrompt,
+		attachedText ? "Use the extracted attachment content in the learner's message. Its filenames are display labels and do not identify server files." : null,
 		`Teach and respond in ${opts.teachingLanguage === "ja" ? "Japanese" : "English"} for this session. This language is fixed for the whole session.`,
 		opts.learnerBackground ? `Learner background (use for analogies and calibration; do not assume expertise beyond this): ${opts.learnerBackground}` : null,
 	].filter(Boolean).join("\n\n");
@@ -197,7 +204,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			systemPrompt,
 			model: engine.model,
 			thinkingLevel: engine.level,
-			tools,
+			tools: attachedText ? tools.filter((tool) => tool.name !== "pdf") : tools,
 			messages: opts.messages ?? [],
 		},
 		streamFn: engine.streamFn,
