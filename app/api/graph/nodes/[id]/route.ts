@@ -1,4 +1,4 @@
-import { withOfficeUser } from "@/src/server";
+import { withOfficeUser, currentUserId } from "@/src/server";
 import { deleteGraphNode, editGraphNode } from "@/src/server";
 
 /**
@@ -41,7 +41,7 @@ async function PATCHImpl(req: Request, { params }: { params: Promise<{ id: strin
 	const outcome = editGraphNode(id, {
 		...(body.name !== undefined ? { name: body.name.trim() } : {}),
 		...(body.statement !== undefined ? { statement: body.statement.trim() } : {}),
-	});
+	}, currentUserId());
 	if (!outcome.ok) {
 		return Response.json({ error: outcome.error, code: outcome.code }, { status: outcome.status });
 	}

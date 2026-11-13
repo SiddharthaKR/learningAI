@@ -63,6 +63,7 @@ import {
 	FolderIcon,
 	FolderOpenIcon,
 	Trash2Icon,
+	HistoryIcon,
 	PencilIcon,
 	ListTreeIcon,
 	SearchIcon,
@@ -486,6 +487,12 @@ export function ChainTableBody({
 																			<pre key={si} className="overflow-x-auto rounded bg-muted/50 px-2 py-1 font-mono text-[10px] text-foreground">{snippet}</pre>
 																		))}
 																	</div>
+																)}
+																{node.editHistory && node.editHistory.length > 0 && (
+																	<span className="mt-1 inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+																		<HistoryIcon className="size-2.5" />
+																		{copy.edited} ({node.editHistory.length})
+																	</span>
 																)}
 															</span>
 															<span className="w-14 shrink-0" />

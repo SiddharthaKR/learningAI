@@ -410,7 +410,7 @@ export function getGraph(graphStore: Pick<GraphStore, "readNodes" | "readChains"
 	for (const line of graphStore.readNodes()) {
 		const existing = byId.get(line.id);
 		if (!existing) {
-			byId.set(line.id, { ...line, aliases: [...line.aliases], provenance: [...line.provenance], ...(line.codeSnippets?.length ? { codeSnippets: [...line.codeSnippets] } : {}) });
+			byId.set(line.id, { ...line, aliases: [...line.aliases], provenance: [...line.provenance], ...(line.codeSnippets?.length ? { codeSnippets: [...line.codeSnippets] } : {}), ...(line.editHistory?.length ? { editHistory: [...line.editHistory] } : {}) });
 			continue;
 		}
 		// A later line's statement is a phrasing, not a replacement.
@@ -425,6 +425,10 @@ export function getGraph(graphStore: Pick<GraphStore, "readNodes" | "readChains"
 			for (const snippet of line.codeSnippets) {
 				if (!existing.codeSnippets.includes(snippet)) existing.codeSnippets.push(snippet);
 			}
+		}
+		if (line.editHistory?.length) {
+			if (!existing.editHistory) existing.editHistory = [];
+			existing.editHistory.push(...line.editHistory);
 		}
 	}
 

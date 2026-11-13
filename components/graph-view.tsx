@@ -66,7 +66,7 @@
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { NotesImportErrors, useNotesImport } from "@/components/notes-import.tsx";
 import Link from "next/link";
-import { FileTextIcon, ListTreeIcon, Loader2Icon, PencilIcon, SearchIcon, SettingsIcon, UploadIcon, WaypointsIcon } from "lucide-react";
+import { ChevronDownIcon, FileTextIcon, HistoryIcon, ListTreeIcon, Loader2Icon, PencilIcon, SearchIcon, SettingsIcon, UploadIcon, WaypointsIcon } from "lucide-react";
 import { EditNodeDialog } from "@/components/edit-node-dialog";
 import { incrementalLayout, propositionSessionHref, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
 import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
@@ -956,6 +956,42 @@ export function GraphChromeRow({
 	);
 }
 
+function EditHistorySection({ editHistory }: { editHistory: NonNullable<GraphNode["editHistory"]> }) {
+	const copy = useI18n().graphUi;
+	const [open, setOpen] = useState(false);
+	return (
+		<div className="mt-2">
+			<button
+				type="button"
+				onClick={() => setOpen(!open)}
+				className="flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+			>
+				<HistoryIcon className="size-3" />
+				<span>{copy.edited} ({editHistory.length})</span>
+				<ChevronDownIcon className={`size-3 transition-transform ${open ? "rotate-180" : ""}`} />
+			</button>
+			{open && (
+				<div className="mt-1 space-y-2 border-l-2 border-muted pl-2">
+					{editHistory.map((entry, i) => (
+						<div key={i} className="text-[11px] text-muted-foreground">
+							<div className="font-medium">
+								{copy.editHistoryEntry.replace("{user}", entry.userId).replace("{date}", new Date(entry.editedAt).toLocaleString())}
+							</div>
+							{entry.changes.map((c, j) => (
+								<div key={j} className="ml-2 mt-0.5">
+									<span className="text-muted-foreground/70">{c.field === "name" ? copy.editFieldName : copy.editFieldStatement}:</span>{" "}
+									<span className="line-through decoration-destructive/40">{c.oldValue}</span>{" "}
+									<span className="text-foreground">{c.newValue}</span>
+								</div>
+							))}
+						</div>
+					))}
+				</div>
+			)}
+		</div>
+	);
+}
+
 export function GraphView({
 	chainSelectOpen = false,
 	practiceSelection,
@@ -1685,6 +1721,9 @@ export function GraphView({
 								<pre key={i} className="overflow-x-auto rounded bg-muted/50 px-2 py-1 font-mono text-[11px] text-foreground">{snippet}</pre>
 							))}
 						</div>
+					)}
+					{selected.node.editHistory && selected.node.editHistory.length > 0 && (
+						<EditHistorySection editHistory={selected.node.editHistory} />
 					)}
 					{selected.sourceIds.length > 0 ? (
 						<div className="mt-3 flex flex-col gap-1">

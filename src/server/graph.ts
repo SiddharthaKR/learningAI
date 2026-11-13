@@ -109,7 +109,7 @@ export type NodeEditOutcome =
 	| { ok: false; status: 409; code: "extraction_running"; error: string }
 	| { ok: true; graphRevision: number };
 
-export function editGraphNode(nodeId: string, patch: { name?: string; statement?: string }): NodeEditOutcome {
+export function editGraphNode(nodeId: string, patch: { name?: string; statement?: string }, userId: string): NodeEditOutcome {
 	if (extractionStatuses().length > 0) {
 		return {
 			ok: false,
@@ -124,8 +124,19 @@ export function editGraphNode(nodeId: string, patch: { name?: string; statement?
 		return { ok: false, status: 404, code: "not_found", error: "No such node" };
 	}
 	const existing = nodes[idx]!;
-	if (patch.name !== undefined) existing.name = patch.name;
-	if (patch.statement !== undefined) existing.statement = patch.statement;
+	const changes: { field: "name" | "statement"; oldValue: string; newValue: string }[] = [];
+	if (patch.name !== undefined && patch.name !== existing.name) {
+		changes.push({ field: "name", oldValue: existing.name, newValue: patch.name });
+		existing.name = patch.name;
+	}
+	if (patch.statement !== undefined && patch.statement !== existing.statement) {
+		changes.push({ field: "statement", oldValue: existing.statement, newValue: patch.statement });
+		existing.statement = patch.statement;
+	}
+	if (changes.length > 0) {
+		if (!existing.editHistory) existing.editHistory = [];
+		existing.editHistory.push({ userId, editedAt: new Date().toISOString(), changes });
+	}
 	stores.graphStore.rewriteLedgers({ nodes });
 	return { ok: true, graphRevision: graphRevision() };
 }

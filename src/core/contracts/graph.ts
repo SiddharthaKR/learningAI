@@ -148,6 +148,19 @@ export interface GraphNode {
 	 *  snippets, examples from the teaching session. Optional; absent
 	 *  on nodes created before the code-snippets feature. */
 	codeSnippets?: string[];
+	/** Manual edit audit trail — every user edit appended here. */
+	editHistory?: NodeEditEntry[];
+}
+
+/** One manual edit to a node — who, when, and what changed. */
+export interface NodeEditEntry {
+	userId: string;
+	editedAt: string;
+	changes: {
+		field: "name" | "statement";
+		oldValue: string;
+		newValue: string;
+	}[];
 }
 
 /** sessions.jsonl line — the emission checkpoint for one chat (which chats
