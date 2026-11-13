@@ -2,6 +2,7 @@
 
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
+import { pendingAttachmentTurns, prepareAttachmentText, type ChatDocument } from "@/components/chat-attachments";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { Hint } from "@/components/ui/hint";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
@@ -256,11 +257,17 @@ export function Chat({
 	// (initialPromptOwed — the pure gate, pinned in the test suite).
 	const sentInitial = useRef(false);
 	useEffect(() => {
-		if (!sentInitial.current && initialPromptOwed(initialMessages, initialPrompt)) {
+		const attachmentTurn = pendingAttachmentTurns.get(chatId);
+		const prompt = attachmentTurn?.text ?? initialPrompt;
+		if (sentInitial.current || !prompt || !initialPromptOwed(initialMessages, prompt)) return;
+		// StrictMode replays mount effects. Let the first cleanup cancel the
+		// scheduled send before it starts a turn and loses its stream attachment.
+		return scheduleInitialPrompt(() => {
 			sentInitial.current = true;
-			void send({ type: "text", text: initialPrompt! });
-		}
-	}, [initialPrompt, initialMessages, send]);
+			pendingAttachmentTurns.delete(chatId);
+			send(attachmentTurn ?? { type: "text", text: prompt });
+		});
+	}, [chatId, initialPrompt, initialMessages, send]);
 
 	// A turn running server-side, attached to no live view of ours (navigate
 	// away mid-turn, or a wake turn discovered mid-session): the reattach
@@ -550,6 +557,10 @@ export function Chat({
 
 	const [text, setText] = useState("");
 	const [composerImages, setComposerImages] = useState<import("@/components/composer").ComposerImage[]>([]);
+	const [documents, setDocuments] = useState<ChatDocument[]>([]);
+	const [uploading, setUploading] = useState(false);
+	const uploadingRef = useRef(false);
+	const [uploadError, setUploadError] = useState<string>();
 	/* The composer's value MIRROR ("nothing gets lost" round, owner
 	 * 2026-10-01): a dictation flush lands via setState, which a closure
 	 * waiting through `await finish()` cannot observe in time. Kept
@@ -626,7 +637,7 @@ export function Chat({
 	// affordance).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
 	const canSend =
-		(text.trim().length > 0 || dictation.active || composerImages.length > 0) && !pending && !activeProblem && !compacting;
+		(text.trim().length > 0 || dictation.active || composerImages.length > 0 || documents.length > 0) && !uploading && !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1082,17 +1093,33 @@ export function Chat({
 		}
 		void dictation.finish().then(doSteerOrSend);
 	};
-	const doSend = () => {
-		if (busy || pending || compacting) return;
+	const doSend = async () => {
+		if (busy || pending || compacting || uploadingRef.current) return;
 		const t = textRef.current.trim();
 		const imgs = composerImages;
-		if (!t && imgs.length === 0) return;
+		if (!t && imgs.length === 0 && documents.length === 0) return;
+		let message = t || (documents.length ? "Help me understand these documents." : "Teach me about this image.");
+		if (documents.length) {
+			uploadingRef.current = true;
+			setUploading(true);
+			setUploadError(undefined);
+			try {
+				message = await prepareAttachmentText(message, documents);
+			} catch (error) {
+				setUploadError((error as Error).message);
+				return;
+			} finally {
+				uploadingRef.current = false;
+				setUploading(false);
+			}
+		}
 		draftRef.current = t; // the refusal flow's preserve-and-replay seam
 		applyText("");
 		setComposerImages([]);
+		setDocuments([]);
 		const input: import("@/src/core/input-events").ChatInput = imgs.length > 0
-			? { type: "text", text: t || "Teach me about this image.", images: imgs.map((im) => ({ data: im.data, mimeType: im.mimeType })) }
-			: { type: "text", text: t };
+			? { type: "text", text: message, images: imgs.map((im) => ({ data: im.data, mimeType: im.mimeType })) }
+			: { type: "text", text: message };
 		void send(input);
 	};
 
@@ -1108,13 +1135,13 @@ export function Chat({
 	const doSteerOrSend = () => {
 		if (pending || compacting) return;
 		const t = textRef.current.trim();
-		if (!t) return;
 		if (busy) {
+			if (!t) return;
 			applyText("");
 			void steer(t);
 			return;
 		}
-		doSend();
+		void doSend();
 	};
 
 	return (
@@ -1623,6 +1650,10 @@ export function Chat({
 							onNext={sendNext}
 							placeholder={nextReady ? copy.chat.askOrNext : undefined}
 							images={composerImages}
+							documents={documents}
+							onDocumentsChange={setDocuments}
+							uploading={uploading}
+							uploadError={uploadError}
 							onImagesChange={setComposerImages}
 						/>
 					}
@@ -1720,6 +1751,11 @@ export type EscAbortTarget = "mermaid" | "plan" | "setup" | "question" | "proble
 export function initialPromptOwed(messages: readonly { role: string }[], prompt: string | undefined): boolean {
 	if (!prompt) return false;
 	return !messages.some((m) => m.role === "user" || m.role === "assistant");
+}
+
+export function scheduleInitialPrompt(send: () => void): () => void {
+	const timer = setTimeout(send, 0);
+	return () => clearTimeout(timer);
 }
 
 export function escAbortTarget(s: {

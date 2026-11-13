@@ -3,6 +3,7 @@
     "title": "Knowledge",
     "description": "Upload personal documents to use with office knowledge in your sessions.",
     "chooseFile": "Choose a document",
+    "sharedDocuments": "Shared Knowledge",
     "upload": "Upload",
     "working": "Processing…",
     "acceptedFormats": "PDF, PPTX, DOCX, MD, TXT. Maximum 25 MiB per document. Excel is not supported.",
@@ -133,7 +134,13 @@
     "selectedNodes": "{count} nodes selected",
     "pickNodes": "Pick nodes",
     "clear": "Clear",
-    "attachImage": "Attach image"
+    "attachFiles": "Attach files",
+    "attachmentDestination": "Save document to",
+    "chatOnly": "This chat only",
+    "personalKnowledge": "My Knowledge",
+    "sharedKnowledge": "Shared Knowledge (all signed-in users)",
+    "removeAttachment": "Remove attachment",
+    "uploadingAttachments": "Preparing attachments…"
   },
   "coverage": {
     "extracting": "extracting…",

@@ -19,7 +19,7 @@ function StatusBadge({ status, copy }: { status: string; copy: { ready: string; 
   return <span className="text-xs text-red-500">{copy.rejected}</span>;
 }
 
-export function KnowledgePage({ initialDocuments }: { initialDocuments: KnowledgeDocumentRecord[] }) {
+export function KnowledgePage({ initialDocuments, sharedDocuments = [] }: { initialDocuments: KnowledgeDocumentRecord[]; sharedDocuments?: KnowledgeDocumentRecord[] }) {
   const copy = useI18n().knowledge;
   const [documents, setDocuments] = useState(initialDocuments);
   const [busy, setBusy] = useState(false);
@@ -133,6 +133,18 @@ export function KnowledgePage({ initialDocuments }: { initialDocuments: Knowledg
               </li>
             ))}</ul>}
       </section>
+      {sharedDocuments.length > 0 && (
+        <section aria-label={copy.sharedDocuments}>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">{copy.sharedDocuments}</h2>
+          <ul className="space-y-2">{sharedDocuments.map((doc) => (
+            <li key={doc.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
+              <FormatBadge format={doc.format} />
+              <span className="min-w-0 flex-1 truncate">{doc.fileName}</span>
+              <StatusBadge status={doc.status} copy={copy} />
+            </li>
+          ))}</ul>
+        </section>
+      )}
     </div>
   </main>;
 }

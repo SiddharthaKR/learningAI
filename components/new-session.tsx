@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Conversation, ConversationContent, ConversationEmptyState } from "@/components/ai-elements/conversation";
-import { Composer } from "@/components/composer";
+import { Composer, type ComposerImage } from "@/components/composer";
+import { pendingAttachmentTurns, prepareAttachmentText, type ChatDocument } from "@/components/chat-attachments";
 import { joinDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
@@ -63,6 +64,7 @@ export async function startDraftSession(
 				: { title: t, ...(teachingLanguage ? { teachingLanguage } : {}) },
 		),
 	});
+	if (!res.ok) throw new Error("Unable to create the session.");
 	const { id } = (await res.json()) as { id: string };
 	// No settings PUT on create (per-session models, owner 2026-09-28):
 	// the SERVER stamps the newborn from the strong slot.
@@ -88,11 +90,13 @@ export function DraftShell({
 	onOpenPicker,
 	onClearPicks,
 	overlay,
+	attachments,
 }: {
 	busy: boolean;
 	text: string;
 	onChange: (v: string) => void;
 	onSend: () => void;
+	attachments?: Pick<React.ComponentProps<typeof Composer>, "images" | "onImagesChange" | "documents" | "onDocumentsChange" | "uploading" | "uploadError">;
 	uiLanguage?: UiLanguage;
 	teachingLanguage?: "en" | "ja";
 	onTeachingLanguageChange?: (value: "en" | "ja") => void;
@@ -135,7 +139,7 @@ export function DraftShell({
 	// round, owner 2026-10-01): the spoken text is deferred in the run's
 	// buffer — Enter must reach the finish-first send, not be gated out by
 	// an empty textarea. Nothing said → the send no-ops.
-	const canSend = text.trim().length > 0 || dictation.active;
+	const canSend = !busy && (text.trim().length > 0 || dictation.active || Boolean(attachments?.images?.length || attachments?.documents?.length));
 	/* FINISH DICTATION FIRST (owner, 2026-10-01): stop the run, let the
 	 * last finals land through onChange, THEN call the parent's send —
 	 * which reads its REF mirror, so the post-await timing of React's
@@ -209,6 +213,7 @@ export function DraftShell({
 								/>
 								<div className="pointer-events-auto overflow-hidden rounded-2xl border bg-card shadow-lg">
 									<Composer
+										{...attachments}
 										busy={busy}
 										value={text}
 										onChange={onChange}
@@ -260,6 +265,10 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 		setText(v);
 	};
 	const [busy, setBusy] = useState(false);
+	const sendingRef = useRef(false);
+	const [images, setImages] = useState<ComposerImage[]>([]);
+	const [documents, setDocuments] = useState<ChatDocument[]>([]);
+	const [uploadError, setUploadError] = useState<string>();
 	// THE PICK BAR (owner round 10): the draft's lifted pick set + the
 	// snapshot the standalone chain-table picker reads. Lazy — the graph
 	// is fetched on FIRST open only, then reused.
@@ -287,17 +296,31 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 			});
 	};
 
-	const send = useCallback(() => {
-		const draft = textRef.current.trim();
-		if (!draft || busy) return;
+	const send = useCallback(async () => {
+		const hasAttachments = images.length > 0 || documents.length > 0;
+		const draft = textRef.current.trim() || (hasAttachments ? documents[0]?.file.name ?? "Attached image" : "");
+		if (!draft || sendingRef.current) return;
+		sendingRef.current = true;
 		setBusy(true);
-		void startDraftSession(draft, fetch, mode === "practice" ? "practice" : mode === "chat" ? "chat" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage)
-			.then((target) => {
-				if (target) router.push(target);
-				else setBusy(false);
-			})
-			.catch(() => setBusy(false));
-	}, [busy, router, mode, teachingLanguage]);
+		setUploadError(undefined);
+		try {
+			const prompt = await prepareAttachmentText(draft, documents);
+			const target = await startDraftSession(draft, fetch, mode === "practice" ? "practice" : mode === "chat" ? "chat" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage);
+			if (!target) throw new Error("Unable to create the session.");
+			if (hasAttachments) {
+				const pathname = target.split("?")[0]!;
+				const chatId = pathname.slice("/chat/".length);
+				pendingAttachmentTurns.set(chatId, { type: "text", text: prompt, images: images.map(({ data, mimeType }) => ({ data, mimeType })) });
+				router.push(pathname);
+			} else {
+				router.push(target);
+			}
+		} catch (error) {
+			sendingRef.current = false;
+			setBusy(false);
+			setUploadError((error as Error).message);
+		}
+	}, [documents, images, router, mode, teachingLanguage]);
 
 	return (
 		<>
@@ -309,6 +332,7 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 				text={text}
 				onChange={applyText}
 				onSend={send}
+				attachments={{ images, onImagesChange: setImages, documents, onDocumentsChange: setDocuments, uploading: busy && documents.length > 0, uploadError }}
 				mode={mode}
 				picks={picks}
 				onOpenPicker={openPicker}

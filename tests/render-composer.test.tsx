@@ -31,6 +31,18 @@ function render(
 }
 
 describe("Composer", () => {
+	it("offers one picker and defaults a presentation to this chat only", () => {
+		const file = new File(["slide"], "lesson.pptx");
+		const html = renderToStaticMarkup(<Composer
+			busy={false} value="" onChange={() => {}} onSend={() => {}} onStop={() => {}} canSend
+			images={[]} onImagesChange={() => {}}
+			documents={[{ file, destination: "chat" }]} onDocumentsChange={() => {}}
+		/>);
+		assert.equal((html.match(/type="file"/g) ?? []).length, 1);
+		assert.match(html, /accept="image\/png,image\/jpeg,image\/webp,\.pdf,\.pptx,\.docx"/);
+		assert.match(html, /value="chat" selected="">This chat only/);
+		assert.match(html, /Shared Knowledge \(all signed-in users\)/);
+	});
 	it("chat placeholder + send button", () => {
 		const html = render();
 		assert.match(html, /Ask, answer, or steer the lesson/, "the default — active sessions");

@@ -3,6 +3,7 @@
     "title": "ナレッジ",
     "description": "セッションの社内ナレッジで利用する個人用ドキュメントをアップロードします。",
     "chooseFile": "ドキュメントを選択",
+    "sharedDocuments": "共有ナレッジ",
     "upload": "アップロード",
     "working": "処理中…",
     "acceptedFormats": "PDF、PPTX、DOCX、MD、TXT。1ファイルにつき最大25 MiB。Excelには対応していません。",
@@ -133,7 +134,13 @@
     "selectedNodes": "{count}件のノードを選択中",
     "pickNodes": "ノードを選択",
     "clear": "クリア",
-    "attachImage": "画像を添付"
+    "attachFiles": "ファイルを添付",
+    "attachmentDestination": "文書の保存先",
+    "chatOnly": "このチャットのみ",
+    "personalKnowledge": "自分のナレッジ",
+    "sharedKnowledge": "共有ナレッジ（ログイン済みの全ユーザー）",
+    "removeAttachment": "添付ファイルを削除",
+    "uploadingAttachments": "添付ファイルを準備中…"
   },
   "coverage": {
     "extracting": "抽出中…",

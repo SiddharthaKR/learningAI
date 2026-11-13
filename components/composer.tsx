@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef as useReactRef } from "react";
-import { ArrowRightIcon, CornerDownLeftIcon, ImageIcon, SquareIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, CornerDownLeftIcon, PaperclipIcon, SquareIcon, XIcon } from "lucide-react";
+import type { AttachmentDestination, ChatDocument } from "./chat-attachments";
 import { cn } from "@/lib/utils";
 import { Hint } from "@/components/ui/hint";
 import { useI18n } from "@/components/i18n-provider";
@@ -61,6 +62,10 @@ export function Composer({
 	onNext,
 	images,
 	onImagesChange,
+	documents,
+	onDocumentsChange,
+	uploading,
+	uploadError,
 }: {
 	busy: boolean;
 	value: string;
@@ -88,24 +93,30 @@ export function Composer({
 	onNext?: () => void;
 	images?: ComposerImage[];
 	onImagesChange?: (images: ComposerImage[]) => void;
+	documents?: ChatDocument[];
+	onDocumentsChange?: (documents: ChatDocument[]) => void;
+	uploading?: boolean;
+	uploadError?: string;
 }) {
 	const copy = useI18n();
 	const fileInputRef = useReactRef<HTMLInputElement | null>(null);
-	const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const files = e.target.files;
-		if (!files || !onImagesChange) return;
-		for (const file of files) {
-			if (!file.type.match(/^image\/(png|jpeg|webp)$/)) continue;
+	const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const files = Array.from(e.target.files ?? []);
+		e.target.value = "";
+		const selectedDocuments = files.filter((file) => /\.(pdf|pptx|docx)$/i.test(file.name));
+		if (selectedDocuments.length) onDocumentsChange?.([...(documents ?? []), ...selectedDocuments.map((file): ChatDocument => ({ file, destination: "chat" }))]);
+		const selectedImages = files.filter((file) => ACCEPTED_IMAGE_TYPES.split(",").includes(file.type));
+		const loaded = await Promise.all(selectedImages.map((file) => new Promise<ComposerImage | null>((resolve) => {
 			const reader = new FileReader();
+			reader.onerror = () => resolve(null);
 			reader.onload = () => {
-				const result = reader.result as string;
-				const base64 = result.split(",")[1];
-				if (!base64) return;
-				onImagesChange([...(images ?? []), { data: base64, mimeType: file.type, preview: result }]);
+				const preview = String(reader.result);
+				const data = preview.split(",")[1];
+				resolve(data ? { data, mimeType: file.type, preview } : null);
 			};
 			reader.readAsDataURL(file);
-		}
-		e.target.value = "";
+		})));
+		if (loaded.length) onImagesChange?.([...(images ?? []), ...loaded.filter((image) => image !== null)]);
 	};
 	const act = () => {
 		const action = enterAction({ busy, canSend, nextProblem });
@@ -115,6 +126,28 @@ export function Composer({
 	};
 	return (
 		<div>
+			{documents?.map(({ file, destination }, index) => (
+				<div key={index} className="flex flex-wrap items-center gap-2 px-3 pt-2 text-sm">
+					<span className="break-all">{file.name}</span>
+					<select
+						aria-label={`${copy.composer.attachmentDestination}: ${file.name}`}
+						value={destination}
+						disabled={uploading}
+						onChange={(event) => {
+							const next = event.target.value as AttachmentDestination;
+							onDocumentsChange?.(documents.map((document, i) => i === index ? { ...document, destination: next } : document));
+						}}
+						className="rounded border bg-card px-1"
+					>
+						<option value="chat">{copy.composer.chatOnly}</option>
+						<option value="personal">{copy.composer.personalKnowledge}</option>
+						<option value="shared">{copy.composer.sharedKnowledge}</option>
+					</select>
+					<button type="button" disabled={uploading} aria-label={`${copy.composer.removeAttachment}: ${file.name}`} onClick={() => onDocumentsChange?.(documents.filter((_, i) => i !== index))}><XIcon className="size-4" /></button>
+				</div>
+			))}
+			{uploading && <p role="status" className="px-3 pt-2 text-sm">{copy.composer.uploadingAttachments}</p>}
+			{uploadError && <p role="alert" className="px-3 pt-2 text-sm text-destructive">{uploadError}</p>}
 			{images && images.length > 0 && (
 				<div className="flex flex-wrap gap-1.5 px-3 pt-2">
 					{images.map((img, i) => (
@@ -142,14 +175,15 @@ export function Composer({
 			>
 				{onImagesChange && (
 					<>
-						<input ref={fileInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES} multiple className="hidden" onChange={handleFileSelect} />
+						<input ref={fileInputRef} type="file" accept={`${ACCEPTED_IMAGE_TYPES},.pdf,.pptx,.docx`} multiple className="hidden" onChange={handleFileSelect} />
 						<button
 							type="button"
+							disabled={uploading}
 							onClick={() => fileInputRef.current?.click()}
 							className="flex size-10 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-							aria-label={copy.composer.attachImage ?? "Attach image"}
+							aria-label={copy.composer.attachFiles}
 						>
-							<ImageIcon className="size-4" />
+							<PaperclipIcon className="size-4" />
 						</button>
 					</>
 				)}

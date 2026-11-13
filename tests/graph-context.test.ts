@@ -29,7 +29,7 @@ const { toLlmMessages } = await import("../src/core/native-messages.ts");
 import type { LhMessage } from "../src/core/native-messages.ts";
 const { projectView } = await import("../src/core/view.ts");
 const { POST } = await import("../app/api/chats/route.ts");
-const { initialPromptOwed } = await import("../components/chat.tsx");
+const { initialPromptOwed, scheduleInitialPrompt } = await import("../components/chat.tsx");
 const { chatStore } = await import("./support/test-stores.ts");
 const { graphStore } = await import("./support/test-stores.ts");
 
@@ -86,6 +86,20 @@ describe("newGraphContextMessage", () => {
 // ── the first-send gate (the dead first turn, owner report 2026-10-04) ──────
 
 describe("initialPromptOwed", () => {
+	it("sends once after React replays the first-message effect", async () => {
+		let sends = 0;
+		const send = () => { sends += 1; };
+		const cleanup = scheduleInitialPrompt(send);
+		cleanup();
+		const cleanupReplay = scheduleInitialPrompt(send);
+		try {
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+			assert.equal(sends, 1);
+		} finally {
+			cleanupReplay();
+		}
+	});
+
 	it("a marker-only record still owes the prompt — scaffolding is not conversation", () => {
 		const marker = newGraphContextMessage(PICKS, []);
 		assert.equal(initialPromptOwed([marker as never], "drill me on logic"), true);

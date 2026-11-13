@@ -53,7 +53,11 @@ export const POST = withOfficeUser(async (request: Request) => {
       return Response.json({ document: publicDocument(document) });
     }
     const indexed = await indexKnowledgeDocument({ fileName: file.name, data });
-    const text = indexed.chunks.map((chunk) => chunk.text).join("\n\n");
+    const text = indexed.chunks.map(({ citation, text }) => {
+      if (citation.format === "pptx") return `Slide ${citation.slide}\n${text}`;
+      if (citation.format === "pdf") return `Page ${citation.page}\n${text}`;
+      return text;
+    }).join("\n\n");
     if (!text.trim()) return Response.json({ error: "no_readable_text" }, { status: 422 });
     const store = destination === "shared" ? sharedKnowledgeStore : checkedStoresForUser(currentUserId()).knowledgeStore;
     const document = destination === "chat" ? indexed.document : await store.uploadDocument({ fileName: file.name, data, contentType: file.type });
