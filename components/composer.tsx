@@ -127,7 +127,7 @@ export function Composer({
 	return (
 		<div>
 			{documents?.map(({ file, destination }, index) => (
-				<div key={index} className="mx-3 mt-2 w-auto max-w-sm space-y-2 rounded-xl border border-border bg-background/60 p-2.5 text-sm">
+				<div key={index} className="mx-3 mt-3 space-y-2 rounded-xl border border-border bg-background/60 p-2.5 text-sm">
 					<div className="flex min-w-0 items-center gap-2 px-1">
 						<FileTextIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
 						<span className="truncate font-medium" title={file.name}>{file.name}</span>
