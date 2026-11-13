@@ -102,3 +102,31 @@ export function deleteGraphNode(nodeId: string): NodeDeleteOutcome {
 	return { ok: true, stats, graphRevision: graphRevision() };
 }
 
+// ─── single-node editing ───────────────────────────────────────────────────
+
+export type NodeEditOutcome =
+	| { ok: false; status: 404; code: "not_found"; error: string }
+	| { ok: false; status: 409; code: "extraction_running"; error: string }
+	| { ok: true; graphRevision: number };
+
+export function editGraphNode(nodeId: string, patch: { name?: string; statement?: string }): NodeEditOutcome {
+	if (extractionStatuses().length > 0) {
+		return {
+			ok: false,
+			status: 409,
+			code: "extraction_running",
+			error: "An extraction is running — try again when it finishes",
+		};
+	}
+	const nodes = stores.graphStore.readNodes();
+	const idx = nodes.findIndex((n) => n.id === nodeId);
+	if (idx === -1) {
+		return { ok: false, status: 404, code: "not_found", error: "No such node" };
+	}
+	const existing = nodes[idx]!;
+	if (patch.name !== undefined) existing.name = patch.name;
+	if (patch.statement !== undefined) existing.statement = patch.statement;
+	stores.graphStore.rewriteLedgers({ nodes });
+	return { ok: true, graphRevision: graphRevision() };
+}
+

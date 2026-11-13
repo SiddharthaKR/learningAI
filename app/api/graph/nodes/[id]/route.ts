@@ -1,5 +1,5 @@
 import { withOfficeUser } from "@/src/server";
-import { deleteGraphNode } from "@/src/server";
+import { deleteGraphNode, editGraphNode } from "@/src/server";
 
 /**
  * DELETE /api/graph/nodes/[id] — single-node deletion, FULL DEATH (owner
@@ -28,3 +28,24 @@ async function DELETEImpl(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export const DELETE = withOfficeUser(DELETEImpl);
+
+async function PATCHImpl(req: Request, { params }: { params: Promise<{ id: string }> }) {
+	const { id } = await params;
+	const body = (await req.json()) as { name?: string; statement?: string };
+	if (body.name !== undefined && (typeof body.name !== "string" || body.name.trim() === "")) {
+		return Response.json({ error: "Name must be a non-empty string" }, { status: 400 });
+	}
+	if (body.statement !== undefined && (typeof body.statement !== "string" || body.statement.trim() === "")) {
+		return Response.json({ error: "Statement must be a non-empty string" }, { status: 400 });
+	}
+	const outcome = editGraphNode(id, {
+		...(body.name !== undefined ? { name: body.name.trim() } : {}),
+		...(body.statement !== undefined ? { statement: body.statement.trim() } : {}),
+	});
+	if (!outcome.ok) {
+		return Response.json({ error: outcome.error, code: outcome.code }, { status: outcome.status });
+	}
+	return Response.json({ graphRevision: outcome.graphRevision });
+}
+
+export const PATCH = withOfficeUser(PATCHImpl);

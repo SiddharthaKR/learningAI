@@ -66,7 +66,8 @@
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { NotesImportErrors, useNotesImport } from "@/components/notes-import.tsx";
 import Link from "next/link";
-import { FileTextIcon, ListTreeIcon, Loader2Icon, SearchIcon, SettingsIcon, UploadIcon, WaypointsIcon } from "lucide-react";
+import { FileTextIcon, ListTreeIcon, Loader2Icon, PencilIcon, SearchIcon, SettingsIcon, UploadIcon, WaypointsIcon } from "lucide-react";
+import { EditNodeDialog } from "@/components/edit-node-dialog";
 import { incrementalLayout, propositionSessionHref, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
 import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
@@ -1238,6 +1239,7 @@ export function GraphView({
 	const [ctxNode, setCtxNode] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
 	const ctxAnchorRef = useRef<HTMLDivElement | null>(null);
 	const [deletingNode, setDeletingNode] = useState<{ id: string; name: string } | null>(null);
+	const [editingNode, setEditingNode] = useState<{ id: string; name: string; statement: string } | null>(null);
 	useEffect(() => {
 		if (ctxNode === null) return;
 		const onPointerDown = (e: PointerEvent) => {
@@ -1532,6 +1534,19 @@ export function GraphView({
 				>
 					<button
 						type="button"
+						data-testid="ctx-node-edit"
+						onClick={() => {
+							const node = snapshot?.propositions.find((n) => n.id === ctxNode.id);
+							if (node) setEditingNode({ id: node.id, name: node.name, statement: node.statement });
+							setCtxNode(null);
+						}}
+						className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+					>
+						<PencilIcon className="size-3" />
+						{copy.edit}
+					</button>
+					<button
+						type="button"
 						data-testid="ctx-node-delete"
 						onClick={() => {
 							setDeletingNode({ id: ctxNode.id, name: ctxNode.name });
@@ -1550,13 +1565,18 @@ export function GraphView({
 				nodes={deletingNode ? [deletingNode] : null}
 				onClose={() => setDeletingNode(null)}
 				onDeleted={(nodeIds, graphRevision) => {
-					// Close the dialog; close the detail card if it pointed here
-					// (the refetch would close it anyway, but the same frame
-					// should not show a card for a node the user just killed).
 					setDeletingNode(null);
 					if (selected && nodeIds.includes(selected.node.id)) setSelected(null);
-					// The wave-6 chain: every listener refetches on this. Clusters
-					// shrink / unrender below the minimum on the server's read.
+					window.dispatchEvent(new CustomEvent("lh:graph-revision", { detail: { graphRevision } }));
+				}}
+			/>
+
+			<EditNodeDialog
+				node={editingNode}
+				onClose={() => setEditingNode(null)}
+				onEdited={(graphRevision) => {
+					setEditingNode(null);
+					if (selected && editingNode && selected.node.id === editingNode.id) setSelected(null);
 					window.dispatchEvent(new CustomEvent("lh:graph-revision", { detail: { graphRevision } }));
 				}}
 			/>
@@ -1646,8 +1666,26 @@ export function GraphView({
 					// over home.tsx's drag surface (2026-09-17).
 					className="lh-no-drag absolute z-10 w-80 max-w-[calc(100%-1rem)] rounded-xl border bg-card p-4 text-left shadow-lg"
 				>
-					<div className="text-sm font-medium leading-snug">{selected.node.name}</div>
+					<div className="flex items-start justify-between gap-2">
+						<div className="text-sm font-medium leading-snug">{selected.node.name}</div>
+						<button
+							type="button"
+							data-testid="detail-card-edit"
+							onClick={() => setEditingNode({ id: selected.node.id, name: selected.node.name, statement: selected.node.statement })}
+							className="shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:bg-accent hover:text-foreground"
+							title={copy.edit}
+						>
+							<PencilIcon className="size-3" />
+						</button>
+					</div>
 					<div className="mt-1 text-xs leading-relaxed text-muted-foreground">{selected.node.statement}</div>
+					{selected.node.codeSnippets && selected.node.codeSnippets.length > 0 && (
+						<div className="mt-2 space-y-1">
+							{selected.node.codeSnippets.map((snippet, i) => (
+								<pre key={i} className="overflow-x-auto rounded bg-muted/50 px-2 py-1 font-mono text-[11px] text-foreground">{snippet}</pre>
+							))}
+						</div>
+					)}
 					{selected.sourceIds.length > 0 ? (
 						<div className="mt-3 flex flex-col gap-1">
 							<div className="text-xs text-muted-foreground">{copy.sessions}</div>

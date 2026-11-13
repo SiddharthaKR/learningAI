@@ -48,6 +48,7 @@ import { PlanMarginalia, planExists } from "@/components/plan-window";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
 import { ArrowRightIcon, DumbbellIcon, WaypointsIcon } from "lucide-react";
+import { VerifyButton } from "@/components/verify-button";
 import type { PlanBlockData } from "@/src/core";
 import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
@@ -1440,8 +1441,9 @@ export function Chat({
 														const sourceId = textPartMessageId(part.id);
 														const anchor = sourceId && sourceTextParts.get(sourceId) === part.id ? messageAnchorId(sourceId) : undefined;
 														return (
-															<div key={part.id || pi} id={anchor} data-source-message-id={sourceId ?? undefined} className="lh-source-passage">
+															<div key={part.id || pi} id={anchor} data-source-message-id={sourceId ?? undefined} className="group/passage lh-source-passage">
 																<MessageResponse>{part.text}</MessageResponse>
+																{part.text && <VerifyButton chatId={chatId} text={part.text} />}
 															</div>
 														);
 													}

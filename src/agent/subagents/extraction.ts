@@ -159,6 +159,11 @@ const propositionProps = {
 			description: "Verbatim phrasings the source used for the same proposition, if any.",
 		}),
 	),
+	codeSnippets: Type.Optional(
+		Type.Array(Type.String(), {
+			description: "Fenced code blocks (commands, snippets, examples) taught alongside this proposition, if any. Include the code content only, not the fences.",
+		}),
+	),
 };
 
 // The extractor redesign (owner, 2026-09-30): the extractor submits
@@ -273,12 +278,12 @@ type NotesAuditResult = AuditVerdicts;
 // a pile of nodes with no structure). Only the per-item aliases stay
 // optional with a ??-fill.
 
-function fillFindings<T extends { propositions: Array<{ aliases?: string[] }>; chains: unknown }>(
+function fillFindings<T extends { propositions: Array<{ aliases?: string[]; codeSnippets?: string[] }>; chains: unknown }>(
 	raw: T,
 ): T {
 	return {
 		...raw,
-		propositions: raw.propositions.map((p) => ({ ...p, aliases: p.aliases ?? [] })),
+		propositions: raw.propositions.map((p) => ({ ...p, aliases: p.aliases ?? [], ...(p.codeSnippets?.length ? { codeSnippets: p.codeSnippets } : {}) })),
 	};
 }
 
@@ -426,7 +431,11 @@ submission OR existing ids from THE GRAPH SO FAR, verbatim. Premises within one 
 TOGETHER — independent arguments for the same conclusion are separate chains. A conclusion may
 reappear, by id, as a premise of later chains. A bare idea that no argument uses rides the
 propositions list alone. Include every field even when empty — "chains": [] when the source makes no
-arguments. The tool's field descriptions carry the details.`;
+arguments. The tool's field descriptions carry the details.
+
+When the source teaches code — commands, snippets, configuration examples, API calls — attach them
+to the proposition they illustrate via the codeSnippets field. Include only the code content itself
+(no fences, no language tags). Omit codeSnippets when there is no code.`;
 
 export const EXTRACTOR_INSTRUCTIONS = `${SESSION_PREAMBLE}\n\n${EXTRACTION_CORE}\n\n${SESSION_MESSAGE_ID_RULE}`;
 export const NOTES_EXTRACTOR_INSTRUCTIONS = `${NOTES_PREAMBLE}\n\n${EXTRACTION_CORE}`;
