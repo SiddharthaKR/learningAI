@@ -25,6 +25,8 @@ export function createKnowledgeStore(root: string, beforePublish: () => void) {
 		catch (error) { console.error("knowledge vault rebuild failed", error); }
 	};
 	return {
+		/** Index file path; a function so the checked-store proxy re-verifies the owner on every call. */
+		indexFile: () => indexFile,
 		readSnapshot: () => readKnowledgeSnapshot(indexFile),
 		writeSnapshot: (snapshot: KnowledgeSnapshot) => writeKnowledgeSnapshotAtomic(indexFile, snapshot, beforePublish),
 		uploadDocument: async ({ fileName, data, contentType }: { fileName: string; data: Uint8Array; contentType?: string }): Promise<KnowledgeDocumentRecord> => {

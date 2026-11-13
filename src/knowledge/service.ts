@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import type { KnowledgeSearchScope } from "../core/contracts/chat.ts";
 import type { KnowledgeChunk, KnowledgeFormat } from "./contracts.ts";
+import { processKnowledgeCache, type CachedStore, type KnowledgeCache } from "./cache.ts";
+import type { ChunkPart } from "./search.ts";
 import { chunkDocument } from "./chunk.ts";
 import { extractDocument } from "./extract.ts";
-import { normalizeKnowledgeFileName, readKnowledgeSnapshot, validateKnowledgeSnapshot, type KnowledgeDocumentRecord, type KnowledgeSnapshot } from "./index-store.ts";
+import { normalizeKnowledgeFileName, validateKnowledgeSnapshot, type KnowledgeDocumentRecord, type KnowledgeSnapshot } from "./index-store.ts";
 import { resolveOpenSection, type OpenSectionResult } from "./open-section.ts";
 import { describeImages, type VisionConfig } from "./vision-job.ts";
 
@@ -45,33 +47,55 @@ export interface KnowledgeLoaderOptions {
 	scope?: KnowledgeSearchScope;
 	sharedIndexFile?: string;
 	loadPersonalSnapshot?: (userId: string) => KnowledgeSnapshot | Promise<KnowledgeSnapshot>;
+	/** Snapshot cache; defaults to the process-wide one. */
+	cache?: KnowledgeCache;
+}
+
+interface ScopedStores {
+	personal?: CachedStore;
+	uploaded?: CachedStore;
+	admin?: CachedStore;
+}
+
+/** Resolve the stores visible under the scope, through the revision-validated cache. */
+async function loadScopedStores(userId: string, options: KnowledgeLoaderOptions): Promise<ScopedStores> {
+	const scope = options.scope ?? "all";
+	const sharedIndexFile = options.sharedIndexFile ?? process.env.KNOWLEDGE_INDEX_FILE?.trim();
+	const cache = options.cache ?? processKnowledgeCache();
+	const stores = await import("../server/stores.ts");
+	let personal: CachedStore | undefined;
+	if (scope !== "shared") {
+		if (options.loadPersonalSnapshot) {
+			// Caller-supplied snapshots have no file identity to validate against: never cached.
+			const snapshot = validateKnowledgeSnapshot(await options.loadPersonalSnapshot(userId));
+			personal = { snapshot, part: { chunks: snapshot.chunks } };
+		} else {
+			// indexFile() is a checked-store call, so the owner-exists guard still applies on cache hits.
+			personal = await cache.get(stores.checkedStoresForUser(userId).knowledgeStore.indexFile(), "personal");
+		}
+	}
+	const uploaded = scope === "personal" ? undefined : await cache.get(stores.sharedKnowledgeStore.indexFile(), "shared");
+	const admin = sharedIndexFile && scope !== "personal" ? await cache.get(sharedIndexFile, "shared") : undefined;
+	return { personal, uploaded, admin };
 }
 
 /** open_section port implementation: owner's personal docs + shared uploads + optional admin index. */
 export async function openKnowledgeSection(userId: string, fileName: string, section: string[], options: KnowledgeLoaderOptions = {}): Promise<OpenSectionResult> {
-	const sharedIndexFile = options.sharedIndexFile ?? process.env.KNOWLEDGE_INDEX_FILE?.trim();
-	const scope = options.scope ?? "all";
-	const stores = await import("../server/stores.ts");
-	const personal = scope === "shared" ? undefined : options.loadPersonalSnapshot
-		? validateKnowledgeSnapshot(await options.loadPersonalSnapshot(userId))
-		: await stores.checkedStoresForUser(userId).knowledgeStore.readSnapshot();
-	const uploaded = scope === "personal" ? undefined : await stores.sharedKnowledgeStore.readSnapshot();
-	const admin = sharedIndexFile && scope !== "personal" ? await readKnowledgeSnapshot(sharedIndexFile) : undefined;
+	const { personal, uploaded, admin } = await loadScopedStores(userId, options);
 	return resolveOpenSection([
-		...(personal ? [{ scope: "personal" as const, label: "personal", snapshot: personal }] : []),
-		...(uploaded ? [{ scope: "shared" as const, label: "shared", snapshot: uploaded }] : []),
-		...(admin ? [{ scope: "shared" as const, label: "shared index", snapshot: admin }] : []),
+		...(personal ? [{ scope: "personal" as const, label: "personal", snapshot: personal.snapshot }] : []),
+		...(uploaded ? [{ scope: "shared" as const, label: "shared", snapshot: uploaded.snapshot }] : []),
+		...(admin ? [{ scope: "shared" as const, label: "shared index", snapshot: admin.snapshot }] : []),
 	], fileName, section);
+}
+
+/** Retriever loader seam, per store: admin index, shared uploads, then personal (cached; carries prepared ranker data). */
+export async function loadKnowledgeParts(userId: string, options: KnowledgeLoaderOptions = {}): Promise<ChunkPart[]> {
+	const { personal, uploaded, admin } = await loadScopedStores(userId, options);
+	return [admin, uploaded, personal].flatMap((store) => (store ? [store.part] : []));
 }
 
 /** Retriever loader seam: reload shared state and resolve only the explicit owner. */
 export async function loadKnowledgeChunks(userId: string, options: KnowledgeLoaderOptions = {}): Promise<KnowledgeChunk[]> {
-	const scope = options.scope ?? "all";
-	const sharedIndexFile = options.sharedIndexFile ?? process.env.KNOWLEDGE_INDEX_FILE?.trim();
-	const shared = sharedIndexFile && scope !== "personal" ? await readKnowledgeSnapshot(sharedIndexFile) : undefined;
-	const personal = scope === "shared" ? undefined : options.loadPersonalSnapshot
-		? validateKnowledgeSnapshot(await options.loadPersonalSnapshot(userId))
-		: await (await import("../server/stores.ts")).checkedStoresForUser(userId).knowledgeStore.readSnapshot();
-	const uploaded = scope === "personal" ? undefined : await (await import("../server/stores.ts")).sharedKnowledgeStore.readSnapshot();
-	return [...(shared?.chunks ?? []), ...(uploaded?.chunks ?? []), ...(personal?.chunks ?? [])];
+	return (await loadKnowledgeParts(userId, options)).flatMap((part) => part.chunks);
 }

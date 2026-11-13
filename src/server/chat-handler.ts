@@ -53,7 +53,7 @@ import { persistTurn, triggerExtraction } from "./turn-service.ts";
 import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, planRetryOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
-import { loadKnowledgeChunks, openKnowledgeSection } from "../knowledge/service.ts";
+import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
 import type { KnowledgeToolContext } from "../agent/tools/knowledge.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
@@ -411,7 +411,7 @@ export async function handleChatInput(
 					ownerId: currentUserId(),
 					chatId,
 					scope: knowledgeScope,
-					retriever: new KnowledgeSearch((userId) => loadKnowledgeChunks(userId, { scope: knowledgeScope }), [bm25Ranker]),
+					retriever: new KnowledgeSearch(async (userId) => ({ parts: await loadKnowledgeParts(userId, { scope: knowledgeScope }) }), [bm25Ranker]),
 					markKnowledgeUsed: (id) => stores.chatStore.markKnowledgeUsed(id),
 					openSection: (userId, fileName, section) => openKnowledgeSection(userId, fileName, section, { scope: knowledgeScope }),
 				}

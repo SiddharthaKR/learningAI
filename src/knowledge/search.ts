@@ -6,9 +6,53 @@ const RRF_K = 60;
 const MIN_OVERLAP = 20;
 const MAX_OVERLAP = 400;
 
-/** Scores chunks for a set of queries. Returns chunkId -> score, only scores > 0. */
+/** Opaque, ranker-defined precomputed data (tokenization, term stats, vectors...). */
+export type PreparedRankerData = unknown;
+
+/**
+ * Scores chunks for a set of queries. Returns chunkId -> score, only scores > 0.
+ *
+ * PREPARE SEAM: a search spans several stores (admin index + shared uploads + the user's personal
+ * docs). A ranker with expensive per-chunk work may implement `prepare` (run ONCE per store
+ * revision by the knowledge cache, cached under `name`) and `combine` (run per search, must be
+ * cheap: merge the per-store pieces of exactly the stores being searched, so corpus-wide
+ * statistics cover the combined set). `rank` then receives the combined data as `prepared`; it
+ * must give the same answer as when called without it (`prepared` is only an optimisation).
+ *
+ * EMBEDDING SEAM (not implemented): an embedding ranker would implement `prepare` by loading
+ * vectors from a persisted sidecar file next to the store's index.json (e.g. index.embeddings.json),
+ * keyed by chunk id + model name, computed at UPLOAD time and never at search time. Chunks with no
+ * vector for the configured model are simply unscored. `combine` concatenates the per-store vector
+ * tables; `rank` embeds only the (short) queries and does the nearest-neighbour scoring. It is
+ * appended to the `rankers` array in KnowledgeSearch and fused by RRF; nothing else changes.
+ */
 export interface Ranker {
-	rank(queries: string[], chunks: KnowledgeChunk[]): Map<string, number>;
+	/** Cache key for this ranker's prepared data; required for `prepare` to be cached. */
+	name?: string;
+	prepare?(chunks: KnowledgeChunk[]): PreparedRankerData;
+	combine?(parts: PreparedRankerData[]): PreparedRankerData;
+	rank(queries: string[], chunks: KnowledgeChunk[], prepared?: PreparedRankerData): Map<string, number>;
+}
+
+/** One store's chunks plus a (cached) way to get a ranker's prepared data for them. */
+export interface ChunkPart {
+	chunks: KnowledgeChunk[];
+	prepared?(ranker: Ranker): PreparedRankerData | undefined;
+}
+
+/** What a loader may return: a flat chunk list (uncached) or per-store parts (cache-aware). */
+export type KnowledgeLoad = KnowledgeChunk[] | { parts: ChunkPart[] };
+
+function preparedFor(ranker: Ranker, parts: ChunkPart[]): PreparedRankerData | undefined {
+	if (!ranker.prepare || !ranker.name) return undefined;
+	const pieces: PreparedRankerData[] = [];
+	for (const part of parts) {
+		const piece = part.prepared?.(ranker);
+		if (piece === undefined) return undefined;
+		pieces.push(piece);
+	}
+	if (ranker.combine) return ranker.combine(pieces);
+	return pieces.length === 1 ? pieces[0] : undefined;
 }
 
 function byScoreThenId(a: [string, number], b: [string, number]): number {
@@ -83,23 +127,26 @@ interface Window {
  */
 export class KnowledgeSearch implements Retriever {
 	constructor(
-		private readonly loadChunks: (userId: string) => KnowledgeChunk[] | Promise<KnowledgeChunk[]>,
+		private readonly loadChunks: (userId: string) => KnowledgeLoad | Promise<KnowledgeLoad>,
 		private readonly rankers: Ranker[],
 	) {}
 
 	/** Ranking only (top hits, no neighbour expansion). */
 	async rankHits(queries: string[], userId: string): Promise<{ hits: KnowledgeResult[]; chunks: KnowledgeChunk[] }> {
 		const normalized = validateQueries(queries);
-		const chunks = await this.loadChunks(userId);
+		const loaded = await this.loadChunks(userId);
+		const parts: ChunkPart[] = Array.isArray(loaded) ? [{ chunks: loaded }] : loaded.parts;
+		const chunks = Array.isArray(loaded) ? loaded : parts.length === 1 ? parts[0]!.chunks : parts.flatMap((part) => part.chunks);
 		if (!chunks.length) return { hits: [], chunks };
+		const prepared = this.rankers.map((ranker) => preparedFor(ranker, parts));
 		const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
 		let scores: Map<string, number>;
 		if (this.rankers.length === 1) {
-			scores = this.rankers[0]!.rank(normalized, chunks);
+			scores = this.rankers[0]!.rank(normalized, chunks, prepared[0]);
 		} else {
 			scores = new Map();
-			for (const ranker of this.rankers) {
-				const ordered = [...ranker.rank(normalized, chunks)].filter(([, score]) => score > 0).sort(byScoreThenId);
+			for (const [rankerIndex, ranker] of this.rankers.entries()) {
+				const ordered = [...ranker.rank(normalized, chunks, prepared[rankerIndex])].filter(([, score]) => score > 0).sort(byScoreThenId);
 				ordered.forEach(([id], index) => scores.set(id, (scores.get(id) ?? 0) + 1 / (RRF_K + index + 1)));
 			}
 		}
