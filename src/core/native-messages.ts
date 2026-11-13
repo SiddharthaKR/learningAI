@@ -39,6 +39,7 @@ import { QUESTION_TOOLS } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
 	HANDOFF_TEXT,
+	planRetryText,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
@@ -69,6 +70,7 @@ export interface LhMarkerMessage {
 	customType:
 		| "graph-context"
 		| "probe-handoff"
+		| "plan-retry"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
@@ -194,6 +196,44 @@ export function newHandoffMessage(chatId: string): LhMarkerMessage {
 		details: { chatId },
 		timestamp: Date.now(),
 	};
+}
+
+/** The one plan-retry nudge (owner, 2026-11-13): same wake pipeline as the
+ *  handoff; the deterministic id makes it once-per-session by construction. */
+export function planRetryId(chatId: string): string {
+	return `steer_planretry_${chatId}`;
+}
+
+export function newPlanRetryMessage(chatId: string, lastError: string | null): LhMarkerMessage {
+	return {
+		id: planRetryId(chatId),
+		role: "custom",
+		customType: "plan-retry",
+		content: planRetryText(lastError),
+		display: true,
+		details: { chatId },
+		timestamp: Date.now(),
+	};
+}
+
+/** Should the plan-retry nudge fire now? Only after the handoff has been
+ *  delivered (so the probe_done turn itself never triggers it), only while
+ *  no plan exists (a plan block is written per successful plan_init), and
+ *  only once. Returns the last plan_init rejection reason, null when it was
+ *  never called, or false when no nudge is owed. */
+export function planRetryOwed(chatId: string, messages: readonly LhMessage[]): string | null | false {
+	const ids = new Set(messages.map((m) => m.id));
+	if (!ids.has(`steer_probe_${chatId}`) || ids.has(planRetryId(chatId))) return false;
+	let lastError: string | null = null;
+	for (const m of messages) {
+		const role = (m as { role?: string }).role;
+		if (role === "custom" && (m as LhMarkerMessage).customType === "plan-block") return false;
+		if (role === "toolResult" && (m as ToolResultMessage).toolName === "plan_init") {
+			const d = (m as ToolResultMessage).details as { ok?: boolean; error?: unknown } | undefined;
+			if (d?.ok === false && typeof d.error === "string") lastError = d.error;
+		}
+	}
+	return lastError;
 }
 
 /** The plan presentation block: pure UI history (a frozen snapshot), no

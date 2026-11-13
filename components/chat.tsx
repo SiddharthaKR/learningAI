@@ -1350,6 +1350,12 @@ export function Chat({
 												return <CompactionMomentDivider key={pi} data={part.data as CompactionDividerData} />;
 											case "data-compaction-cut":
 												return <CompactionCutDivider key={pi} data={part.data as CompactionDividerData} />;
+											case "data-plan-retry":
+												return (
+													<SystemLine key={pi} testId="plan-retry">
+														{copy.chat.retryingPlan}
+													</SystemLine>
+												);
 											case "data-practice-thinking":
 												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-next":

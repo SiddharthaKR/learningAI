@@ -215,7 +215,7 @@ function handOffEligible(chatId: string, agent: Agent): void {
 	const queue = state().queues.get(ownerKey(chatId));
 	if (queue && queue.length > 0) {
 		for (const entry of queue) {
-			if (entry.handedTo !== agent && entry.steer.customType !== "probe-handoff") {
+			if (entry.handedTo !== agent && !startsOwnRun(entry.steer)) {
 				agent.steer(entry.steer);
 				entry.handedTo = agent;
 			}
@@ -392,10 +392,16 @@ export function abortJob(jobId: string): AbortOutcome {
 	return { ok: true };
 }
 
+/** Markers that must START a run rather than ride a live one: the probe
+ *  handoff and the plan-retry nudge (owner, 2026-11-13). */
+function startsOwnRun(steer: SteerMessage): boolean {
+	return steer.customType === "probe-handoff" || steer.customType === "plan-retry";
+}
+
 function chatIdOf(steer: SteerMessage): string {
 	// The probe handoff carries its chat directly in the marker details (the
 	// job record would say it too, but the details are the cheap path).
-	if (steer.customType === "probe-handoff") {
+	if (startsOwnRun(steer)) {
 		return (steer.details as { chatId: string }).chatId;
 	}
 	// The chat is resolvable from the job record; the steer's details
@@ -467,9 +473,7 @@ async function pump(chatId: string): Promise<void> {
 				// probe-handoffs never ride a live run (owner ruling: the
 				// handoff must START the teacher's run) — if any remain
 				// pending, wait the run out and loop to the wake below.
-				const handoffWaits = stillPending.some(
-					(e) => e.steer.customType === "probe-handoff",
-				);
+				const handoffWaits = stillPending.some((e) => startsOwnRun(e.steer));
 				if (handable.length > 0 && !handoffWaits) {
 					return; // the run delivers; settleSteers re-pumps the rest
 				}

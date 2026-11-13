@@ -208,6 +208,20 @@ export const HANDOFF_TEXT =
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and present the plan; I'll accept it or ask for changes.";
 
+/** The one plan-retry nudge (owner, 2026-11-13): fired once per session when
+ *  a turn after the handoff settles with no successful plan_init. Carries
+ *  the last rejection reason (null when plan_init was never called). */
+export function planRetryText(lastError: string | null): string {
+	const head = lastError
+		? `Your plan was NOT created — plan_init was rejected:\n${lastError}\n`
+		: "Your plan was NOT created — plan_init was not called.\n";
+	return (
+		head +
+		"Fix it and call plan_init again. Rules: arrows mean \"must be understood before\", never data flow; " +
+		"no cycles; only `slug[title]` and `a --> b` lines, no subgraph/style."
+	);
+}
+
 // ─── Practice sessions (owner, 2026-10-04) — marker + ack texts ──────────────
 // Single-sourced here per the marker law: the model-facing text of every
 // custom marker lives in core/contracts, never in the flattening seam.

@@ -376,6 +376,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "plan-retry": {
+			// The one plan-retry nudge (owner, 2026-11-13): scaffolding,
+			// rendered as a quiet system line — never a user bubble.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-plan-retry", id: `pr_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "subagent-steer": {
 			const meta = marker.details as SubagentResultMeta;
 			const artifact = marker.details as {

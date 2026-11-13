@@ -123,6 +123,7 @@
     "compacting": "COMPACTING CONTEXT…",
     "thinking": "Thinking",
     "planRejected": "Plan rejected",
+    "retryingPlan": "Retrying plan",
     "askOrNext": "Ask anything, or press Enter for the next one.",
     "contextCompacted": "Context compacted",
     "historyCompacted": "History compacted",

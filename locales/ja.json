@@ -123,6 +123,7 @@
     "compacting": "履歴を整理中…",
     "thinking": "考え中",
     "planRejected": "プランが却下されました",
+    "retryingPlan": "プランを再試行中",
     "askOrNext": "質問を入力するか、Enterキーで次の問題へ進みます。",
     "contextCompacted": "履歴を整理しました",
     "historyCompacted": "履歴を整理済み",

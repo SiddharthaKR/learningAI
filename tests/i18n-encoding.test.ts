@@ -50,7 +50,7 @@ describe("UTF-8 source and locale integrity", () => {
 
   it("serves navigation copy from the Japanese catalog", () => {
     const catalog = JSON.parse(readFileSync(path.join(ROOT, "locales", "ja.json"), "utf8")) as { sidebar?: { sessions?: string } };
-    assert.equal(catalog.sidebar?.sessions, "セッション");
+    assert.equal(catalog.sidebar?.sessions, "過去のセッション");
   });
 
   it("serves active-session chrome from the Japanese catalog", () => {

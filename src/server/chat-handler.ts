@@ -50,7 +50,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, planRetryOwed } from "../core/native-messages.ts";
 import { Bm25Retriever } from "../knowledge/bm25.ts";
 import { loadKnowledgeChunks } from "../knowledge/service.ts";
 import type { KnowledgeToolContext } from "../agent/tools/knowledge.ts";
@@ -586,6 +586,20 @@ export async function handleChatInput(
 				// ones stay parked for the chat's next run (the registry is the
 				// stranding safety net — the agent's undrained copy died above).
 				reconcileUserSteers(chatId, stamped);
+				// THE PLAN-RETRY NUDGE (owner, 2026-11-13): a turn after the
+				// handoff settled with no successful plan_init — queue ONE
+				// nudge (deterministic id ⇒ once per session) carrying the
+				// last rejection, through the same wake pipeline as the
+				// handoff. Aborted turns are the learner's stop — no nudge.
+				if (!isAborted && record.kind !== "practice" && record.kind !== "chat") {
+					const settled = stores.chatStore.getChat(chatId);
+					const owed = settled ? planRetryOwed(chatId, settled.messages) : false;
+					if (owed !== false) {
+						void deliverJobResult(newPlanRetryMessage(chatId, owed)).catch((err: unknown) => {
+							console.error(`[chat ${chatId}] plan-retry nudge failed:`, err);
+						});
+					}
+				}
 				// THE SETTLE KICK (owner round 14): the turn settled — if the
 				// projection is now over threshold, the summary starts in the
 				// background, INSIDE the learner's reading/answering pause
