@@ -9,18 +9,36 @@ export function extractText(fileName: string, data: Uint8Array, format: "md" | "
 	}
 	const lines = text.split("\n");
 	const blocks: ExtractedBlock[] = [];
-	function append(start: number, end: number, heading?: string, headingLine?: number) {
-		while (start <= end && !lines[start]!.trim()) start++;
-		while (end >= start && !lines[end]!.trim()) end--;
-		if (start > end) return;
-		blocks.push({
-			text: lines.slice(start, end + 1).join("\n"),
-			citation: { format, fileName, ...(heading === undefined ? {} : { heading }), lineStart: (headingLine ?? start) + 1, lineEnd: end + 1 },
-		});
-	}
 	let start = 0;
 	let heading: string | undefined;
 	let headingLine: number | undefined;
+	// Heading path, outermost first. Only md has headings.
+	let path: string[] = [];
+	// True while the current segment is a run of markdown pipe-table lines.
+	let inTable = false;
+	// Emits the segment [start, end]; the current heading/path describe that segment.
+	function append(end: number) {
+		const section = path.length ? { section: [...path] } : {};
+		if (inTable) {
+			blocks.push({
+				text: lines.slice(start, end + 1).join("\n"),
+				citation: { format, fileName, ...(heading === undefined ? {} : { heading }), lineStart: start + 1, lineEnd: end + 1 },
+				...section,
+				kind: "table",
+			});
+			return;
+		}
+		let first = start;
+		let last = end;
+		while (first <= last && !lines[first]!.trim()) first++;
+		while (last >= first && !lines[last]!.trim()) last--;
+		if (first > last) return;
+		blocks.push({
+			text: lines.slice(first, last + 1).join("\n"),
+			citation: { format, fileName, ...(heading === undefined ? {} : { heading }), lineStart: (headingLine ?? first) + 1, lineEnd: last + 1 },
+			...section,
+		});
+	}
 	let fence: { marker: string; length: number } | undefined;
 	if (format === "md") {
 		for (let index = 0; index < lines.length; index++) {
@@ -33,15 +51,24 @@ export function extractText(fileName: string, data: Uint8Array, format: "md" | "
 				fence = { marker: fenceMatch[1]![0]!, length: fenceMatch[1]!.length };
 				continue;
 			}
-			const match = /^ {0,3}#{1,6}(?:[ \t]+(.*?)|[ \t]*)$/.exec(lines[index]!);
+			const isTableLine = /^ {0,3}\|/.test(lines[index]!);
+			if (isTableLine !== inTable) {
+				append(index - 1);
+				inTable = isTableLine;
+				start = index;
+				headingLine = undefined;
+			}
+			const match = /^ {0,3}(#{1,6})(?:[ \t]+(.*?)|[ \t]*)$/.exec(lines[index]!);
 			if (!match) continue;
-			append(start, index - 1, heading, headingLine);
-			heading = (match[1] ?? "").replace(/[ \t]+#+[ \t]*$/, "").trim() || undefined;
+			append(index - 1);
+			const level = match[1]!.length;
+			heading = (match[2] ?? "").replace(/[ \t]+#+[ \t]*$/, "").trim() || undefined;
+			path = [...path.slice(0, level - 1), ...(heading === undefined ? [] : [heading])];
 			lines[index] = heading ?? "";
 			headingLine = index;
 			start = index;
 		}
 	}
-	append(start, lines.length - 1, heading, headingLine);
+	append(lines.length - 1);
 	return blocks;
 }

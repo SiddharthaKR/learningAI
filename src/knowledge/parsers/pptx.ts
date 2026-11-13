@@ -1,9 +1,18 @@
 import { posix } from "node:path";
 import { extractSelectedZipEntries, KnowledgeArchiveError } from "../archive.ts";
 import type { ExtractedBlock } from "../contracts.ts";
-import { descendants, officeElements, paragraphText } from "./office.ts";
+import { descendants, officeElements, paragraphText, tableRows, type OfficeElement } from "./office.ts";
 
-function paragraphs(data: Uint8Array): string[] {
+// Slide-body paragraphs in document order, excluding table cells (tables become their own blocks).
+function slideParagraphs(elements: OfficeElement[]): string[] {
+	return elements.flatMap((element) => {
+		if (element.name === "a:tbl") return [];
+		if (element.name === "a:p") return [paragraphText(element, "a:t")];
+		return slideParagraphs(element.children);
+	}).filter((text) => text.trim());
+}
+
+function notesParagraphs(data: Uint8Array): string[] {
 	return descendants(officeElements(data), "a:p").map((paragraph) => paragraphText(paragraph, "a:t")).filter((text) => text.trim());
 }
 
@@ -27,13 +36,20 @@ export function extractPptx(fileName: string, data: Uint8Array): ExtractedBlock[
 	}
 	const blocks: ExtractedBlock[] = [];
 	for (const { name, slide } of slides) {
-		const slideParagraphs = paragraphs(entries.get(name)!);
+		const slideElements = officeElements(entries.get(name)!);
+		const bodyParagraphs = slideParagraphs(slideElements);
+		const title = bodyParagraphs[0] ?? "";
+		const section = title.trim() ? [title] : undefined;
 		const noteParagraphs = (notesForSlide.get(name) ?? []).flatMap((notesPath) => {
 			const note = entries.get(notesPath);
-			return note ? paragraphs(note) : [];
+			return note ? notesParagraphs(note) : [];
 		});
-		const text = [slideParagraphs.join("\n"), noteParagraphs.join("\n")].filter(Boolean).join("\n\n");
-		if (text.trim()) blocks.push({ text, citation: { format: "pptx", fileName, slide, title: slideParagraphs[0] ?? "" } });
+		const text = [bodyParagraphs.join("\n"), noteParagraphs.join("\n")].filter(Boolean).join("\n\n");
+		if (text.trim()) blocks.push({ text, citation: { format: "pptx", fileName, slide, title }, ...(section ? { section } : {}) });
+		for (const table of descendants(slideElements, "a:tbl")) {
+			const rows = tableRows(table, { row: "a:tr", cell: "a:tc", paragraph: "a:p", text: "a:t" });
+			if (rows.length) blocks.push({ text: rows.join("\n"), citation: { format: "pptx", fileName, slide, title }, ...(section ? { section } : {}), kind: "table" });
+		}
 	}
 	return blocks;
 }

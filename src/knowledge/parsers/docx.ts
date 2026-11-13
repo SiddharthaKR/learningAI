@@ -1,6 +1,6 @@
 import { extractSelectedZipEntries, KnowledgeArchiveError } from "../archive.ts";
 import type { ExtractedBlock } from "../contracts.ts";
-import { descendants, officeElements, paragraphText } from "./office.ts";
+import { descendants, officeElements, paragraphText, tableRows, type OfficeElement } from "./office.ts";
 
 export function extractDocx(fileName: string, data: Uint8Array): ExtractedBlock[] {
 	const entries = extractSelectedZipEntries(data, (name) => name === "word/document.xml" || name === "word/styles.xml");
@@ -8,22 +8,68 @@ export function extractDocx(fileName: string, data: Uint8Array): ExtractedBlock[
 	if (!document) throw new KnowledgeArchiveError("XML_INVALID", "The DOCX archive is missing word/document.xml.");
 	const body = descendants(officeElements(document), "w:body")[0];
 	if (!body) throw new KnowledgeArchiveError("XML_INVALID", "The DOCX document has no body.");
-	const headingStyles = new Set<string>();
+	const headingLevels = new Map<string, number>();
 	const styles = entries.get("word/styles.xml");
 	if (styles) {
 		for (const style of descendants(officeElements(styles), "w:style")) {
 			const name = descendants(style.children, "w:name")[0]?.attributes["@_w:val"] ?? "";
-			if (/^heading [1-9]$/i.test(name) && style.attributes["@_w:styleId"]) headingStyles.add(style.attributes["@_w:styleId"]);
+			const level = /^heading ([1-9])$/i.exec(name)?.[1];
+			if (level && style.attributes["@_w:styleId"]) headingLevels.set(style.attributes["@_w:styleId"], Number(level));
 		}
 	}
 	const blocks: ExtractedBlock[] = [];
-	let heading: string | undefined;
-	for (const [index, paragraph] of descendants(body.children, "w:p").entries()) {
-		const text = paragraphText(paragraph, "w:t");
-		if (!text.trim()) continue;
-		const styleId = descendants(paragraph.children, "w:pStyle")[0]?.attributes["@_w:val"] ?? "";
-		if (/^Heading[1-9]$/i.test(styleId) || headingStyles.has(styleId)) heading = text;
-		blocks.push({ text, citation: { format: "docx", fileName, ...(heading === undefined ? {} : { heading }), paragraph: index + 1 } });
+	// Heading path, outermost first. Headings are never body text; they only feed `section`.
+	const path: string[] = [];
+	let pending: { lines: string[]; paragraph: number; heading?: string; section: string[] } | undefined;
+	let paragraphCount = 0;
+	function flush() {
+		if (!pending) return;
+		blocks.push({
+			text: pending.lines.join("\n"),
+			citation: { format: "docx", fileName, ...(pending.heading === undefined ? {} : { heading: pending.heading }), paragraph: pending.paragraph },
+			...(pending.section.length ? { section: pending.section } : {}),
+		});
+		pending = undefined;
 	}
+	function citationHeading(): string | undefined {
+		return path[path.length - 1];
+	}
+	function walk(elements: OfficeElement[]) {
+		for (const element of elements) {
+			if (element.name === "w:p") {
+				const index = ++paragraphCount;
+				const text = paragraphText(element, "w:t");
+				if (!text.trim()) continue;
+				const styleId = descendants(element.children, "w:pStyle")[0]?.attributes["@_w:val"] ?? "";
+				const level = headingLevels.get(styleId) ?? (/^Heading([1-9])$/i.test(styleId) ? Number(styleId.slice(-1)) : undefined);
+				if (level !== undefined) {
+					flush();
+					path.splice(level - 1);
+					path.push(text);
+					continue;
+				}
+				pending ??= { lines: [], paragraph: index, heading: citationHeading(), section: [...path] };
+				pending.lines.push(text);
+			} else if (element.name === "w:tbl") {
+				flush();
+				const firstParagraph = paragraphCount + 1;
+				paragraphCount += descendants(element.children, "w:p").length;
+				const rows = tableRows(element, { row: "w:tr", cell: "w:tc", paragraph: "w:p", text: "w:t" });
+				if (!rows.length) continue;
+				const heading = citationHeading();
+				blocks.push({
+					text: rows.join("\n"),
+					citation: { format: "docx", fileName, ...(heading === undefined ? {} : { heading }), paragraph: firstParagraph },
+					...(path.length ? { section: [...path] } : {}),
+					kind: "table",
+				});
+			} else {
+				// Containers such as w:sdt can wrap body paragraphs; keep document order.
+				walk(element.children);
+			}
+		}
+	}
+	walk(body.children);
+	flush();
 	return blocks;
 }

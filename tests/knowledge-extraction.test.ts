@@ -29,8 +29,8 @@ describe("knowledge document extraction", () => {
 			});
 			assert.deepEqual(await extractDocument({ fileName: "slides.pptx", data }), {
 				fileName: "slides.pptx", format: "pptx", status: "ready", blocks: [
-					{ text: `${title}\n${body}\n\n${note}`, citation: { format: "pptx", fileName: "slides.pptx", slide: 2, title } },
-					{ text: "Last", citation: { format: "pptx", fileName: "slides.pptx", slide: 10, title: "Last" } },
+					{ text: `${title}\n${body}\n\n${note}`, citation: { format: "pptx", fileName: "slides.pptx", slide: 2, title }, section: [title] },
+					{ text: "Last", citation: { format: "pptx", fileName: "slides.pptx", slide: 10, title: "Last" }, section: ["Last"] },
 				],
 			});
 		});
@@ -44,10 +44,8 @@ describe("knowledge document extraction", () => {
 			assert.deepEqual(await extractDocument({ fileName: "guide.docx", data }), {
 				fileName: "guide.docx", format: "docx", status: "ready", blocks: [
 					{ text: body, citation: { format: "docx", fileName: "guide.docx", paragraph: 1 } },
-					{ text: title, citation: { format: "docx", fileName: "guide.docx", heading: title, paragraph: 3 } },
-					{ text: body, citation: { format: "docx", fileName: "guide.docx", heading: title, paragraph: 4 } },
-					{ text: note, citation: { format: "docx", fileName: "guide.docx", heading: note, paragraph: 5 } },
-					{ text: body, citation: { format: "docx", fileName: "guide.docx", heading: note, paragraph: 6 } },
+					{ text: body, citation: { format: "docx", fileName: "guide.docx", heading: title, paragraph: 4 }, section: [title] },
+					{ text: body, citation: { format: "docx", fileName: "guide.docx", heading: note, paragraph: 6 }, section: [title, note] },
 				],
 			});
 		});
@@ -56,8 +54,8 @@ describe("knowledge document extraction", () => {
 			assert.deepEqual(await extractDocument({ fileName: "guide.md", data: utf8(`\uFEFF${body}\r\n# ${title}\r\n${body}\r\n\r\n## ${note}\r${body}`) }), {
 				fileName: "guide.md", format: "md", status: "ready", blocks: [
 					{ text: body, citation: { format: "md", fileName: "guide.md", lineStart: 1, lineEnd: 1 } },
-					{ text: `${title}\n${body}`, citation: { format: "md", fileName: "guide.md", heading: title, lineStart: 2, lineEnd: 3 } },
-					{ text: `${note}\n${body}`, citation: { format: "md", fileName: "guide.md", heading: note, lineStart: 5, lineEnd: 6 } },
+					{ text: `${title}\n${body}`, citation: { format: "md", fileName: "guide.md", heading: title, lineStart: 2, lineEnd: 3 }, section: [title] },
+					{ text: `${note}\n${body}`, citation: { format: "md", fileName: "guide.md", heading: note, lineStart: 5, lineEnd: 6 }, section: [title, note] },
 				],
 			});
 		});
@@ -107,7 +105,7 @@ describe("knowledge document extraction", () => {
 	it("keeps interleaved PPTX run and field text in XML order", async () => {
 		const xml = '<p:sld xmlns:p="urn:p" xmlns:a="urn:a"><a:p><a:r><a:t>First</a:t></a:r><a:fld><a:t>Second</a:t></a:fld><a:r><a:t>Third</a:t></a:r></a:p></p:sld>';
 		assert.deepEqual((await extractDocument({ fileName: "order.pptx", data: officeZip({ "ppt/slides/slide1.xml": xml }) })).blocks, [
-			{ text: "FirstSecondThird", citation: { format: "pptx", fileName: "order.pptx", slide: 1, title: "FirstSecondThird" } },
+			{ text: "FirstSecondThird", citation: { format: "pptx", fileName: "order.pptx", slide: 1, title: "FirstSecondThird" }, section: ["FirstSecondThird"] },
 		]);
 	});
 
@@ -126,8 +124,7 @@ describe("knowledge document extraction", () => {
 
 	it("decodes DOCX heading citations exactly once", async () => {
 		assert.deepEqual((await extractDocument({ fileName: "heading.docx", data: officeZip({ "word/document.xml": documentXml([paragraphXml("Literal &amp;lt;", "Heading1"), paragraphXml("Body")]) }) })).blocks, [
-			{ text: "Literal &lt;", citation: { format: "docx", fileName: "heading.docx", heading: "Literal &lt;", paragraph: 1 } },
-			{ text: "Body", citation: { format: "docx", fileName: "heading.docx", heading: "Literal &lt;", paragraph: 2 } },
+			{ text: "Body", citation: { format: "docx", fileName: "heading.docx", heading: "Literal &lt;", paragraph: 2 }, section: ["Literal &lt;"] },
 		]);
 	});
 
@@ -138,7 +135,7 @@ describe("knowledge document extraction", () => {
 			"ppt/notesSlides/notesSlide1.xml": "<!DOCTYPE unsafe><bad>",
 		});
 		assert.deepEqual((await extractDocument({ fileName: "external.pptx", data })).blocks, [
-			{ text: "Title", citation: { format: "pptx", fileName: "external.pptx", slide: 1, title: "Title" } },
+			{ text: "Title", citation: { format: "pptx", fileName: "external.pptx", slide: 1, title: "Title" }, section: ["Title"] },
 		]);
 	});
 
@@ -164,7 +161,7 @@ describe("knowledge document extraction", () => {
 			"ppt/notesSlides/notesSlide1.xml": notesXml("Related note"),
 		});
 		assert.deepEqual((await extractDocument({ fileName: "encoded.pptx", data })).blocks, [
-			{ text: "Title\n\nRelated note", citation: { format: "pptx", fileName: "encoded.pptx", slide: 1, title: "Title" } },
+			{ text: "Title\n\nRelated note", citation: { format: "pptx", fileName: "encoded.pptx", slide: 1, title: "Title" }, section: ["Title"] },
 		]);
 	});
 
@@ -174,18 +171,20 @@ describe("knowledge document extraction", () => {
 			"word/styles.xml": '<w:styles xmlns:w="urn:w"><w:style w:type="paragraph" w:styleId="Custom&amp;Style"><w:name w:val="head&#105;ng&#32;1"/></w:style></w:styles>',
 		});
 		assert.deepEqual((await extractDocument({ fileName: "encoded.docx", data })).blocks, [
-			{ text: "Heading", citation: { format: "docx", fileName: "encoded.docx", heading: "Heading", paragraph: 1 } },
-			{ text: "Body", citation: { format: "docx", fileName: "encoded.docx", heading: "Heading", paragraph: 2 } },
+			{ text: "Body", citation: { format: "docx", fileName: "encoded.docx", heading: "Heading", paragraph: 2 }, section: ["Heading"] },
 		]);
 	});
 
 	for (const format of ["pptx", "docx"]) {
 		it(`preserves literal CDATA while decoding ordinary ${format} XML text once`, async () => {
 			const mixed = "Before &amp; <![CDATA[&amp; &#65; 日本]]> after &lt;";
-			const data = officeZip(format === "pptx" ? { "ppt/slides/slide1.xml": slideXml([mixed]) } : { "word/document.xml": documentXml([paragraphXml(mixed, "Heading1")]) });
+			const data = officeZip(format === "pptx" ? { "ppt/slides/slide1.xml": slideXml([mixed]) } : { "word/document.xml": documentXml([paragraphXml(mixed, "Heading1"), paragraphXml("Body")]) });
 			const text = "Before & &amp; &#65; 日本 after <";
-			const citation = format === "pptx" ? { format, fileName: `cdata.${format}`, slide: 1, title: text } : { format, fileName: `cdata.${format}`, paragraph: 1, heading: text };
-			assert.deepEqual((await extractDocument({ fileName: `cdata.${format}`, data })).blocks, [{ text, citation }]);
+			if (format === "pptx") {
+				assert.deepEqual((await extractDocument({ fileName: `cdata.${format}`, data })).blocks, [{ text, citation: { format, fileName: `cdata.${format}`, slide: 1, title: text }, section: [text] }]);
+			} else {
+				assert.deepEqual((await extractDocument({ fileName: `cdata.${format}`, data })).blocks, [{ text: "Body", citation: { format, fileName: `cdata.${format}`, paragraph: 2, heading: text }, section: [text] }]);
+			}
 		});
 	}
 
@@ -201,15 +200,15 @@ describe("knowledge document extraction", () => {
 		assert.deepEqual((await extractDocument({ fileName: "empty-heading.md", data: utf8("Preamble\n#\n\nBody\n\n## Next\nMore") })).blocks, [
 			{ text: "Preamble", citation: { format: "md", fileName: "empty-heading.md", lineStart: 1, lineEnd: 1 } },
 			{ text: "Body", citation: { format: "md", fileName: "empty-heading.md", lineStart: 2, lineEnd: 4 } },
-			{ text: "Next\nMore", citation: { format: "md", fileName: "empty-heading.md", heading: "Next", lineStart: 6, lineEnd: 7 } },
+			{ text: "Next\nMore", citation: { format: "md", fileName: "empty-heading.md", heading: "Next", lineStart: 6, lineEnd: 7 }, section: ["Next"] },
 		]);
 	});
 
 	for (const [label, fence, closer] of [["backtick", "```md", "````"], ["tilde", "~~~md", "~~~~"]]) {
 		it(`keeps apparent ATX headings inside ${label} fences as section content`, async () => {
 			assert.deepEqual((await extractDocument({ fileName: "fenced.md", data: utf8(`# Real\nBefore\n${fence}\n# Inside\n${closer}\n## Next\nAfter`) })).blocks, [
-				{ text: `Real\nBefore\n${fence}\n# Inside\n${closer}`, citation: { format: "md", fileName: "fenced.md", heading: "Real", lineStart: 1, lineEnd: 5 } },
-				{ text: "Next\nAfter", citation: { format: "md", fileName: "fenced.md", heading: "Next", lineStart: 6, lineEnd: 7 } },
+				{ text: `Real\nBefore\n${fence}\n# Inside\n${closer}`, citation: { format: "md", fileName: "fenced.md", heading: "Real", lineStart: 1, lineEnd: 5 }, section: ["Real"] },
+				{ text: "Next\nAfter", citation: { format: "md", fileName: "fenced.md", heading: "Next", lineStart: 6, lineEnd: 7 }, section: ["Real", "Next"] },
 			]);
 		});
 	}

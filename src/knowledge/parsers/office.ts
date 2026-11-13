@@ -49,3 +49,15 @@ export function characterReferences(text: string): string {
 export function paragraphText(element: OfficeElement, textTag: string): string {
 	return descendants(element.children, textTag).flatMap((text) => text.text.map((part) => part.cdata ? part.value : characterReferences(part.value))).join("");
 }
+
+// One string per non-empty table row: cells joined with " | ", each cell's
+// paragraphs joined with a space. Rows whose cells are all empty are dropped.
+export function tableRows(table: OfficeElement, names: { row: string; cell: string; paragraph: string; text: string }): string[] {
+	return descendants(table.children, names.row).flatMap((row) => {
+		const cells = descendants(row.children, names.cell).map((cell) => descendants(cell.children, names.paragraph)
+			.map((paragraph) => paragraphText(paragraph, names.text).trim())
+			.filter(Boolean)
+			.join(" "));
+		return cells.some(Boolean) ? [cells.join(" | ")] : [];
+	});
+}
