@@ -21,7 +21,7 @@ async function POSTImpl(req: Request, { params }: { params: Promise<{ id: string
 	const sourceStore = getSessionSources(id);
 	const sources = Array.from(sourceStore.values()).map((s) => ({
 		url: s.url,
-		markdown: s.markdown,
+		markdown: s.markdownContent,
 	}));
 
 	try {
