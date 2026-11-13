@@ -3,6 +3,7 @@ import type { KnowledgeChunk, KnowledgeFormat } from "./contracts.ts";
 import { chunkDocument } from "./chunk.ts";
 import { extractDocument } from "./extract.ts";
 import { normalizeKnowledgeFileName, readKnowledgeSnapshot, validateKnowledgeSnapshot, type KnowledgeDocumentRecord, type KnowledgeSnapshot } from "./index-store.ts";
+import { resolveOpenSection, type OpenSectionResult } from "./open-section.ts";
 import { describeImages, type VisionConfig } from "./vision-job.ts";
 
 function acceptedFormat(fileName: string): KnowledgeFormat | undefined {
@@ -41,6 +42,22 @@ export async function indexKnowledgeDocument({ fileName, data, visionConfig }: {
 export interface KnowledgeLoaderOptions {
 	sharedIndexFile?: string;
 	loadPersonalSnapshot?: (userId: string) => KnowledgeSnapshot | Promise<KnowledgeSnapshot>;
+}
+
+/** open_section port implementation: owner's personal docs + shared uploads + optional admin index. */
+export async function openKnowledgeSection(userId: string, fileName: string, section: string[], options: KnowledgeLoaderOptions = {}): Promise<OpenSectionResult> {
+	const sharedIndexFile = options.sharedIndexFile ?? process.env.KNOWLEDGE_INDEX_FILE?.trim();
+	const stores = await import("../server/stores.ts");
+	const personal = options.loadPersonalSnapshot
+		? validateKnowledgeSnapshot(await options.loadPersonalSnapshot(userId))
+		: await stores.checkedStoresForUser(userId).knowledgeStore.readSnapshot();
+	const uploaded = await stores.sharedKnowledgeStore.readSnapshot();
+	const admin = sharedIndexFile ? await readKnowledgeSnapshot(sharedIndexFile) : undefined;
+	return resolveOpenSection([
+		{ scope: "personal", label: "personal", snapshot: personal },
+		{ scope: "shared", label: "shared", snapshot: uploaded },
+		...(admin ? [{ scope: "shared" as const, label: "shared index", snapshot: admin }] : []),
+	], fileName, section);
 }
 
 /** Retriever loader seam: reload shared state and resolve only the explicit owner. */

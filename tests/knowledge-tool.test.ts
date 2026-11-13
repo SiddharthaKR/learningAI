@@ -23,6 +23,7 @@ function makeCtx(overrides: Partial<KnowledgeToolContext> = {}): KnowledgeToolCo
 		chatId: "test-chat",
 		retriever: { search: async () => [] },
 		markKnowledgeUsed: () => true,
+		openSection: async () => null,
 		...overrides,
 	};
 }

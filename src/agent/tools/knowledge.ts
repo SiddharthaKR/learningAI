@@ -21,6 +21,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import type { Retriever } from "../../knowledge/retriever.ts";
 import type { KnowledgeResult } from "../../knowledge/contracts.ts";
+import { MAX_SECTION_CHARS, type KnowledgeSectionResponse } from "../../knowledge/map-contracts.ts";
 
 const searchKnowledgeInput = Type.Object({
 	queries: Type.Array(Type.String({ minLength: 1 }), {
@@ -32,6 +33,20 @@ const searchKnowledgeInput = Type.Object({
 	}),
 });
 
+const openSectionInput = Type.Object({
+	file: Type.String({ minLength: 1, description: "File name exactly as shown in a search citation." }),
+	section: Type.Union([Type.Array(Type.String()), Type.String()], {
+		description:
+			"Heading path shown after § in the citation, outermost first: an array of headings, or one string with " +
+			"\" › \" separators. [] reads the whole document.",
+	}),
+});
+
+function normalizeSectionPath(section: string[] | string): string[] {
+	const parts = (Array.isArray(section) ? section : [section]).flatMap((part) => part.split(" › "));
+	return parts.map((part) => part.trim()).filter((part) => part.length > 0);
+}
+
 export interface KnowledgeToolContext {
 	/** The session owner's user ID — retrieval resolves only their personal + shared chunks. */
 	ownerId: string;
@@ -42,6 +57,10 @@ export interface KnowledgeToolContext {
 	/** Atomically set knowledgeUsed on the session. Returns true if the
 	 *  transition false→true was persisted. Throws on persist failure. */
 	markKnowledgeUsed: (chatId: string) => boolean;
+	/** open_section port (injected from the composition root): resolve a file
+	 *  name + heading path among the owner's personal + shared documents.
+	 *  null = not found; {ambiguous} = several documents share the name. */
+	openSection: (ownerId: string, fileName: string, section: string[]) => Promise<KnowledgeSectionResponse | { ambiguous: string[] } | null>;
 }
 
 export function formatCitation(result: KnowledgeResult): string {
@@ -73,7 +92,8 @@ export function createKnowledgeTool(ctx: KnowledgeToolContext): Record<string, A
 				"Search the owner's office documents (shared and personal) by keyword. Returns up to 8 relevant text " +
 				"chunks with exact citations (filename, page/slide/heading/paragraph/line). Include Japanese AND English " +
 				"formulations plus key terms or acronyms in your queries so bilingual documents are found. " +
-				"When citing retrieved content in your response, always name the source file and location.",
+				"When citing retrieved content in your response, always name the source file and location. " +
+					"To read a whole section when one hit is not enough, call open_section with a result's file name and its § path.",
 			parameters: searchKnowledgeInput,
 			execute: serverExecute("search_knowledge", searchKnowledgeInput, async ({ queries }): Promise<string | object> => {
 				// Runtime backstop: the schema enforces 1–4 non-empty strings,
@@ -96,6 +116,40 @@ export function createKnowledgeTool(ctx: KnowledgeToolContext): Record<string, A
 					(r, i) => `${i + 1}. ${formatCitation(r)}\n${r.text}`,
 				);
 				return formatted.join("\n\n---\n\n");
+			}),
+		},
+		open_section: {
+			name: "open_section",
+			label: "open_section",
+			description:
+				"Read a WHOLE section of one office document (shared or personal) when a single search_knowledge hit is not enough. " +
+				"`file` is the file name exactly as shown in a search citation. `section` is the heading path shown after § in the " +
+				"citation, outermost heading first, as an array (e.g. [\"Chapter 2\", \"Setup\"]); it may also be one string with " +
+				"\" › \" separators exactly as the citation shows it (\"Chapter 2 › Setup\"). An empty array reads the whole document. " +
+				"Output is capped at 12,000 characters; open a deeper subsection for the rest.",
+			parameters: openSectionInput,
+			execute: serverExecute("open_section", openSectionInput, async ({ file, section }): Promise<string | object> => {
+				const path = normalizeSectionPath(section);
+				const found = await ctx.openSection(ctx.ownerId, file, path);
+				if (!found) {
+					return `No section found for file "${file}"${path.length ? ` at §${path.join(" › ")}` : ""}. ` +
+						"Use search_knowledge first and pass a result's file name and § path exactly as cited.";
+				}
+				if ("ambiguous" in found) {
+					return `Several documents match "${file}": ${found.ambiguous.join("; ")}. Cannot choose between them; tell the user the file name is ambiguous.`;
+				}
+				// STICKY PERSIST: same rule as search_knowledge — before any content.
+				try {
+					ctx.markKnowledgeUsed(ctx.chatId);
+				} catch (err) {
+					console.error(`[open_section] sticky persist failed for chat ${ctx.chatId}:`, err);
+					return "Knowledge retrieval succeeded but the session could not be updated. Please try again.";
+				}
+				const header = found.citation
+					? formatCitation({ id: "", sourceId: found.documentId, text: "", score: 0, citation: found.citation, section: found.path } as KnowledgeResult)
+					: `[${found.fileName}${found.path.length ? `, §${found.path.join(" › ")}` : ""}]`;
+				return `${header}\n${found.text}` +
+					(found.truncated ? `\n\n[Section truncated at ${MAX_SECTION_CHARS.toLocaleString("en-US")} characters — open a deeper subsection for the rest.]` : "");
 			}),
 		},
 	};
