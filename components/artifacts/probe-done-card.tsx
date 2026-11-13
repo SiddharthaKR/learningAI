@@ -4,6 +4,7 @@ import { ClipboardCheckIcon } from "lucide-react";
 import { parseProbeDoneInput, type ProbeDoneResult } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
 import { formatMessage } from "@/src/core";
+import { MessageResponse } from "@/components/ai-elements/message";
 
 /**
  * The probe conclusion card (docs/probe-teach-split.md §2): renders the
@@ -59,11 +60,12 @@ export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unkn
 					{strands.map((s, i) => (
 						<div key={i} className="rounded-lg bg-background/60 px-3 py-2">
 							<div className="text-sm font-medium">{s.strand}</div>
-							<div className="mt-0.5 text-sm text-muted-foreground">{s.assessment}</div>
+							{/* Markdown (owner report, 2026-11-13): the prober writes **Floor:** etc. */}
+							<MessageResponse className="mt-0.5 text-sm text-muted-foreground [&_p]:my-0">{s.assessment}</MessageResponse>
 						</div>
 					))}
 					{assessment?.summary && (
-						<p className="px-1 text-sm text-muted-foreground">{assessment.summary}</p>
+						<MessageResponse className="px-1 text-sm text-muted-foreground [&_p]:my-0">{assessment.summary}</MessageResponse>
 					)}
 				</div>
 			) : (

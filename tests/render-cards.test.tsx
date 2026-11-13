@@ -474,6 +474,22 @@ describe("probe-done card", () => {
 		assert.ok(!echoless.includes("modal logic basics"), "no assessment echo in the result");
 	});
 
+	it("renders Markdown in the assessment instead of literal ** markers", () => {
+		const markdown = {
+			...validAssessment,
+			strands: validAssessment.strands.map((s: { strand: string; assessment: string }, i: number) =>
+				i === 0 ? { ...s, assessment: "**Floor:** knows the idea. **Ceiling/Gap:** lacks the mechanics." } : s,
+			),
+			summary: "The learner needs **mechanics** first.",
+		};
+		const html = renderToStaticMarkup(
+			<ProbeDoneCard part={{ state: "output-available", input: { assessment: markdown }, output: { ok: true } } as never} />,
+		);
+		assert.ok(!html.includes("**Floor:**"), "no literal bold markers");
+		assert.match(html, /<strong[^>]*>Floor:<\/strong>/);
+		assert.match(html, /<strong[^>]*>mechanics<\/strong>/);
+	});
+
 	it("previews the assessment from a PENDING (validated) input", () => {
 		const html = renderToStaticMarkup(
 			<ProbeDoneCard part={{ state: "input-available", input: { assessment: validAssessment } } as never} />,
