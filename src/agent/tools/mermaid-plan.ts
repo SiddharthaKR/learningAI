@@ -104,7 +104,7 @@ export function parseMermaidPlan(mermaid: string): PlanParseResult {
 	};
 
 	for (let i = first + 1; i < lines.length; i++) {
-		const line = lines[i]?.trim() ?? "";
+		const line = (lines[i]?.trim() ?? "").replace(/;+$/, "");
 		const no = i + 1;
 		if (line.length === 0 || line.startsWith("%%")) continue;
 
