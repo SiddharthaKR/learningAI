@@ -726,10 +726,10 @@ function SessionsSidebar() {
 					</button>
 				</div>
 
-				<div className="mx-3 mb-2 flex items-center gap-2">
-					<span className="text-xs uppercase tracking-widest text-muted-foreground/70">{copy.sidebar.sessions}</span>
+				<div className="mx-3 mb-2 mt-2 space-y-2 border-t border-border pt-3">
+					<h2 className="text-sm font-semibold text-foreground">{copy.sidebar.sessions}</h2>
 					<Hint label={copy.sidebar.searchSessions} action="sessions-search" side="bottom">
-					<span className="relative flex-1">
+					<span className="relative block">
 						<Input
 							ref={searchRef}
 							data-testid="session-search"
@@ -794,12 +794,14 @@ function SessionsSidebar() {
 				    Practice / All — the real modes first, "All" as the escape
 				    hatch on the right, mirroring the create-buttons above.
 				    Persisted client-side. */}
-				<div className="mx-3 flex items-center gap-0.5 rounded-md border border-border/60 bg-background p-0.5" data-testid="session-kind-filter">
+				<p id="session-kind-filter-label" className="mx-3 mb-1 text-xs text-muted-foreground">{copy.sidebar.filterByType}</p>
+				<div role="group" aria-labelledby="session-kind-filter-label" className="mx-3 flex items-center gap-0.5 rounded-md border border-border/60 bg-background p-0.5" data-testid="session-kind-filter">
 					{(["teach", "practice", "chat"] as const).map((f) => (
 						<button
 							key={f}
 							type="button"
 							data-testid={`kind-filter-${f}`}
+							aria-pressed={kindFilter === f}
 							onClick={() => setFilter(f)}
 							className={cn(
 								"flex-1 rounded-sm px-2 py-1 text-[11px] uppercase tracking-wider transition-colors",
