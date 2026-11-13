@@ -12,7 +12,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev",
-		"build": "next build && node scripts/check-build-artifacts.mjs",
+		"build": "next build --webpack && node scripts/check-build-artifacts.mjs",
 		"start": "next start",
 		"build:source": "node scripts/build-source.mjs",
 		"test": "tsx --import ./tests/bootstrap.mjs --test tests/*.test.ts tests/*.test.tsx",
