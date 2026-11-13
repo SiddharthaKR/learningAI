@@ -40,9 +40,15 @@ import {
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
 
+/** A base64-encoded image attached to a text input. */
+export interface ChatInputImage {
+	data: string;
+	mimeType: string;
+}
+
 /** One client-originated input event (the POST body's `input`). */
 export type ChatInput =
-	| { type: "text"; text: string }
+	| { type: "text"; text: string; images?: ChatInputImage[] }
 	| { type: "answer"; toolCallId: string; answer: QuestionAnswerData }
 	| { type: "continue" }
 	/** The practice dock's two buttons (owner, 2026-10-04): the learner's
@@ -147,6 +153,22 @@ export function dismissAppends(record: { messages: LhMessage[] }, input: Dismiss
 	return [newAnswerResult(input.toolCallId, pending.tool, input.answer)];
 }
 
+const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+function parseInputImages(raw: unknown): ChatInputImage[] {
+	if (raw === undefined || raw === null) return [];
+	if (!Array.isArray(raw)) throw new ChatInputError("images must be an array");
+	return raw.map((img, idx) => {
+		if (typeof img !== "object" || img === null) throw new ChatInputError(`images[${idx}] must be an object`);
+		const { data, mimeType } = img as Record<string, unknown>;
+		if (typeof data !== "string" || data.length === 0) throw new ChatInputError(`images[${idx}].data must be a non-empty string`);
+		if (typeof mimeType !== "string" || !ALLOWED_IMAGE_TYPES.has(mimeType)) {
+			throw new ChatInputError(`images[${idx}].mimeType must be one of ${[...ALLOWED_IMAGE_TYPES].join(", ")}`);
+		}
+		return { data, mimeType } as ChatInputImage;
+	});
+}
+
 /** A malformed input event (the honest 400 — the orphan-trap discipline). */
 export class ChatInputError extends Error {}
 
@@ -155,11 +177,15 @@ export function parseChatInput(input: unknown): ChatInput {
 	if (typeof input !== "object" || input === null) throw new ChatInputError("input must be an object");
 	const i = input as Record<string, unknown>;
 	switch (i.type) {
-		case "text":
-			if (typeof i.text !== "string" || (i.text as string).trim().length === 0) {
-				throw new ChatInputError("text input requires non-empty text");
+		case "text": {
+			const images = parseInputImages(i.images);
+			if (typeof i.text !== "string" || ((i.text as string).trim().length === 0 && images.length === 0)) {
+				throw new ChatInputError("text input requires non-empty text or at least one image");
 			}
-			return { type: "text", text: i.text };
+			return images.length > 0
+				? { type: "text", text: i.text, images }
+				: { type: "text", text: i.text };
+		}
 		case "answer":
 			if (typeof i.toolCallId !== "string" || i.toolCallId.length === 0) {
 				throw new ChatInputError("answer input requires toolCallId");
@@ -200,7 +226,7 @@ export function inputAppends(
 ): LhMessage[] {
 	switch (input.type) {
 		case "text":
-			return [...dismissalConclusion(record), newUserMessage(input.text)];
+			return [...dismissalConclusion(record), newUserMessage(input.text, input.images)];
 		case "answer": {
 			const pending = danglingQuestionOf(record.messages);
 			if (!pending || pending.toolCallId !== input.toolCallId) {

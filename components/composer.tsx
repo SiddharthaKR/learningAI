@@ -1,9 +1,16 @@
 "use client";
 
-import { ArrowRightIcon, CornerDownLeftIcon, SquareIcon } from "lucide-react";
+import { useRef as useReactRef } from "react";
+import { ArrowRightIcon, CornerDownLeftIcon, ImageIcon, SquareIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Hint } from "@/components/ui/hint";
 import { useI18n } from "@/components/i18n-provider";
+
+export interface ComposerImage {
+	data: string;
+	mimeType: string;
+	preview: string;
+}
 
 /**
  * The chat composer — content row ONLY (the persistent rounded shell lives in
@@ -37,6 +44,8 @@ export function enterAction(state: {
 	return "none";
 }
 
+const ACCEPTED_IMAGE_TYPES = "image/png,image/jpeg,image/webp";
+
 export function Composer({
 	busy,
 	value,
@@ -50,6 +59,8 @@ export function Composer({
 	placeholder = "Ask, answer, or steer the lesson…",
 	nextProblem = false,
 	onNext,
+	images,
+	onImagesChange,
 }: {
 	busy: boolean;
 	value: string;
@@ -75,8 +86,27 @@ export function Composer({
 	/** The signal's dispatcher (send({type:"next"})) — the chip and the
 	 *  empty-Enter share it. */
 	onNext?: () => void;
+	images?: ComposerImage[];
+	onImagesChange?: (images: ComposerImage[]) => void;
 }) {
 	const copy = useI18n();
+	const fileInputRef = useReactRef<HTMLInputElement | null>(null);
+	const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const files = e.target.files;
+		if (!files || !onImagesChange) return;
+		for (const file of files) {
+			if (!file.type.match(/^image\/(png|jpeg|webp)$/)) continue;
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				const base64 = result.split(",")[1];
+				if (!base64) return;
+				onImagesChange([...(images ?? []), { data: base64, mimeType: file.type, preview: result }]);
+			};
+			reader.readAsDataURL(file);
+		}
+		e.target.value = "";
+	};
 	const act = () => {
 		const action = enterAction({ busy, canSend, nextProblem });
 		if (action === "stop") onStop();
@@ -84,15 +114,46 @@ export function Composer({
 		else if (action === "next") onNext?.();
 	};
 	return (
-		<form
-			data-testid="composer"
-			className="flex items-end gap-1.5 p-1.5"
-			onSubmit={(e) => {
-				e.preventDefault();
-				act();
-			}}
-		>
-			<textarea
+		<div>
+			{images && images.length > 0 && (
+				<div className="flex flex-wrap gap-1.5 px-3 pt-2">
+					{images.map((img, i) => (
+						<div key={i} className="group/thumb relative">
+							{/* eslint-disable-next-line @next/next/no-img-element */}
+							<img src={img.preview} alt="" className="size-14 rounded-md border border-border object-cover" />
+							<button
+								type="button"
+								onClick={() => onImagesChange?.(images.filter((_, j) => j !== i))}
+								className="absolute -right-1 -top-1 hidden size-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground group-hover/thumb:flex"
+							>
+								<XIcon className="size-2.5" />
+							</button>
+						</div>
+					))}
+				</div>
+			)}
+			<form
+				data-testid="composer"
+				className="flex items-end gap-1.5 p-1.5"
+				onSubmit={(e) => {
+					e.preventDefault();
+					act();
+				}}
+			>
+				{onImagesChange && (
+					<>
+						<input ref={fileInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES} multiple className="hidden" onChange={handleFileSelect} />
+						<button
+							type="button"
+							onClick={() => fileInputRef.current?.click()}
+							className="flex size-10 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+							aria-label={copy.composer.attachImage ?? "Attach image"}
+						>
+							<ImageIcon className="size-4" />
+						</button>
+					</>
+				)}
+				<textarea
 				ref={inputRef}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
@@ -160,5 +221,6 @@ export function Composer({
 					</button>
 				)}
 		</form>
+		</div>
 	);
 }

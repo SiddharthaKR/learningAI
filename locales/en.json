@@ -124,7 +124,8 @@
     "selectedNode": "{count} node selected",
     "selectedNodes": "{count} nodes selected",
     "pickNodes": "Pick nodes",
-    "clear": "Clear"
+    "clear": "Clear",
+    "attachImage": "Attach image"
   },
   "coverage": {
     "extracting": "extracting…",

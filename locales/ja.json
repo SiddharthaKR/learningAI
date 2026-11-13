@@ -124,7 +124,8 @@
     "selectedNode": "{count}件のノードを選択中",
     "selectedNodes": "{count}件のノードを選択中",
     "pickNodes": "ノードを選択",
-    "clear": "クリア"
+    "clear": "クリア",
+    "attachImage": "画像を添付"
   },
   "coverage": {
     "extracting": "抽出中…",

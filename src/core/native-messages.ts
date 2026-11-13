@@ -34,7 +34,7 @@
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, ImageContent, Message, TextContent, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
@@ -119,11 +119,18 @@ export function newMessageId(): string {
 //     core/input-events.ts; steers in core/contracts/jobs.ts) ─────────────────
 
 /** A learner-authored user message (text input, verdict note). */
-export function newUserMessage(text: string): LhMessage & UserMessage {
+export function newUserMessage(text: string, images?: { data: string; mimeType: string }[]): LhMessage & UserMessage {
+	const content: string | (TextContent | ImageContent)[] =
+		images && images.length > 0
+			? [
+				...images.map((img): ImageContent => ({ type: "image", data: img.data, mimeType: img.mimeType })),
+				...(text ? [{ type: "text", text } as TextContent] : []),
+			]
+			: text;
 	return {
 		id: newMessageId(),
 		role: "user",
-		content: text,
+		content,
 		timestamp: Date.now(),
 	};
 }
