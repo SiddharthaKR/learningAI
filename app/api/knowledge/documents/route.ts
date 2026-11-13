@@ -1,7 +1,7 @@
 import { withOfficeUser } from "@/src/server";
 import { currentUserId } from "@/src/server";
 import { checkedStoresForUser } from "@/src/server";
-import { indexKnowledgeDocument, sharedKnowledgeStore } from "@/src/server";
+import { appendSharedKnowledgeAudit, indexKnowledgeDocument, sharedKnowledgeStore, usernameForUserId } from "@/src/server";
 import { MAX_KNOWLEDGE_MULTIPART_BYTES, validateKnowledgeUpload } from "@/src/core";
 import type { KnowledgeDocumentRecord } from "@/src/core";
 
@@ -61,6 +61,10 @@ export const POST = withOfficeUser(async (request: Request) => {
     if (!text.trim()) return Response.json({ error: "no_readable_text" }, { status: 422 });
     const store = destination === "shared" ? sharedKnowledgeStore : checkedStoresForUser(currentUserId()).knowledgeStore;
     const document = destination === "chat" ? indexed.document : await store.uploadDocument({ fileName: file.name, data, contentType: file.type });
+    if (destination === "shared") {
+      const userId = currentUserId();
+      await appendSharedKnowledgeAudit({ at: new Date().toISOString(), userId, username: await usernameForUserId(userId), action: "add", fileName: document.fileName, documentId: document.id });
+    }
     return Response.json({ document: publicDocument(document), text: text.slice(0, 24_000), truncated: text.length > 24_000 });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";

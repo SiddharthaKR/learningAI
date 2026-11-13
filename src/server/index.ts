@@ -56,3 +56,4 @@ export * from "./accounts.ts";
 export * from "./office-auth.ts";
 export * from "./session-auth.ts";
 export * from "./source-archive.ts";
+export * from "./knowledge-audit.ts";

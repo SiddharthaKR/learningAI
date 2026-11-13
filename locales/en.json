@@ -18,7 +18,15 @@
     "invalid_upload": "Choose one valid document to upload.",
     "invalid_file_name": "The document filename is invalid. Rename it and try again.",
     "upload_failed": "The document could not be uploaded. Please try again.",
-    "delete_failed": "The document could not be deleted. Please try again."
+    "delete_failed": "The document could not be deleted. Please try again.",
+    "no_readable_text": "This file has no readable text.",
+    "uploadTo": "Upload to",
+    "personal": "Personal",
+    "shared": "Shared",
+    "sharedActivity": "Shared activity",
+    "added": "Added",
+    "deleted": "Deleted",
+    "noActivity": "No activity yet."
   },
   "common": {
     "english": "English",

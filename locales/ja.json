@@ -18,7 +18,15 @@
     "invalid_upload": "有効なドキュメントを1つ選択してください。",
     "invalid_file_name": "ファイル名が無効です。名前を変更して再試行してください。",
     "upload_failed": "アップロードできませんでした。もう一度お試しください。",
-    "delete_failed": "削除できませんでした。もう一度お試しください。"
+    "delete_failed": "削除できませんでした。もう一度お試しください。",
+    "no_readable_text": "このファイルには読み取れるテキストがありません。",
+    "uploadTo": "アップロード先",
+    "personal": "個人",
+    "shared": "共有",
+    "sharedActivity": "共有アクティビティ",
+    "added": "追加",
+    "deleted": "削除",
+    "noActivity": "アクティビティはまだありません。"
   },
   "common": {
     "english": "英語",
