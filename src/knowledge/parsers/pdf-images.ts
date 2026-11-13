@@ -1,4 +1,4 @@
-import { deflateSync } from "fflate";
+import { zlibSync } from "fflate";
 import { standardFontsDir } from "../../agent/subagents/pdf-ops.ts";
 import type { ExtractedImage } from "../contracts.ts";
 
@@ -38,7 +38,7 @@ function pngChunk(type: string, data: Uint8Array): Uint8Array {
 	return out;
 }
 
-function rgbaToPng(width: number, height: number, rgba: Uint8Array): Uint8Array {
+export function rgbaToPng(width: number, height: number, rgba: Uint8Array): Uint8Array {
 	const signature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 	const ihdr = new Uint8Array(13);
@@ -54,7 +54,7 @@ function rgbaToPng(width: number, height: number, rgba: Uint8Array): Uint8Array 
 		raw[y * (1 + rowBytes)] = 0; // filter: none
 		raw.set(rgba.subarray(y * rowBytes, y * rowBytes + rowBytes), y * (1 + rowBytes) + 1);
 	}
-	const compressed = deflateSync(raw);
+	const compressed = zlibSync(raw);
 	const idatChunk = pngChunk("IDAT", compressed);
 	const iendChunk = pngChunk("IEND", new Uint8Array(0));
 
@@ -65,6 +65,51 @@ function rgbaToPng(width: number, height: number, rgba: Uint8Array): Uint8Array 
 		offset += part.length;
 	}
 	return png;
+}
+
+/** pdfjs resolves image objects asynchronously: objs.get(name) throws until
+ *  they arrive, so wait via the callback form (bounded). */
+function resolveImageObject(page: { objs: { get(name: string, cb?: (value: unknown) => void): unknown } }, name: string): Promise<unknown> {
+	return new Promise((resolve) => {
+		const timer = setTimeout(() => resolve(undefined), 10000);
+		try {
+			page.objs.get(name, (value) => {
+				clearTimeout(timer);
+				resolve(value);
+			});
+		} catch {
+			clearTimeout(timer);
+			resolve(undefined);
+		}
+	});
+}
+
+/** pdfjs ImageKind -> RGBA bytes (1 = 1bpp gray, 2 = RGB24, 3 = RGBA32). */
+function toRgba(width: number, height: number, kind: number, data: Uint8Array | Uint8ClampedArray): Uint8Array | undefined {
+	if (kind === 3) return data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+	const out = new Uint8Array(width * height * 4);
+	if (kind === 2) {
+		for (let i = 0, n = width * height; i < n; i++) {
+			out[i * 4] = data[i * 3]!;
+			out[i * 4 + 1] = data[i * 3 + 1]!;
+			out[i * 4 + 2] = data[i * 3 + 2]!;
+			out[i * 4 + 3] = 255;
+		}
+		return out;
+	}
+	if (kind === 1) {
+		const rowBytes = Math.ceil(width / 8);
+		for (let y = 0; y < height; y++) {
+			for (let x = 0; x < width; x++) {
+				const bit = (data[y * rowBytes + (x >> 3)]! >> (7 - (x & 7))) & 1;
+				const o = (y * width + x) * 4;
+				out[o] = out[o + 1] = out[o + 2] = bit ? 255 : 0;
+				out[o + 3] = 255;
+			}
+		}
+		return out;
+	}
+	return undefined;
 }
 
 export async function extractPdfImages(fileName: string, data: Uint8Array): Promise<ExtractedImage[]> {
@@ -94,11 +139,12 @@ export async function extractPdfImages(fileName: string, data: Uint8Array): Prom
 				if (!imageName || seen.has(imageName)) continue;
 				seen.add(imageName);
 				try {
-					const imgObj = page.objs.get(imageName) as { width: number; height: number; data: Uint8Array | Uint8ClampedArray; kind: number } | undefined;
+					const imgObj = (await resolveImageObject(page, imageName)) as { width: number; height: number; data: Uint8Array | Uint8ClampedArray; kind: number } | undefined;
 					if (!imgObj?.data || !imgObj.width || !imgObj.height) continue;
 					const rawBytes = imgObj.data.length;
 					if (!meetsMinimumSize(rawBytes, imgObj.width, imgObj.height)) continue;
-					const rgba = imgObj.data instanceof Uint8Array ? imgObj.data : new Uint8Array(imgObj.data.buffer, imgObj.data.byteOffset, imgObj.data.byteLength);
+					const rgba = toRgba(imgObj.width, imgObj.height, imgObj.kind, imgObj.data);
+						if (!rgba) continue;
 					const pngData = rgbaToPng(imgObj.width, imgObj.height, rgba);
 					images.push({
 						data: pngData,
