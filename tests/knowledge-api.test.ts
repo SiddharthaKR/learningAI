@@ -11,6 +11,7 @@ import { DELETE } from "../app/api/knowledge/documents/[id]/route.ts";
 import { MAX_KNOWLEDGE_UPLOAD_BYTES } from "../src/knowledge/upload.ts";
 import { pdfFixture, officeZip, slideXml, documentXml, paragraphXml } from "./fixtures/knowledge/builders.ts";
 import nextConfig from "../next.config.ts";
+import { loadKnowledgeChunks } from "../src/knowledge/service.ts";
 
 let a: Account;
 let b: Account;
@@ -23,11 +24,26 @@ before(async () => {
 function headers(owner?: Account): Headers {
   return new Headers(owner ? { cookie: `lh_session=${createSessionToken(owner.id, process.env.SESSION_SECRET!)}` } : {});
 }
-function upload(owner: Account | undefined, fileName: string, data: Uint8Array | string, type = ""): Request {
+function upload(owner: Account | undefined, fileName: string, data: Uint8Array | string, type = "", destination?: string): Request {
   const form = new FormData();
   form.set("file", new Blob([typeof data === "string" ? data : new Uint8Array(data)], { type }), fileName);
+  if (destination) form.set("destination", destination);
   return new Request("http://office.test/api/knowledge/documents", { method: "POST", headers: headers(owner), body: form });
 }
+
+it("extracts a chat-only presentation without publishing it, and shares only explicitly shared uploads", async () => {
+  const deck = officeZip({ "ppt/slides/slide1.xml": slideXml(["Unique attachment slide"]) });
+  const attached = await POST(upload(a, "attach.pptx", deck, "", "chat"));
+  assert.equal(attached.status, 200);
+  assert.match((await attached.json()).text, /Unique attachment slide/);
+  assert.ok(!(await loadKnowledgeChunks(a.id)).some((chunk) => chunk.citation.fileName === "attach.pptx"));
+  assert.equal((await POST(upload(a, "personal.pptx", deck, "", "personal"))).status, 200);
+  assert.ok(!(await loadKnowledgeChunks(b.id)).some((chunk) => chunk.citation.fileName === "personal.pptx"));
+  assert.equal((await POST(upload(a, "shared.pptx", deck, "", "shared"))).status, 200);
+  for (const owner of [a, b]) {
+    assert.ok((await loadKnowledgeChunks(owner.id)).some((chunk) => chunk.citation.fileName === "shared.pptx"));
+  }
+});
 const list = (owner?: Account) => GET(new Request("http://office.test/api/knowledge/documents", { headers: headers(owner) }));
 const remove = (owner: Account | undefined, id: string) => DELETE(new Request(`http://office.test/api/knowledge/documents/${id}`, { method: "DELETE", headers: headers(owner) }), { params: Promise.resolve({ id }) });
 

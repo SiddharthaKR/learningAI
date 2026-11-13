@@ -23,6 +23,7 @@ import { resolveSettings, type EffectiveSettings } from "../core/settings-resolu
 import { fixedOfficeModelSpec } from "./office-config.ts";
 /** The only path constructor for personal stores. */
 const cache = new Map<string, ReturnType<typeof constructUserStores>>();
+export const sharedKnowledgeStore = createKnowledgeStore(path.join(PATHS.data, "shared"), () => {});
 function assertOwnerExists(userId: string): void {
 	if (!accountExistsSync(PATHS.data, userId)) throw new Error("Owner account no longer exists");
 }

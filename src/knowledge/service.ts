@@ -50,5 +50,6 @@ export async function loadKnowledgeChunks(userId: string, options: KnowledgeLoad
 	const personal = options.loadPersonalSnapshot
 		? validateKnowledgeSnapshot(await options.loadPersonalSnapshot(userId))
 		: await (await import("../server/stores.ts")).checkedStoresForUser(userId).knowledgeStore.readSnapshot();
-	return [...(shared?.chunks ?? []), ...personal.chunks];
+	const uploaded = await (await import("../server/stores.ts")).sharedKnowledgeStore.readSnapshot();
+	return [...(shared?.chunks ?? []), ...uploaded.chunks, ...personal.chunks];
 }
