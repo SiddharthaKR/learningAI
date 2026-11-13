@@ -3,6 +3,9 @@ import { MAX_KNOWLEDGE_MULTIPART_BYTES } from "./src/knowledge/upload.ts";
 
 const nextConfig: NextConfig = {
 	experimental: {
+		// Avoid the Next.js 16.4 persisted-cache HMR reload loop after restart.
+		// https://github.com/vercel/next.js/issues/100267
+		turbopackFileSystemCacheForDev: false,
 		// Proxy clones the request body before the route can enforce file size.
 		proxyClientMaxBodySize: MAX_KNOWLEDGE_MULTIPART_BYTES,
 	},
