@@ -132,7 +132,8 @@
     "selectedNode": "{count} node selected",
     "selectedNodes": "{count} nodes selected",
     "pickNodes": "Pick nodes",
-    "clear": "Clear"
+    "clear": "Clear",
+    "attachImage": "Attach image"
   },
   "coverage": {
     "extracting": "extracting…",
@@ -450,6 +451,21 @@
     "doneAria": "Done picking — {count} {propositions} selected",
     "deleteSelected": "Delete {count} selected {nodes}",
     "delete": "Delete",
+    "edit": "Edit",
+    "editNodeAria": "Edit node",
+    "editNode": "Edit node",
+    "editNodeName": "Name",
+    "editNodeStatement": "Statement",
+    "save": "Save",
+    "saving": "Saving…",
+    "editFailed": "Edit failed — try again.",
+    "edited": "edited",
+    "editHistory": "Edit history",
+    "editHistoryEntry": "{user} · {date}",
+    "editFieldName": "Name",
+    "editFieldStatement": "Statement",
+    "editBefore": "was",
+    "editAfter": "now",
     "costHint": "Graph costs — click for details",
     "pipelineCosts": "Graph pipeline costs",
     "extraction": "Extraction",
@@ -579,6 +595,21 @@
     "downloadConversation": "Download conversation",
     "userRole": "User",
     "assistantRole": "Assistant"
+  },
+  "verify": {
+    "tooltip": "Verify claims against sources",
+    "running": "Verifying…",
+    "verified": "Verified",
+    "claim": "Claim",
+    "verdict": "Verdict",
+    "source": "Source",
+    "explanation": "Explanation",
+    "supported": "Supported",
+    "unsupported": "Unsupported",
+    "noSources": "No sources available for this session",
+    "partial": "Partially supported",
+    "close": "Close",
+    "noClaims": "No verifiable claims found."
   },
   "notesImport": {
     "invalidResponse": "Invalid import response. Please retry the file.",

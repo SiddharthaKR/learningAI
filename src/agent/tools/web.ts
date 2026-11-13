@@ -93,6 +93,9 @@ export interface WebToolPolicy {
 	canFetch?: (url: string) => boolean;
 	/** Search results are authorization sources; fetched-page links never are. */
 	onSearchResults?: (results: readonly WebSearchResult[]) => void;
+	/** Called after a successful web_fetch with the URL and extracted markdown
+	 *  — used by the session source store so the verifier can access raw content. */
+	onFetchContent?: (url: string, markdown: string) => void;
 }
 
 export function createWebTools(search: () => SearchProvider | null, fetchDeps: RestrictedFetchDeps = {}, approve?: WebApproval, policy: WebToolPolicy = {}): Record<string, AgentTool<any>> {
@@ -138,7 +141,9 @@ export function createWebTools(search: () => SearchProvider | null, fetchDeps: R
 					if (approve && await approve("web_fetch", url, reason) === null) return "user denied";
 					if (policy.enabled && !policy.enabled()) return "Web research is off for this session";
 					if (policy.canFetch && !policy.canFetch(url)) return "paste the link in chat to let me read it";
-					return await fetchAndExtract(url, fetchDeps);
+					const content = await fetchAndExtract(url, fetchDeps);
+					policy.onFetchContent?.(url, content);
+					return content;
 				} catch (err) {
 					const host = (() => { try { return new URL(url).hostname; } catch { return "invalid URL"; } })();
 					return `web_fetch failed for ${host}: ${err instanceof Error ? err.message : String(err)}`;

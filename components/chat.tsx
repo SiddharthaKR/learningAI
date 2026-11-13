@@ -48,6 +48,7 @@ import { PlanMarginalia, planExists } from "@/components/plan-window";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
 import { ArrowRightIcon, DumbbellIcon, MessageCircleIcon, WaypointsIcon } from "lucide-react";
+import { VerifyButton } from "@/components/verify-button";
 import type { PlanBlockData } from "@/src/core";
 import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
@@ -548,6 +549,7 @@ export function Chat({
 	const phases = useMemo(() => phaseTimeline(messages), [messages]);
 
 	const [text, setText] = useState("");
+	const [composerImages, setComposerImages] = useState<import("@/components/composer").ComposerImage[]>([]);
 	/* The composer's value MIRROR ("nothing gets lost" round, owner
 	 * 2026-10-01): a dictation flush lands via setState, which a closure
 	 * waiting through `await finish()` cannot observe in time. Kept
@@ -624,7 +626,7 @@ export function Chat({
 	// affordance).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
 	const canSend =
-		(text.trim().length > 0 || dictation.active) && !pending && !activeProblem && !compacting;
+		(text.trim().length > 0 || dictation.active || composerImages.length > 0) && !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1083,10 +1085,15 @@ export function Chat({
 	const doSend = () => {
 		if (busy || pending || compacting) return;
 		const t = textRef.current.trim();
-		if (!t) return;
+		const imgs = composerImages;
+		if (!t && imgs.length === 0) return;
 		draftRef.current = t; // the refusal flow's preserve-and-replay seam
 		applyText("");
-		void send({ type: "text", text: t });
+		setComposerImages([]);
+		const input: import("@/src/core/input-events").ChatInput = imgs.length > 0
+			? { type: "text", text: t || "Teach me about this image.", images: imgs.map((im) => ({ data: im.data, mimeType: im.mimeType })) }
+			: { type: "text", text: t };
+		void send(input);
 	};
 
 	/* STEER VS SEND (owner arc 2026-10-03): a send while a turn runs steers
@@ -1409,6 +1416,14 @@ export function Chat({
 												    sits INSIDE the rail, same mono-xs register and same 1ch
 												    rail as the thinking rows — one quote geometry. */}
 										<div className="font-medium uppercase tracking-wide text-muted-foreground">{copy.chat.you}</div>
+												{m.parts.some((p) => p.type === "image") && (
+													<div className="my-1 flex flex-wrap gap-2">
+														{m.parts.filter((p) => p.type === "image").map((p, ii) => (
+															// eslint-disable-next-line @next/next/no-img-element
+															<img key={ii} src={`data:${p.mimeType};base64,${p.data}`} alt="" className="max-h-48 rounded border border-border" />
+														))}
+													</div>
+												)}
 												<div className="lh-prose whitespace-pre-wrap text-foreground">
 													{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
 												</div>
@@ -1450,8 +1465,9 @@ export function Chat({
 														const sourceId = textPartMessageId(part.id);
 														const anchor = sourceId && sourceTextParts.get(sourceId) === part.id ? messageAnchorId(sourceId) : undefined;
 														return (
-															<div key={part.id || pi} id={anchor} data-source-message-id={sourceId ?? undefined} className="lh-source-passage">
+															<div key={part.id || pi} id={anchor} data-source-message-id={sourceId ?? undefined} className="group/passage lh-source-passage">
 																<MessageResponse>{part.text}</MessageResponse>
+																{part.text && <VerifyButton chatId={chatId} text={part.text} />}
 															</div>
 														);
 													}
@@ -1606,6 +1622,8 @@ export function Chat({
 							nextProblem={nextReady}
 							onNext={sendNext}
 							placeholder={nextReady ? copy.chat.askOrNext : undefined}
+							images={composerImages}
+							onImagesChange={setComposerImages}
 						/>
 					}
 					onSubmitAnswer={(output) => {

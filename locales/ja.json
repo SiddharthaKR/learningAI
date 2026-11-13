@@ -132,7 +132,8 @@
     "selectedNode": "{count}件のノードを選択中",
     "selectedNodes": "{count}件のノードを選択中",
     "pickNodes": "ノードを選択",
-    "clear": "クリア"
+    "clear": "クリア",
+    "attachImage": "画像を添付"
   },
   "coverage": {
     "extracting": "抽出中…",
@@ -450,6 +451,21 @@
     "doneAria": "選択完了 — {count}件の{propositions}を選択中",
     "deleteSelected": "選択した{count}件の{nodes}を削除",
     "delete": "削除",
+    "edit": "編集",
+    "editNodeAria": "ノードを編集",
+    "editNode": "ノードを編集",
+    "editNodeName": "名前",
+    "editNodeStatement": "命題",
+    "save": "保存",
+    "saving": "保存中…",
+    "editFailed": "編集に失敗しました。再試行してください。",
+    "edited": "編集済み",
+    "editHistory": "編集履歴",
+    "editHistoryEntry": "{user} · {date}",
+    "editFieldName": "名前",
+    "editFieldStatement": "命題",
+    "editBefore": "変更前",
+    "editAfter": "変更後",
     "costHint": "グラフのコスト — クリックして詳細を表示",
     "pipelineCosts": "グラフ処理のコスト",
     "extraction": "抽出",
@@ -579,6 +595,21 @@
     "downloadConversation": "会話をダウンロード",
     "userRole": "ユーザー",
     "assistantRole": "アシスタント"
+  },
+  "verify": {
+    "tooltip": "ソースに対して主張を検証する",
+    "running": "検証中…",
+    "verified": "検証済み",
+    "claim": "主張",
+    "verdict": "判定",
+    "source": "ソース",
+    "explanation": "説明",
+    "supported": "裏付けあり",
+    "unsupported": "裏付けなし",
+    "noSources": "このセッションに利用可能なソースがありません",
+    "partial": "部分的に裏付けあり",
+    "close": "閉じる",
+    "noClaims": "検証可能な主張が見つかりませんでした。"
   },
   "notesImport": {
     "invalidResponse": "取り込み結果の形式が正しくありません。ファイルを再試行してください。",

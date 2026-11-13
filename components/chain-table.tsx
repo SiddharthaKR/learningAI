@@ -63,6 +63,8 @@ import {
 	FolderIcon,
 	FolderOpenIcon,
 	Trash2Icon,
+	HistoryIcon,
+	PencilIcon,
 	ListTreeIcon,
 	SearchIcon,
 	XIcon,
@@ -71,6 +73,7 @@ import { chainsForSelection, formatChainLine, fuzzyScore } from "@/src/core";
 import type { GraphChain, GraphNode } from "@/src/core";
 import { TopBar } from "@/components/top-bar";
 import { DeleteNodeDialog } from "@/components/delete-node-dialog";
+import { EditNodeDialog } from "@/components/edit-node-dialog";
 import { LatexGlyph } from "@/components/latex-glyph";
 import { useI18n } from "@/components/i18n-provider";
 import { formatMessage } from "@/src/core";
@@ -115,6 +118,7 @@ export function ChainTableBody({
 	onToggleNodes,
 	onClear,
 	onDelete,
+	onEdit,
 	onClose,
 	selectMode,
 	onSelect,
@@ -138,6 +142,8 @@ export function ChainTableBody({
 	onClear: () => void;
 	/** Opens the full-death confirm dialog (owner, 2026-09-29 night). */
 	onDelete: () => void;
+	/** Opens the edit dialog for a single selected node. */
+	onEdit?: () => void;
 	onClose: () => void;
 	/** PRACTICE SELECT (2026-10-04): the floating bar's confirm becomes
 	 *  "Practice these" — no delete fence; the caller owns what the
@@ -473,8 +479,21 @@ export function ChainTableBody({
 																testid={`prop-checkbox-${id}`}
 														label={formatMessage(copy.selectNode, { name: node.name })}
 															/>
-															<span className="min-w-0 flex-1 text-xs leading-relaxed text-muted-foreground">
-																{node.statement}
+															<span className="min-w-0 flex-1">
+																<span className="text-xs leading-relaxed text-muted-foreground">{node.statement}</span>
+																{node.codeSnippets && node.codeSnippets.length > 0 && (
+																	<div className="mt-1 space-y-1">
+																		{node.codeSnippets.map((snippet, si) => (
+																			<pre key={si} className="overflow-x-auto rounded bg-muted/50 px-2 py-1 font-mono text-[10px] text-foreground">{snippet}</pre>
+																		))}
+																	</div>
+																)}
+																{node.editHistory && node.editHistory.length > 0 && (
+																	<span className="mt-1 inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/60">
+																		<HistoryIcon className="size-2.5" />
+																		{copy.edited} ({node.editHistory.length})
+																	</span>
+																)}
 															</span>
 															<span className="w-14 shrink-0" />
 															<span className="w-20 shrink-0" />
@@ -527,6 +546,17 @@ export function ChainTableBody({
 							</button>
 						) : (
 							<>
+							{selection.size === 1 && onEdit && (
+								<button
+									type="button"
+									data-testid="chain-edit"
+									onClick={onEdit}
+									className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+								>
+									<PencilIcon aria-hidden="true" className="size-3.5" />
+									{copy.edit}
+								</button>
+							)}
 							{/* The danger fence (owner ruling): a divider quarantines
 								    the destructive action at the bar's right end — the
 								    safe actions and the kill switch never blend. The
@@ -636,6 +666,7 @@ export function ChainTableOverlay({
 	const [expandedClusters, setExpandedClusters] = useState<ReadonlySet<string>>(() => new Set());
 	const [expandedChains, setExpandedChains] = useState<ReadonlySet<string>>(() => new Set());
 	const [deleteOpen, setDeleteOpen] = useState(false);
+	const [editOpen, setEditOpen] = useState(false);
 
 	// Controlled when the caller lifts the selection (the practice pick
 	// set); internal (uncontrolled) otherwise — the delete flow's own.
@@ -714,6 +745,7 @@ export function ChainTableOverlay({
 					onToggleNodes={toggleNodes}
 					onClear={() => applySelection(new Set())}
 					onDelete={() => setDeleteOpen(true)}
+					onEdit={selection.size === 1 ? () => setEditOpen(true) : undefined}
 					onClose={onClose}
 					selectMode={selectMode}
 					onSelect={onClose}
@@ -724,13 +756,19 @@ export function ChainTableOverlay({
 					nodes={selectedNodes.map((n) => ({ id: n.id, name: n.name }))}
 					onClose={() => setDeleteOpen(false)}
 					onDeleted={(deadIds, graphRevision) => {
-						// Close the dialog; prune the dead ids from the
-						// selection (the rest of a big selection survives);
-						// announce the revision so GraphView refetches the
-						// snapshot — fresh nodes/edges flow back in as props.
 						setDeleteOpen(false);
 						const dead = new Set(deadIds);
 						applySelection(new Set([...selection].filter((id) => !dead.has(id))));
+						window.dispatchEvent(new CustomEvent("lh:graph-revision", { detail: { graphRevision } }));
+					}}
+				/>
+			)}
+			{editOpen && selectedNodes.length === 1 && selectedNodes[0] && (
+				<EditNodeDialog
+					node={{ id: selectedNodes[0].id, name: selectedNodes[0].name, statement: selectedNodes[0].statement }}
+					onClose={() => setEditOpen(false)}
+					onEdited={(graphRevision) => {
+						setEditOpen(false);
 						window.dispatchEvent(new CustomEvent("lh:graph-revision", { detail: { graphRevision } }));
 					}}
 				/>

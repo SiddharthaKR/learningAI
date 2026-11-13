@@ -171,12 +171,17 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 		}
 
 		if (role === "user") {
-			const content = m.content as string | Array<{ type: string; text?: string }>;
-			const texts =
-				typeof content === "string"
-					? [content]
-					: content.filter((c) => c.type === "text").map((c) => (c as { text: string }).text);
-			out.push({ id: m.id, role: "user", parts: texts.map(textPart) });
+			const content = m.content as string | Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+			const parts: LhViewPart[] = [];
+			if (typeof content === "string") {
+				parts.push(textPart(content));
+			} else {
+				for (const c of content) {
+					if (c.type === "text" && c.text) parts.push(textPart(c.text));
+					else if (c.type === "image" && c.data && c.mimeType) parts.push({ type: "image", data: c.data, mimeType: c.mimeType });
+				}
+			}
+			out.push({ id: m.id, role: "user", parts });
 			continue;
 		}
 

@@ -144,6 +144,23 @@ export interface GraphNode {
 	createdAt: string;
 	/** Every (chat, message) point where this proposition came up. */
 	provenance: ProvenancePoint[];
+	/** Fenced code blocks associated with this proposition — commands,
+	 *  snippets, examples from the teaching session. Optional; absent
+	 *  on nodes created before the code-snippets feature. */
+	codeSnippets?: string[];
+	/** Manual edit audit trail — every user edit appended here. */
+	editHistory?: NodeEditEntry[];
+}
+
+/** One manual edit to a node — who, when, and what changed. */
+export interface NodeEditEntry {
+	userId: string;
+	editedAt: string;
+	changes: {
+		field: "name" | "statement";
+		oldValue: string;
+		newValue: string;
+	}[];
 }
 
 /** sessions.jsonl line — the emission checkpoint for one chat (which chats
@@ -228,6 +245,8 @@ export interface ExtractedProposition {
 	statement: string;
 	/** Verbatim phrasings the session used. */
 	aliases: string[];
+	/** Fenced code blocks taught alongside this proposition. */
+	codeSnippets?: string[];
 	/* Submit-schema slim (owner, 2026-09-28): `messages` and `evidence`
 	 * are GONE. The verbatim-quote fields were never persisted and weak
 	 * models burned their retries on them ("propositions.0: must be
