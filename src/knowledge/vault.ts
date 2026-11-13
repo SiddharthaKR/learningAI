@@ -66,10 +66,27 @@ export async function writeKnowledgeVault(root: string, snapshot: KnowledgeSnaps
 	try {
 		await mkdir(tempDir, { recursive: true });
 		for (const node of map.nodes) await writeFile(path.join(tempDir, `${names.get(node.id)}.md`), render(node), "utf8");
-		await rename(vaultDir, oldDir).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
-		await rename(tempDir, vaultDir);
+		await renameWithRetry(vaultDir, oldDir).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+		await renameWithRetry(tempDir, vaultDir);
 	} finally {
 		await rm(tempDir, { recursive: true, force: true }).catch(() => {});
 		await rm(oldDir, { recursive: true, force: true }).catch(() => {});
+	}
+}
+
+/** Windows briefly locks freshly written files (indexer/antivirus), so a
+ *  directory rename right after writing can fail with EPERM/EBUSY/EACCES.
+ *  Retry with a short backoff; anything else (or the last attempt) throws. */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+	const delays = [50, 100, 200, 400, 800, 1600];
+	for (let attempt = 0; ; attempt++) {
+		try {
+			await rename(from, to);
+			return;
+		} catch (error) {
+			const code = (error as NodeJS.ErrnoException).code;
+			if (attempt >= delays.length || (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES")) throw error;
+			await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+		}
 	}
 }
