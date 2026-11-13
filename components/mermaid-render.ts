@@ -11,6 +11,7 @@
 
 import { createMermaidPlugin } from "@streamdown/mermaid";
 import type { MermaidConfig } from "mermaid";
+import { quoteMermaidLabels } from "@/components/mermaid-heal";
 
 /** The chart's base font size (px) — mermaid sizes ALL text relative to
  *  this, so it's the number the display-width cap (md-blocks) divides by:
@@ -36,6 +37,23 @@ const plugin = createMermaidPlugin();
  *  mermaid caches rendered ids, and a repeated id across charts/renders
  *  returns the stale svg (the bug streamdown's own id minting avoids). */
 export async function renderMermaid(chart: string): Promise<string> {
+	try {
+		return await renderOnce(chart);
+	} catch (error) {
+		// One healing retry (owner, 2026-11-13): quote risky node labels. A
+		// chart that parsed is never touched; if healing changes nothing or
+		// still fails, the ORIGINAL error is what the learner sees.
+		const healed = quoteMermaidLabels(chart);
+		if (healed === chart) throw error;
+		try {
+			return await renderOnce(healed);
+		} catch {
+			throw error;
+		}
+	}
+}
+
+async function renderOnce(chart: string): Promise<string> {
 	const id = `lh-mermaid-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 	const { svg } = await plugin.getMermaid(mermaidTheme).render(id, chart);
 	return svg;
