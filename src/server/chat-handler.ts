@@ -29,6 +29,7 @@ import { checkedStoresForUser, effectiveSettings, stores } from "./stores.ts";
 import { currentUserId } from "./user-scope.ts";
 import { runOwnedJob } from "./owned-job.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
+import { addSessionSource } from "./session-sources.ts";
 import { searchProvider } from "./search.ts";
 import { userMessageUrls } from "./web-provenance.ts";
 import { webNeedsApproval } from "./web-policy.ts";
@@ -145,6 +146,7 @@ function spawnOfficeJob(jobId: string, ownerId: string | undefined, input?: unkn
 	void runOwnedJob(ownerId, jobId, async (id) => {
 		const owned = checkedStoresForUser(ownerId);
 		const runner = createJobRunner({
+			onFetchContent: addSessionSource,
 			chatStore: owned.chatStore,
 			jobStore: owned.jobStore,
 			deliver: deliverJobResult,

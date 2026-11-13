@@ -11,7 +11,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { PATHS } from "../../config.ts";
-import { currentUserId } from "../server/user-scope.ts";
+import { currentUserId } from "./user-scope.ts";
 
 export interface SourceEntry {
 	url: string;

@@ -1,7 +1,4 @@
-import { withOfficeUser } from "@/src/server";
-import { getChat } from "@/src/server";
-import { getSessionSources } from "@/src/agent/session-sources.ts";
-import { runVerifierAgent, type VerifierClaim } from "@/src/agent/subagents/verifier.ts";
+import { getChat, getSessionSources, runVerifierAgent, withOfficeUser, type VerifierClaim } from "@/src/server";
 
 /**
  * POST /api/chats/[id]/verify — verify a teaching message's claims

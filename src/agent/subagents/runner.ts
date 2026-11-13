@@ -28,7 +28,6 @@ import { runPdfReaderAgent } from "./pdf-reader.ts";
 import { runResearcherAgent } from "./researcher.ts";
 import type { WebApproval } from "../tools/web.ts";
 import { runVisualMaker } from "./visual-maker.ts";
-import { addSessionSource } from "../session-sources.ts";
 
 /**
  * The background job runner (contracts.ts "THE ASYNC PROTOCOL" §2–3), created
@@ -64,6 +63,7 @@ export const pdfModelOverride: { current?: PiEngine } = {};
 type JobToolInput = ResearchToolInput | DemoToolInput | VisualToolInput | PdfToolInput;
 
 export interface JobRunnerDeps {
+	onFetchContent?: (chatId: string, url: string, markdown: string) => void;
 	chatStore: ChatStore;
 	jobStore: JobStore;
 	/**
@@ -375,7 +375,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 					enabled: () => deps.webEnabled?.(job.chatId) ?? true,
 					canFetch: (url) => searchUrls.has(url) || deps.webAllowedUrl?.(job.chatId, url) === true,
 					onSearchResults: (results) => { for (const hit of results) searchUrls.add(hit.url); },
-					onFetchContent: (url, markdown) => addSessionSource(job.chatId, url, markdown),
+					onFetchContent: (url, markdown) => deps.onFetchContent?.(job.chatId, url, markdown),
 				},
 				approve: deps.webApproval ? ((tool, value, reason) => deps.webApproval!(job.chatId, tool, value, reason, (candidate) => searchUrls.has(candidate) || deps.webAllowedUrl?.(job.chatId, candidate) === true)) as WebApproval : undefined,
 				abortSignal: loop.abortSignal,
