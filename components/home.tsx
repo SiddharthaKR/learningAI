@@ -196,6 +196,31 @@ export function Home({
 							/>
 						)}
 					/>
+					<div className="flex flex-col items-center">
+						<div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-background p-0.5" data-testid="home-mode-switch">
+							{(["teach", "practice", "chat"] as const).map((m) => (
+								<button
+									key={m}
+									type="button"
+									data-testid={`home-mode-${m}`}
+									onClick={() => setMode(m)}
+									className={
+										"flex items-center gap-1 rounded-sm px-2 py-0.5 text-[11px] uppercase tracking-wider transition-colors " +
+										(mode === m
+											? "bg-accent text-foreground"
+											: "text-muted-foreground hover:text-foreground")
+									}
+								>
+									{m === "practice" ? <DumbbellIcon aria-hidden="true" className="size-3" /> : null}
+									{m === "chat" ? <MessageCircleIcon aria-hidden="true" className="size-3" /> : null}
+									{m === "teach" ? copy.home.teach : m === "practice" ? copy.home.practice : copy.home.chat}
+								</button>
+							))}
+						</div>
+						<p className="mt-1 text-[11px] text-muted-foreground">
+							{mode === "teach" ? copy.home.teachSubtitle : mode === "practice" ? copy.home.practiceSubtitle : copy.home.chatSubtitle}
+						</p>
+					</div>
 					<form
 						className="flex items-end gap-1.5 rounded-2xl border bg-card p-1.5 shadow-lg"
 					onSubmit={(e) => {
@@ -247,33 +272,6 @@ export function Home({
 					    pills write /api/settings/models). */}
 					<StatsBar
 						turns={[] as TurnUsage[]}
-						leadingSlot={
-							<div className="flex flex-col items-center">
-								<div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-background p-0.5" data-testid="home-mode-switch">
-									{(["teach", "practice", "chat"] as const).map((m) => (
-										<button
-											key={m}
-											type="button"
-											data-testid={`home-mode-${m}`}
-											onClick={() => setMode(m)}
-											className={
-												"flex items-center gap-1 rounded-sm px-2 py-0.5 text-[11px] uppercase tracking-wider transition-colors " +
-												(mode === m
-													? "bg-accent text-foreground"
-													: "text-muted-foreground hover:text-foreground")
-											}
-										>
-											{m === "practice" ? <DumbbellIcon aria-hidden="true" className="size-3" /> : null}
-											{m === "chat" ? <MessageCircleIcon aria-hidden="true" className="size-3" /> : null}
-											{m === "teach" ? copy.home.teach : m === "practice" ? copy.home.practice : copy.home.chat}
-										</button>
-									))}
-								</div>
-								<p className="mt-1 text-[11px] text-muted-foreground">
-									{mode === "teach" ? copy.home.teachSubtitle : mode === "practice" ? copy.home.practiceSubtitle : copy.home.chatSubtitle}
-								</p>
-							</div>
-						}
 					/>
 				</div>
 			</div>
