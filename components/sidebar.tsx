@@ -698,7 +698,7 @@ function SessionsSidebar() {
 						type="button"
 						data-testid="new-session"
 						onClick={() => void newSession()}
-						className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+						className="flex w-full items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold tracking-wide text-primary-foreground transition-colors hover:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 					>
 						<PlusIcon className="size-3" />
 						{copy.sidebar.teaching}
@@ -708,7 +708,7 @@ function SessionsSidebar() {
 						type="button"
 						data-testid="new-session-practice"
 						onClick={() => router.push("/chat/new?mode=practice")}
-						className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+						className="flex w-full items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold tracking-wide text-primary-foreground transition-colors hover:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 					>
 						<DumbbellIcon className="size-3" />
 						{copy.sidebar.practice}
@@ -718,7 +718,7 @@ function SessionsSidebar() {
 						type="button"
 						data-testid="new-session-chat"
 						onClick={() => router.push("/chat/new?mode=chat")}
-						className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+						className="flex w-full items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold tracking-wide text-primary-foreground transition-colors hover:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 					>
 						<MessageCircleIcon className="size-3" />
 						{copy.sidebar.chat}
@@ -806,7 +806,7 @@ function SessionsSidebar() {
 							className={cn(
 								"flex-1 rounded-sm px-2 py-1 text-[11px] uppercase tracking-wider transition-colors",
 								kindFilter === f
-									? "bg-accent text-foreground"
+									? "bg-muted font-semibold text-foreground"
 									: "text-muted-foreground hover:text-foreground",
 							)}
 						>
