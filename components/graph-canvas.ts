@@ -87,6 +87,9 @@ export interface CanvasNode {
 	color?: string;
 	/** Optional disc radius multiplier on settings.nodeSize; absent = 1. */
 	radius?: number;
+	/** Optional label tier: 0/absent = the global label gate; t > 0 = the
+	 *  label appears only after zooming in 2^t times further. */
+	labelTier?: number;
 }
 
 /** One directed edge of the DERIVED view (chains-primary, 2026-09-30):
@@ -587,6 +590,7 @@ export class GraphCanvasRenderer {
 	private data: CanvasData | null = null;
 	/** id -> node for the current data (avoids O(n^2) scans). */
 	private nodeById = new Map<string, CanvasNode>();
+	private hasLabelTiers = false;
 	private settings: GraphRenderSettings | null = null;
 	private visible: ReadonlySet<string> | null = null;
 	private lockLayout = false;
@@ -767,6 +771,7 @@ export class GraphCanvasRenderer {
 	setData(data: CanvasData): void {
 		this.data = data;
 		this.nodeById = new Map(data.nodes.map((n) => [n.id, n]));
+		this.hasLabelTiers = data.nodes.some((n) => (n.labelTier ?? 0) > 0);
 		let minX = Infinity;
 		let minY = Infinity;
 		let maxX = -Infinity;
@@ -1732,13 +1737,19 @@ export class GraphCanvasRenderer {
 
 		// 6. Node labels — one global gate, faded together. World-scaled
 		// with the graph (they grow as you zoom in, Obsidian-style).
-		if (nodeAlpha > 0.01) {
+		// Optional per-node labelTier (Knowledge Map, 2026-11-13): tier t
+		// appears only once zoomed in 2^t times further than tier 0 — deep
+		// sections stay unlabeled until you zoom toward them. Nodes without
+		// a tier keep the single global gate (the learning graph unchanged).
+		if (nodeAlpha > 0.01 || this.hasLabelTiers) {
 			ctx.save();
-			ctx.globalAlpha = nodeAlpha;
 			ctx.font = this.worldLabelFont;
 			for (const [id, lines] of this.labelLines) {
 				const n = this.nodeById.get(id);
 				if (!n) continue;
+				const alpha = n.labelTier ? labelAlpha(ratio * 2 ** n.labelTier, settings.labelZoom) : nodeAlpha;
+				if (alpha <= 0.01) continue;
+				ctx.globalAlpha = alpha;
 				drawNameLines(ctx, n.x, n.y, lines, this.world, data.colors.label, n.radius ?? 1);
 			}
 			ctx.restore();

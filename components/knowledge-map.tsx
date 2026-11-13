@@ -26,7 +26,9 @@ import {
 const MAP_SETTINGS: GraphRenderSettings = {
   ...DEFAULT_RENDER_SETTINGS,
   clusterLabels: false,
-  labelZoom: 2,
+  // Tier-0 labels (documents and the top two section levels) show at the
+  // fitted zoom; each deeper level needs ~2x more zoom (labelTier).
+  labelZoom: 1.2,
   arrowLength: 1.5,
 };
 
@@ -127,7 +129,21 @@ export function KnowledgeMap({ revision }: { revision: number }) {
       return; // no 2D canvas (non-browser environment)
     }
     rendererRef.current = renderer;
+    // Re-frame whenever the canvas is resized (tab open, side panel,
+    // window) until the user pans/zooms themselves — the first size the
+    // renderer sees is often pre-layout, which left the map off-frame.
+    let userMoved = false;
+    const markMoved = () => { userMoved = true; };
+    canvas.addEventListener("wheel", markMoved, { passive: true });
+    canvas.addEventListener("pointerdown", markMoved);
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => { if (!userMoved) requestAnimationFrame(() => renderer.fit()); });
+    observer?.observe(canvas);
     return () => {
+      observer?.disconnect();
+      canvas.removeEventListener("wheel", markMoved);
+      canvas.removeEventListener("pointerdown", markMoved);
       rendererRef.current = null;
       renderer.destroy();
     };
@@ -146,6 +162,7 @@ export function KnowledgeMap({ revision }: { revision: number }) {
         label: l.node.label,
         color: SCOPE_COLORS[l.node.scope],
         radius: l.radius,
+        labelTier: Math.max(0, l.node.path.length - 2),
       })),
       edges: layout.edges.map((e) => ({ from: e.from, to: e.to })),
       clusters: [],
