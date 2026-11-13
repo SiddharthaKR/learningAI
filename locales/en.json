@@ -92,7 +92,9 @@
   "home": {
     "startSession": "Start session",
     "teach": "Teach",
-    "practice": "Practice"
+    "practice": "Practice",
+    "teachSubtitle": "The tutor finds where you are, plans a path, and teaches step by step.",
+    "practiceSubtitle": "Work through problems on topics you've already learned."
   },
   "chat": {
     "sessionTitle": "Session title",

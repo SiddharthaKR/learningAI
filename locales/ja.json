@@ -92,7 +92,9 @@
   "home": {
     "startSession": "セッションを開始",
     "teach": "学習",
-    "practice": "練習"
+    "practice": "練習",
+    "teachSubtitle": "チューターがあなたの理解度を測り、計画を立て、段階的に教えます。",
+    "practiceSubtitle": "すでに学んだトピックの問題に取り組みます。"
   },
   "chat": {
     "sessionTitle": "セッション名",
