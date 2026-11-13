@@ -98,6 +98,7 @@ export type StepUsageCollector = (usage: Usage) => void;
 
 /** Per-request construction options (the handler wires all of these). */
 export interface AgentBuildOptions {
+	timeZone?: string;
 	/** Fixed on the session at creation, independent of the account UI language. */
 	teachingLanguage?: "en" | "ja";
 	/** Personal learner context; never persisted into another user's session. */
@@ -187,8 +188,15 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			? lastUserMessage.content.includes("\n\nExtracted attachment content\n\n")
 			: lastUserMessage.content.some((part) => part.type === "text" && part.text.includes("\n\nExtracted attachment content\n\n"))
 	);
+	let date: string;
+	try {
+		date = new Intl.DateTimeFormat("en", { dateStyle: "full", timeZone: opts.timeZone ?? "UTC" }).format(new Date());
+	} catch {
+		date = new Intl.DateTimeFormat("en", { dateStyle: "full", timeZone: "UTC" }).format(new Date());
+	}
 	const systemPrompt = [
 		basePrompt,
+		`Current date: ${date}.`,
 		attachedText ? "Use the extracted attachment content in the learner's message. Its filenames are display labels and do not identify server files." : null,
 		`Teach and respond in ${opts.teachingLanguage === "ja" ? "Japanese" : "English"} for this session. This language is fixed for the whole session.`,
 		opts.learnerBackground ? `Learner background (use for analogies and calibration; do not assume expertise beyond this): ${opts.learnerBackground}` : null,

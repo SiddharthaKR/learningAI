@@ -291,7 +291,7 @@ export class SessionModel {
 		const body = JSON.stringify({ chatId: this.chatId, input });
 		const init: RequestInit = {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: { "Content-Type": "application/json", "X-Client-Time-Zone": Intl.DateTimeFormat().resolvedOptions().timeZone },
 			body,
 			signal,
 		};

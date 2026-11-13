@@ -201,7 +201,7 @@ export async function handleChatRequest(
 		}
 		throw err;
 	}
-	return handleChatInput(chatId, input, buildAgent);
+	return handleChatInput(chatId, input, buildAgent, req.headers.get("X-Client-Time-Zone") ?? undefined);
 }
 
 /**
@@ -213,6 +213,7 @@ export async function handleChatInput(
 	chatId: string,
 	input: TurnInput,
 	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean }) => TeachingAgent,
+	timeZone?: string,
 ): Promise<Response> {
 	let record = stores.chatStore.getChat(chatId);
 	if (!record) {
@@ -383,6 +384,7 @@ export async function handleChatInput(
 	// sub-agent JOB tools (research/demo/visual/pdf; adjudicated with the
 	// user: quiz/ask/fs/plan/probe_done are always-on).
 	const agentOpts: AgentBuildOptions = {
+		timeZone,
 		teachingLanguage: record.teachingLanguage ?? "en",
 		learnerBackground: (await createAccountStore(PATHS.data).byId(currentUserId()))?.background,
 		engine,
