@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CornerDownLeftIcon, DumbbellIcon, MessageCircleIcon } from "lucide-react";
+import { CornerDownLeftIcon } from "lucide-react";
 import { GraphView } from "@/components/graph-view";
 import { MinimalHome } from "@/components/minimal-home";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
@@ -78,7 +78,6 @@ export function Home({
 	 *  may carry proposition picks from the chain table (the chip above
 	 *  the composer opens the picker; the picks seed the opening prompt).
 	 *  Not enforcing any input format — the picks are a convenience. */
-	const [mode, setMode] = useState<"teach" | "practice" | "chat">("teach");
 	const [practiceProps, setPracticeProps] = useState<{ id: string; name: string; statement: string }[]>([]);
 	const [chainSelectOpen, setChainSelectOpen] = useState(false);
 	// The chain table is CONTROLLED off this id set (the lifted pick).
@@ -111,7 +110,6 @@ export function Home({
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					title: t,
-					...(mode === "practice" ? { kind: "practice" } : mode === "chat" ? { kind: "chat" } : {}),
 					...(practiceProps.length > 0 ? { graphContext: { propositions: practiceProps } } : {}),
 				}),
 			});
@@ -188,7 +186,7 @@ export function Home({
 					    shows the pick HINT so the affordance is discoverable;
 					    teaching mode with nothing picked renders nothing. */}
 					<ComposerActions
-						picker={(practiceProps.length > 0 || mode === "practice") && (
+						picker={practiceProps.length > 0 && (
 							<NodePickerControl
 								count={practiceProps.length}
 								onOpen={() => setChainSelectOpen(true)}
@@ -196,31 +194,6 @@ export function Home({
 							/>
 						)}
 					/>
-					<div className="flex flex-col items-center">
-						<div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-background p-0.5" data-testid="home-mode-switch">
-							{(["teach", "practice", "chat"] as const).map((m) => (
-								<button
-									key={m}
-									type="button"
-									data-testid={`home-mode-${m}`}
-									onClick={() => setMode(m)}
-									className={
-										"flex items-center gap-1 rounded-sm px-2 py-0.5 text-[11px] uppercase tracking-wider transition-colors " +
-										(mode === m
-											? "bg-accent text-foreground"
-											: "text-muted-foreground hover:text-foreground")
-									}
-								>
-									{m === "practice" ? <DumbbellIcon aria-hidden="true" className="size-3" /> : null}
-									{m === "chat" ? <MessageCircleIcon aria-hidden="true" className="size-3" /> : null}
-									{m === "teach" ? copy.home.teach : m === "practice" ? copy.home.practice : copy.home.chat}
-								</button>
-							))}
-						</div>
-						<p className="mt-1 text-[11px] text-muted-foreground">
-							{mode === "teach" ? copy.home.teachSubtitle : mode === "practice" ? copy.home.practiceSubtitle : copy.home.chatSubtitle}
-						</p>
-					</div>
 					<form
 						className="flex items-end gap-1.5 rounded-2xl border bg-card p-1.5 shadow-lg"
 					onSubmit={(e) => {
@@ -250,7 +223,7 @@ export function Home({
 								void start();
 							}
 						}}
-						placeholder={mode === "practice" ? copy.newSession.practicePlaceholder : mode === "chat" ? copy.newSession.chatPlaceholder : copy.newSession.learnPlaceholder}
+						placeholder={copy.newSession.learnPlaceholder}
 						autoFocus
 						rows={1}
 						className="field-sizing-content lh-input max-h-48 min-h-10 flex-1 resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"

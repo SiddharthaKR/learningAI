@@ -44,6 +44,8 @@
     "teaching": "Teaching",
     "practice": "Practice",
     "all": "All",
+    "chat": "Chat",
+    "createChat": "create a new chat session",
     "createTeaching": "create a new teaching session",
     "createPractice": "create a new practice session",
     "sessions": "Sessions",

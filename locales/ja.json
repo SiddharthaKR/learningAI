@@ -44,6 +44,8 @@
     "teaching": "学習",
     "practice": "練習",
     "all": "すべて",
+    "chat": "チャット",
+    "createChat": "新しいチャットセッションを作成",
     "createTeaching": "新しい学習セッションを作成",
     "createPractice": "新しい練習セッションを作成",
     "sessions": "セッション",

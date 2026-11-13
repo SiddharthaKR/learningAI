@@ -382,7 +382,7 @@ export function RenameRow({ chat, onCommit, onCancel }: { chat: ChatListItem; on
 /** The three-way kind filter (practice sessions, owner 2026-10-04):
  *  Teaching / All / Practice — a client-side filter over the same
  *  snapshot, persisted in localStorage, defaulting to All. */
-export type SessionKindFilter = "teach" | "all" | "practice";
+export type SessionKindFilter = "teach" | "all" | "practice" | "chat";
 const KIND_FILTER_KEY = "lh:session-kind-filter";
 
 function SessionsSidebar() {
@@ -393,7 +393,7 @@ function SessionsSidebar() {
 	const [kindFilter, setKindFilter] = useState<SessionKindFilter>("all");
 	useEffect(() => {
 		const stored = window.localStorage.getItem(KIND_FILTER_KEY);
-		if (stored === "teach" || stored === "all" || stored === "practice") setKindFilter(stored);
+		if (stored === "teach" || stored === "all" || stored === "practice" || stored === "chat") setKindFilter(stored);
 	}, []);
 	const setFilter = useCallback((f: SessionKindFilter) => {
 		setKindFilter(f);
@@ -714,6 +714,16 @@ function SessionsSidebar() {
 						{copy.sidebar.practice}
 						<span className="sr-only">{copy.sidebar.createPractice}</span>
 					</button>
+					<button
+						type="button"
+						data-testid="new-session-chat"
+						onClick={() => router.push("/chat/new?mode=chat")}
+						className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+					>
+						<MessageCircleIcon className="size-3" />
+						{copy.sidebar.chat}
+						<span className="sr-only">{copy.sidebar.createChat}</span>
+					</button>
 				</div>
 
 				<div className="mx-3 mb-2 flex items-center gap-2">
@@ -785,7 +795,7 @@ function SessionsSidebar() {
 				    hatch on the right, mirroring the create-buttons above.
 				    Persisted client-side. */}
 				<div className="mx-3 flex items-center gap-0.5 rounded-md border border-border/60 bg-background p-0.5" data-testid="session-kind-filter">
-					{(["teach", "practice", "all"] as const).map((f) => (
+					{(["teach", "practice", "chat"] as const).map((f) => (
 						<button
 							key={f}
 							type="button"
@@ -798,7 +808,7 @@ function SessionsSidebar() {
 									: "text-muted-foreground hover:text-foreground",
 							)}
 						>
-							{f === "teach" ? copy.sidebar.teaching : f === "all" ? copy.sidebar.all : copy.sidebar.practice}
+							{f === "teach" ? copy.sidebar.teaching : f === "chat" ? copy.sidebar.chat : copy.sidebar.practice}
 						</button>
 					))}
 				</div>
