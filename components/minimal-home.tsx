@@ -35,17 +35,19 @@ export function KnowledgeSummary({
 	chains,
 	teachSessions,
 	practiceSessions,
+	chatSessions = 0,
 	importedNotes,
 }: {
 	propositions: number;
 	chains: number;
 	teachSessions: number;
 	practiceSessions: number;
+	chatSessions?: number;
 	importedNotes: number;
 }) {
 	const copy = useI18n().graphUi;
 	const empty =
-		propositions === 0 && chains === 0 && teachSessions === 0 && practiceSessions === 0 && importedNotes === 0;
+		propositions === 0 && chains === 0 && teachSessions === 0 && practiceSessions === 0 && chatSessions === 0 && importedNotes === 0;
 	return (
 		<div data-testid="knowledge-summary" className="flex flex-col items-center text-center">
 			{/* Own-line law (owner, 2026-10-06): every count sits on its own
@@ -67,6 +69,9 @@ export function KnowledgeSummary({
 				</p>
 				<p className="font-ui text-sm text-muted-foreground">
 					{practiceSessions} {practiceSessions === 1 ? copy.practiceSession : copy.practiceSessions}
+				</p>
+				<p className="font-ui text-sm text-muted-foreground">
+					{chatSessions} {chatSessions === 1 ? copy.chatSession : copy.chatSessions}
 				</p>
 			</div>
 			<div className="h-4" aria-hidden="true" />
@@ -132,6 +137,7 @@ export function MinimalHome({
 
 	const teachSessions = chats.filter((c) => c.kind === "teach").length;
 	const practiceSessions = chats.filter((c) => c.kind === "practice").length;
+	const chatSessions = chats.filter((c) => c.kind === "chat").length;
 
 	return (
 		<div className="relative h-full">
@@ -154,6 +160,7 @@ export function MinimalHome({
 					chains={snapshot?.chains.length ?? 0}
 					teachSessions={teachSessions}
 					practiceSessions={practiceSessions}
+					chatSessions={chatSessions}
 					importedNotes={Object.keys(snapshot?.fileSources ?? {}).length}
 				/>
 			</div>

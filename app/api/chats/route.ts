@@ -28,7 +28,7 @@ async function POSTImpl(req: Request) {
 	const title = typeof body.title === "string" ? body.title : "";
 	// Practice sessions (owner, 2026-10-04): kind "practice" marks the
 	// record — the practice agent + its tools from turn 1, no extraction.
-	const kind = body.kind === "practice" ? ("practice" as const) : undefined;
+	const kind = body.kind === "practice" ? ("practice" as const) : body.kind === "chat" ? ("chat" as const) : undefined;
 	const account = await createAccountStore(PATHS.data).byId(currentUserId());
 	if (!account) return Response.json({ error: "Account not found" }, { status: 401 });
 	const language = body.teachingLanguage === undefined ? account.teachingLanguage : body.teachingLanguage;

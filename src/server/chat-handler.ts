@@ -1,9 +1,11 @@
 ﻿import type { Usage } from "@earendil-works/pi-ai";
 import {
+	createChatAgent,
 	createPracticeAgent,
 	createProberAgent,
 	createTeacherAgent,
 	type AgentBuildOptions,
+	type ChatToolContext,
 	type TeachingAgent,
 } from "../agent/teacher-agent.ts";
 import { piEngineForSpec, type PiEngine } from "../agent/models.ts";
@@ -264,12 +266,12 @@ export async function handleChatInput(
 			chatStore: stores.chatStore,
 			engine: conversationEngine,
 			modelId: modelIdForCompaction,
-			kind: record.kind === "practice" ? "practice" : hasProbeDone(record.messages) ? "teach" : "probe",
+			kind: record.kind === "practice" ? "practice" : record.kind === "chat" ? "chat" : hasProbeDone(record.messages) ? "teach" : "probe",
 			thresholdTokens: effectiveThresholdTokens(
 				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
 			),
-			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : "teacher").length / 4),
+			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : record.kind === "chat" ? "chat" : "teacher").length / 4),
 		},
 		chatId,
 	);
@@ -414,7 +416,20 @@ export async function handleChatInput(
 	// uniform across kinds).
 	const constructed: TeachingAgent = buildAgent
 		? buildAgent({ ...agentOpts, teaching })
-		: record.kind === "practice"
+		: record.kind === "chat"
+			? createChatAgent(
+					{
+						chatId,
+						jobs: {
+							chatId, jobStore: stores.jobStore,
+							spawn: (job, input) => spawnOfficeJob(job.id, job.ownerId, input),
+							searchAvailable: () => researchAvailable(chatId),
+						},
+						knowledge: knowledgeCtx,
+					},
+					agentOpts,
+				)
+			: record.kind === "practice"
 			? createPracticeAgent(
 					{
 						chatId,
@@ -535,7 +550,7 @@ export async function handleChatInput(
 				// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
 				// no extraction, no graph, no coverage (v1: the session itself
 				// is the deliverable).
-				if (record.kind !== "practice" && extractionEnabled(effective.graph)) {
+				if (record.kind !== "practice" && record.kind !== "chat" && extractionEnabled(effective.graph)) {
 					// Fresh per-turn read of the graph section's chunk budget
 					// (extraction-UX redesign, 2026-09-24): the trigger compares
 					// against it and the pipeline's batches share it.

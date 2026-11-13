@@ -47,7 +47,7 @@ import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
 import { PlanMarginalia, planExists } from "@/components/plan-window";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
-import { ArrowRightIcon, DumbbellIcon, WaypointsIcon } from "lucide-react";
+import { ArrowRightIcon, DumbbellIcon, MessageCircleIcon, WaypointsIcon } from "lucide-react";
 import type { PlanBlockData } from "@/src/core";
 import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
@@ -212,7 +212,7 @@ export function Chat({
 	/** The session kind (practice sessions, owner 2026-10-04): practice
 	 *  renders no phase chip (no probe→teach arc applies) and a Practice
 	 *  tag rides the header instead. */
-	kind?: "teach" | "practice";
+	kind?: "teach" | "practice" | "chat";
 	teachingLanguage?: "en" | "ja";
 	knowledgeUsed?: boolean;
 	initialPrompt?: string;
@@ -1240,8 +1240,8 @@ export function Chat({
 					{/* Practice (owner, 2026-10-04): the coverage ring hides —
 				    practice never extracts, so an ever-filling ring with no
 				    run behind it would lie. */}
-					{kind !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
-					{/* Practice sessions: no phase arc — a quiet Practice tag
+					{kind !== "practice" && kind !== "chat" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
+					{/* Practice/chat sessions: no phase arc — a quiet tag
 					    instead of the phase chip. */}
 					{kind === "practice" ? (
 						<span
@@ -1252,6 +1252,16 @@ export function Chat({
 						>
 							<DumbbellIcon className="size-3" />
 							{copy.chat.practice}
+						</span>
+					) : kind === "chat" ? (
+						<span
+							data-testid="phase-chip"
+							data-phase="chat"
+							aria-hidden="true"
+							className="pointer-events-none flex shrink-0 select-none items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+						>
+							<MessageCircleIcon className="size-3" />
+							{copy.home.chat}
 						</span>
 					) : (
 						<PhaseChip phase={phases.at(-1) ?? "probe"} />

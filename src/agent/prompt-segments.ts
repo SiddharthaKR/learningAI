@@ -42,6 +42,11 @@ const PROMPTS_DIR = path.join(PATHS.root, "src", "agent", "prompts");
  *  (practice has no such tools). */
 const PRACTICE_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "16-mental-model.md", "40-formatting.md"];
 
+/** Chat agent (free conversation): voice, accuracy, and formatting —
+ *  no mental-model (irrelevant outside teaching), no question/confidence
+ *  mechanics (no quiz tools). */
+const CHAT_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "40-formatting.md"];
+
 /** Absolute path for an override file (unchecked — validate first). */
 function overrideFileFor(segmentPath: string): string {
 	return path.join(PROMPTS_OVERRIDE_DIR, ...segmentPath.split("/"));
@@ -71,7 +76,7 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 	// plays the base role), but the FORMATTING guide composes for every
 	// agent (owner, 2026-10-04 late): LaTeX delimiters and markdown apply
 	// in all settings — practice shares the $...$/$$...$$ authoring contract.
-	const segments: Array<{ path: string; shared: boolean; file: string }> = agent === "practice" ? [] : [
+	const segments: Array<{ path: string; shared: boolean; file: string }> = (agent === "practice" || agent === "chat") ? [] : [
 		{ path: "system-prompt.md", shared: true, file: PATHS.teacherPrompt },
 	];
 	const dir = path.join(PROMPTS_DIR, agent);
@@ -84,7 +89,7 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 	const sharedDir = path.join(PROMPTS_DIR, "shared");
 	if (fs.existsSync(sharedDir)) {
 		// The practice allowlist (owner, 2026-10-04 late): formatting only.
-		const allow = agent === "practice" ? PRACTICE_SHARED_FRAGMENTS : null;
+		const allow = agent === "practice" ? PRACTICE_SHARED_FRAGMENTS : agent === "chat" ? CHAT_SHARED_FRAGMENTS : null;
 		const sharedFragments = fs
 			.readdirSync(sharedDir)
 			.filter((f) => FRAGMENT_RE.test(f) && (allow === null || allow.includes(f)))

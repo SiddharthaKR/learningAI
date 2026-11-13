@@ -60,6 +60,7 @@
     "exportMarkdown": "Markdownで書き出す…",
     "delete": "削除…",
     "practiceSession": "練習セッション",
+    "chatSession": "チャットセッション",
     "justNow": "たった今",
     "minutesAgo": "{count}分前",
     "hoursAgo": "{count}時間前",
@@ -87,14 +88,19 @@
     "practiceDescription": "知識グラフから項目を選ぶか、練習したい内容や問題を入力してください。",
     "teachingLanguage": "授業言語",
     "learnPlaceholder": "何を学びたいですか？",
-    "practicePlaceholder": "何を練習したいですか？"
+    "practicePlaceholder": "何を練習したいですか？",
+    "chatPlaceholder": "何でも聞いてください…",
+    "chatTitle": "チャット",
+    "chatDescription": "自由な会話 — 構造化された授業やクイズはありません。"
   },
   "home": {
     "startSession": "セッションを開始",
     "teach": "学習",
     "practice": "練習",
+    "chat": "チャット",
     "teachSubtitle": "チューターがあなたの理解度を測り、計画を立て、段階的に教えます。",
-    "practiceSubtitle": "すでに学んだトピックの問題に取り組みます。"
+    "practiceSubtitle": "すでに学んだトピックの問題に取り組みます。",
+    "chatSubtitle": "自由な会話 — 構造化された授業やクイズはありません。"
   },
   "chat": {
     "sessionTitle": "セッション名",
@@ -410,6 +416,8 @@
     "teachingSessions": "学習セッション",
     "practiceSession": "練習セッション",
     "practiceSessions": "練習セッション",
+    "chatSession": "チャットセッション",
+    "chatSessions": "チャットセッション",
     "importedNote": "取り込んだノート",
     "importedNotes": "取り込んだノート",
     "empty": "まだ何もありません。ノートを取り込んでグラフを作り始めましょう。",

@@ -42,7 +42,7 @@ const DOCK = "mx-auto w-full max-w-[46rem] px-4";
 export async function startDraftSession(
 	text: string,
 	fetchLike: typeof fetch,
-	mode?: "practice",
+	mode?: "practice" | "chat",
 	picks?: readonly DraftPick[],
 	teachingLanguage?: "en" | "ja",
 ): Promise<string | null> {
@@ -58,6 +58,8 @@ export async function startDraftSession(
 		body: JSON.stringify(
 			mode === "practice"
 				? { title: t, kind: "practice", ...(picks && picks.length > 0 ? { graphContext: { propositions: picks } } : {}), ...(teachingLanguage ? { teachingLanguage } : {}) }
+				: mode === "chat"
+				? { title: t, kind: "chat", ...(teachingLanguage ? { teachingLanguage } : {}) }
 				: { title: t, ...(teachingLanguage ? { teachingLanguage } : {}) },
 		),
 	});
@@ -97,7 +99,7 @@ export function DraftShell({
 	/** The practice draft (owner, 2026-10-04): ?mode=practice — the
 	 *  created session carries kind:"practice" and the copy changes
 	 *  (the practice agent opens; no probing). */
-	mode?: "teach" | "practice";
+	mode?: "teach" | "practice" | "chat";
 	/** The first-run CTA (fix wave chunk B): the same "Set up your models"
 	 *  affordance home carries, rendered above the draft shell — passed by
 	 *  NewSession, which owns the configured state and the SetupDialog. */
@@ -179,10 +181,12 @@ export function DraftShell({
 						<Conversation className="h-full min-w-0 flex-1" initial="instant">
 							<ConversationContent className="min-h-full gap-0 p-0">
 								<ConversationEmptyState
-									title={mode === "practice" ? copy.newSession.practiceTitle : copy.newSession.title}
+									title={mode === "practice" ? copy.newSession.practiceTitle : mode === "chat" ? copy.newSession.chatTitle : copy.newSession.title}
 									description={
 										mode === "practice"
 											? copy.newSession.practiceDescription
+											: mode === "chat"
+											? copy.newSession.chatDescription
 											: copy.newSession.description
 									}
 								/>
@@ -218,7 +222,7 @@ export function DraftShell({
 										// input (owner refinement round, 2026-09-24) — no lesson has
 										// started yet, so the composer must not read like one is in
 										// flight.
-										placeholder={mode === "practice" ? copy.newSession.practicePlaceholder : copy.newSession.learnPlaceholder}
+										placeholder={mode === "practice" ? copy.newSession.practicePlaceholder : mode === "chat" ? copy.newSession.chatPlaceholder : copy.newSession.learnPlaceholder}
 									/>
 								</div>
 								<StatsBar
@@ -242,7 +246,7 @@ export function DraftShell({
 	);
 }
 
-export function NewSession({ initialConfigured, mode = "teach", initialLanguage = "en", uiLanguage = "en" }: { initialConfigured: boolean; mode?: "teach" | "practice"; initialLanguage?: "en" | "ja"; uiLanguage?: UiLanguage }) {
+export function NewSession({ initialConfigured, mode = "teach", initialLanguage = "en", uiLanguage = "en" }: { initialConfigured: boolean; mode?: "teach" | "practice" | "chat"; initialLanguage?: "en" | "ja"; uiLanguage?: UiLanguage }) {
 	const router = useRouter();
 	const [teachingLanguage, setTeachingLanguage] = useState<"en" | "ja">(initialLanguage);
 	const [text, setText] = useState("");
@@ -287,7 +291,7 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 		const draft = textRef.current.trim();
 		if (!draft || busy) return;
 		setBusy(true);
-		void startDraftSession(draft, fetch, mode === "practice" ? "practice" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage)
+		void startDraftSession(draft, fetch, mode === "practice" ? "practice" : mode === "chat" ? "chat" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage)
 			.then((target) => {
 				if (target) router.push(target);
 				else setBusy(false);

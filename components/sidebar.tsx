@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { MenuShell } from "@/components/menu-shell";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import type { ChatDeleteMode } from "@/src/core";
-import { DumbbellIcon, LogOutIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PlusIcon, SearchIcon, SettingsIcon, SlidersHorizontalIcon } from "lucide-react";
+import { DumbbellIcon, LogOutIcon, MessageCircleIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PlusIcon, SearchIcon, SettingsIcon, SlidersHorizontalIcon } from "lucide-react";
 import { ActivitySection } from "@/components/activity-dock";
 import { CoverageMenuBlock } from "@/components/extraction-coverage";
 import { LhMark } from "@/components/lh-mark";
@@ -320,6 +320,9 @@ export function SessionRow({
 			    the teaching rows and reads cleaner. */}
 			{(chat.kind ?? "teach") === "practice" && (
 				<DumbbellIcon className="size-3.5 shrink-0 text-muted-foreground/70" aria-label={copy.sidebar.practiceSession} />
+			)}
+			{(chat.kind ?? "teach") === "chat" && (
+				<MessageCircleIcon className="size-3.5 shrink-0 text-muted-foreground/70" aria-label={copy.sidebar.chatSession} />
 			)}
 		</button>
 	);

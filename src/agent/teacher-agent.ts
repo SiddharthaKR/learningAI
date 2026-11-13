@@ -15,6 +15,8 @@ import {
 	type TeacherToolContext,
 } from "./tools.ts";
 import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
+import { jobTools, type JobToolContext } from "./tools/jobs.ts";
+import { createKnowledgeTool, type KnowledgeToolContext } from "./tools/knowledge.ts";
 import { healToolRecord } from "./tools/heal.ts";
 import { quizInputObject, quizInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
@@ -46,7 +48,7 @@ import { toLlmMessages } from "../core/native-messages.ts";
 
 /** Which agent's prompt directory to compose. Practice (2026-10-04)
  *  composes ONLY its own directory — see prompt-segments.ts. */
-export type AgentKind = "prober" | "teacher" | "practice";
+export type AgentKind = "prober" | "teacher" | "practice" | "chat";
 
 // P2 (2026-09-19): segment discovery + override resolution live in ONE
 // canonical place now — src/store/prompt-overrides.ts (listSourceSegments
@@ -86,6 +88,7 @@ const composedInstructions: Record<AgentKind, string> = {
 	prober: composeInstructions("prober"),
 	teacher: composeInstructions("teacher"),
 	practice: composeInstructions("practice"),
+	chat: composeInstructions("chat"),
 };
 
 // Money channel (wave 4): the chat-handler passes a per-turn collector;
@@ -308,8 +311,37 @@ export function createPracticeAgent(ctx: PracticeToolContext, opts: AgentBuildOp
 	return baseAgentOptions("practice", opts, Object.values(tools));
 }
 
+/** Context for the free-chat agent: optional research/pdf jobs and
+ *  knowledge search — no teaching tools, no question tools. */
+export interface ChatToolContext {
+	chatId: string;
+	jobs?: JobToolContext;
+	knowledge?: KnowledgeToolContext;
+}
+
+/**
+ * The CHAT agent (free conversation): no prober/teacher split, no
+ * plan/question/problem tools. Its registry is ONLY the optional job
+ * tools (research, pdf) and the knowledge search when enabled. Turns
+ * end naturally — no question stopper needed.
+ */
+export function createChatAgent(ctx: ChatToolContext, opts: AgentBuildOptions = {}) {
+	const tools: Record<string, AgentTool<any>> = healToolRecord({
+		...(ctx.jobs ? (() => {
+			const jobs = jobTools(ctx.jobs!);
+			return {
+				...(jobs.research ? { research: jobs.research } : {}),
+				pdf: jobs.pdf!,
+			};
+		})() : {}),
+		...(ctx.knowledge ? createKnowledgeTool(ctx.knowledge) : {}),
+	});
+	return baseAgentOptions("chat", opts, Object.values(tools));
+}
+
 export type ProberAgent = ReturnType<typeof createProberAgent>;
 export type TeacherAgent = ReturnType<typeof createTeacherAgent>;
 export type PracticeAgent = ReturnType<typeof createPracticeAgent>;
-export type TeachingAgent = ProberAgent | TeacherAgent | PracticeAgent;
+export type ChatAgent = ReturnType<typeof createChatAgent>;
+export type TeachingAgent = ProberAgent | TeacherAgent | PracticeAgent | ChatAgent;
 

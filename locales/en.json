@@ -60,6 +60,7 @@
     "exportMarkdown": "Export as Markdown…",
     "delete": "Delete…",
     "practiceSession": "Practice session",
+    "chatSession": "Chat session",
     "justNow": "just now",
     "minutesAgo": "{count}m ago",
     "hoursAgo": "{count}h ago",
@@ -87,14 +88,19 @@
     "practiceDescription": "Pick nodes from your knowledge graph, describe what you want to practice, or bring your own problem.",
     "teachingLanguage": "Teaching language",
     "learnPlaceholder": "What do you want to learn?",
-    "practicePlaceholder": "What do you want to practice?"
+    "practicePlaceholder": "What do you want to practice?",
+    "chatPlaceholder": "Ask anything...",
+    "chatTitle": "Chat",
+    "chatDescription": "A free conversation — no structured teaching or quizzes."
   },
   "home": {
     "startSession": "Start session",
     "teach": "Teach",
     "practice": "Practice",
+    "chat": "Chat",
     "teachSubtitle": "The tutor finds where you are, plans a path, and teaches step by step.",
-    "practiceSubtitle": "Work through problems on topics you've already learned."
+    "practiceSubtitle": "Work through problems on topics you've already learned.",
+    "chatSubtitle": "A free conversation — no structured teaching or quizzes."
   },
   "chat": {
     "sessionTitle": "Session title",
@@ -410,6 +416,8 @@
     "teachingSessions": "teaching sessions",
     "practiceSession": "practice session",
     "practiceSessions": "practice sessions",
+    "chatSession": "chat session",
+    "chatSessions": "chat sessions",
     "importedNote": "imported note",
     "importedNotes": "imported notes",
     "empty": "Nothing here yet — import notes to begin building the graph.",
