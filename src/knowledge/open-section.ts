@@ -31,7 +31,28 @@ export function resolveOpenSection(sources: OpenSectionSource[], fileName: strin
 			return { ambiguous: pool.map(({ source, doc }) => `${doc.fileName} (${source.label}, id ${doc.id.slice(0, 8)})`) };
 		}
 		const { source, doc } = pool[0]!;
-		return sectionText(source.snapshot, source.scope, doc.id, section);
+		const exact = sectionText(source.snapshot, source.scope, doc.id, section);
+		if (exact || section.length === 0) return exact;
+		// Agents often drop the leading segments (a PDF's single title
+		// section) — owner report, 2026-11-14. Accept the path when exactly
+		// one section in this document ends with it.
+		const full = uniquePathEndingWith(source.snapshot, doc.id, section);
+		return full ? sectionText(source.snapshot, source.scope, doc.id, full) : null;
 	}
 	return null;
+}
+
+/** The single full section path in a document that has `tail` as its last
+ *  segments (any depth), or null when none or several match. */
+function uniquePathEndingWith(snapshot: KnowledgeSnapshot, documentId: string, tail: string[]): string[] | null {
+	const candidates = new Map<string, string[]>();
+	for (const chunk of snapshot.chunks) {
+		const path = chunk.sourceId === documentId ? chunk.section : undefined;
+		if (!path || path.length <= tail.length) continue;
+		for (let end = tail.length; end <= path.length; end++) {
+			const prefix = path.slice(0, end);
+			if (tail.every((segment, i) => prefix[end - tail.length + i] === segment)) candidates.set(prefix.join("\u001f"), prefix);
+		}
+	}
+	return candidates.size === 1 ? [...candidates.values()][0]! : null;
 }
