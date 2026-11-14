@@ -71,8 +71,8 @@ export type AgentKind = "prober" | "teacher" | "practice" | "chat";
  *  tests/prompt-overrides.test.ts). Overrides are a static-file read
  *  through config paths, not request state — the store import carries no
  *  chat/job machinery. */
-export function composeInstructions(kind: AgentKind, switches?: Record<string, boolean>): string {
-	const segments = effectivePromptSegments(kind, switches ?? {});
+export function composeInstructions(kind: AgentKind, switches?: Record<string, boolean>, omit?: (path: string) => boolean): string {
+	const segments = effectivePromptSegments(kind, switches ?? {}).filter((s) => !omit?.(s.path));
 	return segments
 		.map((s) => (s.enabled ? s.overrideText! : s.sourceText))
 		.map((t) => t.trim())
@@ -179,8 +179,13 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	// ("practice" is not a ModelRole) honest about that.
 	const engine = opts.engine ?? piEngineFor(kind as "prober" | "teacher");
 	const stopper = makeQuestionStopper();
-	const basePrompt = opts.promptSwitches
-		? composeInstructions(kind, opts.promptSwitches)
+	// The knowledge segment describes search_knowledge/open_section; when the
+	// session has office knowledge OFF those tools aren't registered, and a
+	// small model called the missing tool anyway (owner report, 2026-11-14).
+	const knowledgeOn = tools.some((tool) => tool.name === "search_knowledge");
+	const omitKnowledge = knowledgeOn ? undefined : (path: string) => /(^|\/)\d+-knowledge\.md$/.test(path);
+	const basePrompt = opts.promptSwitches || omitKnowledge
+		? composeInstructions(kind, opts.promptSwitches, omitKnowledge)
 		: composedInstructions[kind]!;
 	const lastUserMessage = opts.messages?.findLast((message) => message.role === "user");
 	const attachedText = lastUserMessage?.role === "user" && (
