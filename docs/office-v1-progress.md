@@ -300,9 +300,9 @@ These are UI polish changes. All acceptance items remain at their prior status; 
 
 | Item | Status | Notes |
 |---|---|---|
-| Web research | Code done, host-untested | SearXNG is called directly (Tavily/Brave removed). Needs `SEARCH_PROVIDER=searxng` and SearXNG in Docker on .126; see `DEPLOY.md` section 5. |
+| Web research | SearXNG working on .126 (2026-11-16) | SearXNG returns results on .126 (`curl --noproxy '*' 127.0.0.1:8080/search?q=fpga&format=json`). Image installed offline from the `searxng-image` branch; `general.contact_url` and `outgoing.proxies` set in `~/searxng/settings.yml`. App side: set `SEARCH_PROVIDER=searxng`, restart, then the in-app test (see plan below). |
 | `/source` route | Implemented, host-untested | AGPL compliance route: unauthenticated archive download of the app source, excluding `.env`, `data/`, knowledge files, indexes, and secrets. |
-| Deployment on .126 | Pending | `DEPLOY.md` and `deploy/learnharness.service` are written; the host run and acceptance checks have not been done. |
+| Deployment on .126 | In progress (2026-11-16) | App updated from `office` and running; SearXNG running. Picture reading is NOT working on .126 yet (images do not reach the model; see "Picture reading on .126" below). Full acceptance checks (`DEPLOY.md` section 8) not yet run. |
 | Concurrency limits | Untested | `MAX_CONCURRENT_LLM=2` is set but not host-tested with multiple users. |
 | Shared knowledge index | Operator-configured | Paths are set in the host `.env` by the operator (decided 2026-11-11); empty means off. Optional admin-built index. Separately, users upload to the Shared pool on the Knowledge page (`data/shared/`, audited). |
 
@@ -314,3 +314,49 @@ These are UI polish changes. All acceptance items remain at their prior status; 
 - **`/admin/knowledge`:** totals, uploads per day and uploader per document, from `sharedKnowledgeStore` plus the audit log (`computeKnowledgeStats` in `src/knowledge/stats.ts`).
 - **Graph:** Graph/Table toggle on the graph page (`components/graph-table.tsx`): search, per-row and bulk delete through the existing delete dialog.
 - **Known gaps:** no sidebar link to `/admin`.
+
+## Picture reading, new-session switches, search label (2026-11-16)
+
+Branch `claude/pptx-image-reading` (not yet merged into `office`; open the PR from GitHub). CI checks pass locally: typecheck, lint, 2108 tests (four clean full runs), production build.
+
+- **Picture reading (opt-in).** A "Read pictures (slower)" box on each PPTX/Word/PDF attachment in the chat box and on the Knowledge page upload. Shown only when the server has vision (`LLM_VISION=true`, or `VISION_BASE_URL` + `VISION_MODEL`). Off by default; each user's choice is saved on their account (`readPictures` in `accounts.json`, `PATCH /api/preferences`).
+  - Pictures are described by the vision model and indexed as text where they appear: slide (PPTX), page (PDF), paragraph under its heading (Word). Template/header/footer art and duplicates are skipped; at most 30 per file; calls share the background LLM limit.
+  - The vision call asks for `reasoning_effort: "none"` (measured on Gemma 4 e4b: 8 s vs 20 s, and thinking can no longer consume the whole answer), retrying once without it if the server rejects the option.
+  - Scanned PDFs are skipped (already read by OCR). Word pictures now cite their real paragraph and heading (were all "paragraph 1").
+  - Documents record `hasPictures` / `picturesRead`. A saved text-only file shows **Read pictures** on the Knowledge page (`POST /api/knowledge/documents/[id]/pictures`; owner for personal, anyone for shared); re-attaching it with the box ticked reads them in place (same id, no duplicate). Upload extracts once (no double indexing); re-attaching a saved file reuses its stored chunks.
+  - Failure never stops the upload or the chat: the text is kept, the model is told, and the user sees a dismissible note naming the slides/pages/headings (en/ja).
+  - Fixed latent bugs: picture chunks used an invalid `sourceId` (`<id>-img`, rejected by the snapshot validator); template pictures were labelled "slide 1".
+- **New-session switches.** The new-session screen shows the same web/knowledge switches as a running session, both off every time (owner decision). Ticked switches are saved to the session (`PUT /api/chats/[id]/settings`) before its first reply, so turn 1 already uses them. Before, the switches only appeared after the first reply.
+- **Web switch label.** "Enable web search" / 「ウェブ検索を有効にする」 when a search provider is configured; "Read linked pages" when the tutor can only open pasted links. Nothing passed the mode before, so it always said "Read linked pages". Server setup reaches the UI through `ServerCapabilitiesProvider` in the root layout.
+- **Verified in the browser with the real model (laptop, Gemma 4 e4b):** knowledge ticked before the first message answered from the shared lab rules on turn 1; a picture-only value (t_setup 2 ns, t_hold 1 ns) was read from a slide; the remembered choice pre-ticked the box in a new session; "Read pictures" upgraded a saved deck in place.
+- **Commit attribution:** no Claude co-author line on commits from now on (owner, 2026-11-16); past history is left unchanged.
+
+### Picture reading on .126: not working yet
+
+With `LLM_VISION=true` on .126, every picture "description" came back as *"Please provide the image you would like me to describe"*: the model received the instruction but not the image. Either LM Studio has Gemma 4 26B loaded without its vision projector (mmproj), or `gemma4_proxy.py` (:8088) drops image parts when it re-renders the chat template. The app currently accepts that reply as a description, so it ends up in the chat text and, for saved files, in the knowledge index.
+
+## Plan (next steps)
+
+**On .126 (operator)**
+1. Set `LLM_VISION=false` in `.env` and restart until images reach the model (hides the box; decks read as text).
+2. Delete any deck saved with pictures ticked while vision was broken, and re-upload it later.
+3. Load Gemma 4 26B's vision projector in LM Studio; then run the image test:
+   `curl --noproxy '*' 127.0.0.1:8088/v1/chat/completions` with an `image_url` part, `"max_tokens":1024`, `"reasoning_effort":"none"`. A real description means it works; "please provide the image" means the proxy drops images.
+4. If the proxy drops images: make `gemma4_proxy.py` forward `image_url` parts to LM Studio. Then set `LLM_VISION=true` again and restart.
+5. Web search in the app: `SEARCH_PROVIDER=searxng`, `SEARXNG_URL=http://127.0.0.1:8080`, `NO_PROXY` includes `127.0.0.1`; restart; check `GET /api/search` reports `available: true`; in a Chat tick "Enable web search" and ask for sources. After a reboot: `deploy/searxng.sh start`.
+6. Page reading (opening result pages) needs `HTTPS_PROXY`/`HTTP_PROXY`; ask IT for a service account or an IP allowlist for .126 rather than a personal login.
+7. Check `LLM_CONTEXT_WINDOW` matches the context actually configured in LM Studio for the 26B (compaction triggers at window − 16k).
+8. Run the `DEPLOY.md` section 8 acceptance checks.
+
+**Code (proposed, needs the owner's go-ahead)**
+1. Vision self-check at server start: send one small test picture with a known word; if the model can't read it back, keep picture reading off (box hidden) and log why.
+2. Per-picture check: the describe prompt asks for a fixed marker when no image is visible; that marker, or replies asking for an image, count as failed (they show in the "couldn't read" note and are never stored).
+3. Merge `claude/pptx-image-reading` into `office` (after 1–2, or with `LLM_VISION=false` on .126 meanwhile).
+
+**Known gaps / later**
+- No sidebar link to `/admin` (open by URL).
+- The user's own message shows the whole extracted attachment text under an English "Extracted attachment content" label (the tutor uses that line as a marker, so it needs a display-only fix).
+- Quiz options: the accessible name drops emphasised words (e.g. "before"/"after"), so screen readers hear identical options.
+- `npm audit`: 2 high from `linkify-it` via the unused dependency `ansi-to-react` (remove it); 3 moderate from `minimatch` in ESLint tooling (dev only). Do not run `npm audit fix --force`.
+- `fast-xml-parser` is pinned at 5.12.0 (5.12.1 available; bump in its own PR with the extraction tests).
+- Teaching on the small laptop model skipped `plan_init` even after the retry nudge; retest planning on the 26B.
