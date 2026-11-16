@@ -107,10 +107,12 @@ it("vision failure: the upload still succeeds with the slide text, and the repor
 
 it("saved to My Knowledge: described once; re-attaching the same deck makes no model calls", async () => {
 	mode = "ok"; calls = 0;
-	const first = await upload(deck(3), "personal");
+	// One build: the zip builder stamps the current time, so two builds can differ by a second.
+	const data = deck(3);
+	const first = await upload(data, "personal");
 	assert.equal(first.status, 200);
 	assert.equal(calls, 1, "one picture, one call (no double indexing)");
-	const again = await upload(deck(3), "personal");
+	const again = await upload(data, "personal");
 	const body = await again.json() as { text: string; imageReport?: unknown };
 	assert.equal(calls, 1, "the stored copy is reused");
 	assert.ok(body.text.includes("Slide 2 (image)\n§ Timing\nTiming diagram"), "earlier descriptions come back from the store");
@@ -119,12 +121,13 @@ it("saved to My Knowledge: described once; re-attaching the same deck makes no m
 
 it("upgrade: a deck saved without pictures gets them read in place when re-attached with pictures ticked", async () => {
 	mode = "ok"; calls = 0;
-	const first = await upload(deck(6), "personal", false);
+	const data = deck(6); // one build: the same bytes both times
+	const first = await upload(data, "personal", false);
 	const saved = await first.json() as { document: { id: string; hasPictures?: boolean; picturesRead?: boolean } };
 	assert.equal(saved.document.hasPictures, true);
 	assert.equal(saved.document.picturesRead, undefined);
 	assert.equal(calls, 0);
-	const again = await upload(deck(6), "personal");
+	const again = await upload(data, "personal");
 	const body = await again.json() as { document: { id: string; picturesRead?: boolean }; text: string; imageReport: unknown };
 	assert.equal(calls, 1);
 	assert.equal(body.document.id, saved.document.id, "same document, no duplicate");

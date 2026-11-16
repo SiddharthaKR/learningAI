@@ -223,7 +223,7 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
       </div>
       {pictures.available && (
         <label className="-mt-5 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground" title={catalog.composer.readPicturesHint}>
-          <input type="checkbox" checked={pictures.enabled} disabled={busy} onChange={(event) => pictures.setEnabled(event.target.checked)} className="size-4 accent-primary" />
+          <input type="checkbox" checked={pictures.enabled} disabled={busy} onChange={(event) => pictures.setEnabled(event.target.checked)} aria-label={catalog.composer.readPictures} className="size-4 accent-primary" />
           {catalog.composer.readPictures}
         </label>
       )}

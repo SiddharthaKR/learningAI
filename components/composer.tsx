@@ -179,6 +179,7 @@ export function Composer({
 									onDocumentsChange?.(documents.map((document, i) => i === index ? { ...document, readImages: next } : document));
 									pictures.setEnabled(next); // remembered as this user's choice
 								}}
+								aria-label={`${copy.composer.readPictures}: ${file.name}`}
 								className="size-3.5 accent-primary"
 							/>
 							{copy.composer.readPictures}

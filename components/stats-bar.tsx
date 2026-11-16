@@ -5,6 +5,7 @@ import { contextWindow, sessionCost, turnCost, type ChatSettings, type Knowledge
 import { formatTokens, formatUsd, prettyModel } from "@/components/usage-format";
 import { catalogLimits, useModelCatalog } from "@/components/model-picker";
 import { useI18n } from "@/components/i18n-provider";
+import { useServerCapabilities } from "@/components/server-capabilities";
 import { formatMessage } from "@/src/core";
 
 /**
@@ -52,12 +53,16 @@ export function KnowledgeScopeSelect({ settings, disabled, onChange }: {
  );
 }
 
+/** A session's web/knowledge switch (or the knowledge scope). */
+export type SourceField = "webResearchEnabled" | "officeKnowledgeEnabled" | "knowledgeScope";
+
 export function StatsBar({
 	turns,
 	dictationSlot,
 	chatId,
 	leadingSlot,
-	webMode = "linked-pages",
+	webMode: webModeProp,
+	draftSources,
 }: {
 	turns: TurnUsage[];
 	/** The bound session (per-session models, owner 2026-09-28): present
@@ -74,10 +79,18 @@ export function StatsBar({
 	 *  composer's teach | practice switch rides here — before the session
 	 *  data (which renders nothing pre-chat on that surface). */
 	leadingSlot?: ReactNode;
-	/** Pilot mode uses URL-only fetching; searxng changes this label to web research. */
+	/** Overrides the server's setup (tests); normally read from ServerCapabilitiesProvider. */
 	webMode?: "linked-pages" | "search";
+	/** The new-session screen's web/knowledge switches: held locally until the session
+	 *  exists, then saved to it before its first reply (no chatId yet). */
+	draftSources?: { settings: ChatSettings; onChange: (field: SourceField, value: boolean | KnowledgeSearchScope) => void };
 }) {
 	const copy = useI18n().activityUi;
+	// The web switch says "Enable web search" when the server has a search provider,
+	// "Read linked pages" when it can only open links the user pastes.
+	const { webSearch } = useServerCapabilities();
+	const webMode = webModeProp ?? (webSearch ? "search" : "linked-pages");
+	const webLabel = webMode === "search" ? copy.enableWebSearch : copy.readLinkedPages;
 	const [open, setOpen] = useState(false);
 	// Same dropdown discipline as the model control (owner, df4433f treatment,
 	// stats round 1): close on any pointerdown outside the bar or on Escape.
@@ -259,25 +272,32 @@ export function StatsBar({
 				<div className="flex min-w-0 flex-1 items-center justify-center">{dictationSlot}</div>
 			)}
 
-   {chatId && (
-    <div className="flex flex-wrap items-center gap-3" data-testid="session-source-controls">
-     {(["webResearchEnabled", "officeKnowledgeEnabled"] as const).map((field) => (
-      <label key={field} className="flex cursor-pointer items-center gap-1.5">
-       <input
-        type="checkbox"
-        checked={sessionSettings?.[field] ?? false}
-        disabled={!sessionSettings || saving}
-        onChange={(event) => void saveFlag(field, event.target.checked)}
-        aria-label={field === "webResearchEnabled" ? (webMode === "search" ? copy.webResearch : copy.readLinkedPages) : copy.officeKnowledge}
-        className="accent-foreground"
-       />
-       <span>{field === "webResearchEnabled" ? (webMode === "search" ? copy.webResearch : copy.readLinkedPages) : copy.officeKnowledge}</span>
-      </label>
-     ))}
-     <KnowledgeScopeSelect settings={sessionSettings} disabled={saving} onChange={(scope) => void saveFlag("knowledgeScope", scope)} />
-     {settingError && <span role="alert" className="text-red-400">{settingError}</span>}
-    </div>
-   )}
+   {(chatId || draftSources) && (() => {
+    // A running session saves each change to its record; the new-session screen
+    // holds them until the session exists (draftSources).
+    const settings = chatId ? sessionSettings : draftSources!.settings;
+    const disabled = chatId ? !sessionSettings || saving : false;
+    const change = (field: SourceField, value: boolean | KnowledgeSearchScope) => { if (chatId) void saveFlag(field, value); else draftSources!.onChange(field, value); };
+    return (
+     <div className="flex flex-wrap items-center gap-3" data-testid="session-source-controls">
+      {(["webResearchEnabled", "officeKnowledgeEnabled"] as const).map((field) => (
+       <label key={field} className="flex cursor-pointer items-center gap-1.5">
+        <input
+         type="checkbox"
+         checked={settings?.[field] ?? false}
+         disabled={disabled}
+         onChange={(event) => change(field, event.target.checked)}
+         aria-label={field === "webResearchEnabled" ? webLabel : copy.officeKnowledge}
+         className="accent-foreground"
+        />
+        <span>{field === "webResearchEnabled" ? webLabel : copy.officeKnowledge}</span>
+       </label>
+      ))}
+      <KnowledgeScopeSelect settings={settings} disabled={chatId ? saving : false} onChange={(scope) => change("knowledgeScope", scope)} />
+      {chatId && settingError && <span role="alert" className="text-red-400">{settingError}</span>}
+     </div>
+    );
+   })()}
 
 		</div>
 	);

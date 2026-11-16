@@ -478,7 +478,8 @@
     "knowledgeScopeShared": "Shared only",
     "knowledgeScopePersonal": "Personal only",
     "loadControlsError": "Session controls could not be loaded.",
-    "saveControlsError": "Could not save session controls."
+    "saveControlsError": "Could not save session controls.",
+    "enableWebSearch": "Enable web search"
   },
   "graphUi": {
     "title": "Knowledge graph",

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
-import { authenticatedAccount, knowledgeVision } from "@/src/server";
+import { authenticatedAccount, knowledgeVision, searchStatus } from "@/src/server";
+import { ServerCapabilitiesProvider } from "@/components/server-capabilities";
 import { PictureReadingProvider } from "@/components/picture-reading";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -30,6 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 			</head>
 			<body className="min-h-dvh antialiased">
 			<I18nProvider language={language}>
+			<ServerCapabilitiesProvider webSearch={searchStatus().available}>
 			<PictureReadingProvider available={Boolean(account && knowledgeVision())} initialEnabled={account?.readPictures ?? false}>
 			{/* The notification channel rides OUTSIDE everything: sidebar, dock,
 				 and pages all subscribe as the polls retire (push S3, 2026-10-02). */}
@@ -43,6 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 				</AppearanceProvider>
 			</ServerEventsProvider>
 			</PictureReadingProvider>
+			</ServerCapabilitiesProvider>
 			</I18nProvider>
 		</body>
 		</html>
