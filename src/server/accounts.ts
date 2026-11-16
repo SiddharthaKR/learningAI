@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCallback);
 export type Language = "en" | "ja";
-export interface Account { id: string; username: string; uiLanguage: Language; teachingLanguage: Language; background?: string; createdAt: string }
+export interface Account { id: string; username: string; uiLanguage: Language; teachingLanguage: Language; background?: string; createdAt: string; /** Read pictures in uploaded documents by default (the user's last choice; off when absent). */ readPictures?: boolean }
 interface StoredAccount extends Account { passwordSalt: string; passwordHash: string }
 interface AccountFile { version: 1; accounts: StoredAccount[] }
 
@@ -108,7 +108,8 @@ export function createAccountStore(root: string) {
         return publicAccount(found);
       });
     },
-    async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string }): Promise<Account> {
+    async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string; readPictures?: boolean }): Promise<Account> {
+      if (changes.readPictures !== undefined && typeof changes.readPictures !== "boolean") throw new Error("readPictures must be true or false");
       for (const language of [changes.uiLanguage, changes.teachingLanguage]) {
         if (language !== undefined && language !== "en" && language !== "ja") throw new Error("Unsupported language");
       }
@@ -122,6 +123,7 @@ export function createAccountStore(root: string) {
         if (changes.uiLanguage !== undefined) account.uiLanguage = changes.uiLanguage;
         if (changes.teachingLanguage !== undefined) account.teachingLanguage = changes.teachingLanguage;
         if (changes.background !== undefined) account.background = changes.background.trim() || undefined;
+        if (changes.readPictures !== undefined) account.readPictures = changes.readPictures;
         await write(data);
         return publicAccount(account);
       });

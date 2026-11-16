@@ -12,7 +12,7 @@ export default async function Page() {
       sharedKnowledgeStore.readSnapshot(),
       isAdminUser(userId),
     ]);
-    const publicDocuments = (source: typeof snapshot) => source.documents.map(({ id, fileName, format, status }) => ({ id, fileName, format, status }));
+    const publicDocuments = (source: typeof snapshot) => source.documents.map(({ id, fileName, format, status, hasPictures, picturesRead }) => ({ id, fileName, format, status, ...(hasPictures ? { hasPictures } : {}), ...(picturesRead ? { picturesRead } : {}) }));
     return <KnowledgePage initialDocuments={publicDocuments(snapshot)} sharedDocuments={publicDocuments(shared)} isAdmin={isAdmin} />;
   });
 }

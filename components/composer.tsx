@@ -6,6 +6,7 @@ import type { AttachmentDestination, ChatDocument } from "./chat-attachments";
 import { cn } from "@/lib/utils";
 import { Hint } from "@/components/ui/hint";
 import { useI18n } from "@/components/i18n-provider";
+import { picturesReadable, usePictureReading } from "@/components/picture-reading";
 
 export interface ComposerImage {
 	data: string;
@@ -66,6 +67,8 @@ export function Composer({
 	onDocumentsChange,
 	uploading,
 	uploadError,
+	notice,
+	onDismissNotice,
 }: {
 	busy: boolean;
 	value: string;
@@ -97,14 +100,19 @@ export function Composer({
 	onDocumentsChange?: (documents: ChatDocument[]) => void;
 	uploading?: boolean;
 	uploadError?: string;
+	/** A non-blocking note (e.g. pictures that could not be read); shown above the input until dismissed. */
+	notice?: string;
+	onDismissNotice?: () => void;
 }) {
 	const copy = useI18n();
+	const pictures = usePictureReading();
 	const fileInputRef = useReactRef<HTMLInputElement | null>(null);
 	const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
 		const files = Array.from(e.target.files ?? []);
 		e.target.value = "";
 		const selectedDocuments = files.filter((file) => /\.(pdf|pptx|docx)$/i.test(file.name));
-		if (selectedDocuments.length) onDocumentsChange?.([...(documents ?? []), ...selectedDocuments.map((file): ChatDocument => ({ file, destination: "chat" }))]);
+		// Each file starts from the user's remembered choice (only when the server can read pictures).
+		if (selectedDocuments.length) onDocumentsChange?.([...(documents ?? []), ...selectedDocuments.map((file): ChatDocument => ({ file, destination: "chat", ...(pictures.available && pictures.enabled ? { readImages: true } : {}) }))]);
 		const selectedImages = files.filter((file) => ACCEPTED_IMAGE_TYPES.split(",").includes(file.type));
 		const loaded = await Promise.all(selectedImages.map((file) => new Promise<ComposerImage | null>((resolve) => {
 			const reader = new FileReader();
@@ -126,7 +134,7 @@ export function Composer({
 	};
 	return (
 		<div>
-			{documents?.map(({ file, destination }, index) => (
+			{documents?.map(({ file, destination, readImages }, index) => (
 				<div key={index} className="mx-3 mt-3 space-y-2 rounded-xl border border-border bg-background/60 p-2.5 text-sm">
 					<div className="flex min-w-0 items-center gap-2 px-1">
 						<FileTextIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
@@ -160,10 +168,37 @@ export function Composer({
 						<XIcon aria-hidden className="size-4" />
 					</button>
 					</div>
+					{pictures.available && picturesReadable(file.name) && (
+						<label className="flex cursor-pointer items-center gap-2 px-1 text-xs text-muted-foreground" title={copy.composer.readPicturesHint}>
+							<input
+								type="checkbox"
+								checked={Boolean(readImages)}
+								disabled={uploading}
+								onChange={(event) => {
+									const next = event.target.checked;
+									onDocumentsChange?.(documents.map((document, i) => i === index ? { ...document, readImages: next } : document));
+									pictures.setEnabled(next); // remembered as this user's choice
+								}}
+								aria-label={`${copy.composer.readPictures}: ${file.name}`}
+								className="size-3.5 accent-primary"
+							/>
+							{copy.composer.readPictures}
+						</label>
+					)}
 				</div>
 			))}
-			{uploading && <p role="status" className="px-3 pt-2 text-sm">{copy.composer.uploadingAttachments}</p>}
+			{uploading && <p role="status" className="px-3 pt-2 text-sm">{documents?.some(({ readImages }) => readImages) ? copy.composer.readingAttachmentImages : copy.composer.uploadingAttachments}</p>}
 			{uploadError && <p role="alert" className="px-3 pt-2 text-sm text-destructive">{uploadError}</p>}
+			{notice && (
+				<div role="status" data-testid="image-notice" className="mx-3 mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+					<p className="min-w-0 flex-1">{notice}</p>
+					{onDismissNotice && (
+						<button type="button" aria-label={copy.composer.dismissNotice} onClick={onDismissNotice} className="-mr-1 grid size-5 shrink-0 place-items-center rounded transition-colors hover:bg-amber-500/20">
+							<XIcon aria-hidden className="size-3.5" />
+						</button>
+					)}
+				</div>
+			)}
 			{images && images.length > 0 && (
 				<div className="flex flex-wrap gap-1.5 px-3 pt-2">
 					{images.map((img, i) => (

@@ -21,6 +21,8 @@ export interface ExtractedImage {
 	width: number;
 	height: number;
 	citation: KnowledgeCitation;
+	/** Heading path where the picture sits, when the reader knows it (Word). */
+	section?: string[];
 }
 
 export interface KnowledgeChunk {

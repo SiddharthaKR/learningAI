@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
-import { pendingAttachmentTurns, prepareAttachmentText, type ChatDocument } from "@/components/chat-attachments";
+import { formatImageNotice, pendingAttachmentNotices, pendingAttachmentTurns, prepareAttachments, type AttachmentImageIssue, type ChatDocument } from "@/components/chat-attachments";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { Hint } from "@/components/ui/hint";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
@@ -591,6 +591,9 @@ export function Chat({
 	const [uploading, setUploading] = useState(false);
 	const uploadingRef = useRef(false);
 	const [uploadError, setUploadError] = useState<string>();
+	// Pictures in attachments that could not be read: a dismissible note, never a send failure.
+	const [imageIssues, setImageIssues] = useState<AttachmentImageIssue[]>(() => pendingAttachmentNotices.get(chatId) ?? []);
+	useEffect(() => { pendingAttachmentNotices.delete(chatId); }, [chatId]);
 	/* The composer's value MIRROR ("nothing gets lost" round, owner
 	 * 2026-10-01): a dictation flush lands via setState, which a closure
 	 * waiting through `await finish()` cannot observe in time. Kept
@@ -1134,7 +1137,9 @@ export function Chat({
 			setUploading(true);
 			setUploadError(undefined);
 			try {
-				message = await prepareAttachmentText(message, documents);
+				const prepared = await prepareAttachments(message, documents);
+				message = prepared.text;
+				setImageIssues(prepared.imageIssues);
 			} catch (error) {
 				setUploadError((error as Error).message);
 				return;
@@ -1692,6 +1697,8 @@ export function Chat({
 							onDocumentsChange={setDocuments}
 							uploading={uploading}
 							uploadError={uploadError}
+							notice={formatImageNotice(imageIssues, copy)}
+							onDismissNotice={() => setImageIssues([])}
 							onImagesChange={setComposerImages}
 						/>
 					}

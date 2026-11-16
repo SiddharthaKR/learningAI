@@ -184,7 +184,24 @@
     "sharedKnowledge": "Shared Knowledge (all signed-in users)",
     "removeAttachment": "Remove attachment",
     "uploadingAttachments": "Preparing attachments…",
-    "sessionPlaceholder": "Ask, answer, or steer the lesson…"
+    "sessionPlaceholder": "Ask, answer, or steer the lesson…",
+    "picturesUnreadable": "Couldn't read pictures in {file} ({where}). Continuing with the text.",
+    "whereSlide": "slide {list}",
+    "whereSlides": "slides {list}",
+    "wherePage": "page {list}",
+    "wherePages": "pages {list}",
+    "whereNear": "near {list}",
+    "whereParagraph": "paragraph {list}",
+    "whereParagraphs": "paragraphs {list}",
+    "quote": "“{text}”",
+    "readPictures": "Read pictures (slower)",
+    "readPicturesHint": "Describe the pictures in this file with the vision model so they can be asked about and searched. Each picture takes a few seconds.",
+    "readPicturesAction": "Read pictures",
+    "readingPictures": "Reading pictures…",
+    "picturesReadBadge": "Pictures read",
+    "imagesSkipped": "{file}: only the first {max} images were read.",
+    "dismissNotice": "Dismiss",
+    "readingAttachmentImages": "Preparing attachments… pictures in slides can take a little longer."
   },
   "coverage": {
     "extracting": "extracting…",
@@ -461,7 +478,8 @@
     "knowledgeScopeShared": "Shared only",
     "knowledgeScopePersonal": "Personal only",
     "loadControlsError": "Session controls could not be loaded.",
-    "saveControlsError": "Could not save session controls."
+    "saveControlsError": "Could not save session controls.",
+    "enableWebSearch": "Enable web search"
   },
   "graphUi": {
     "title": "Knowledge graph",

@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation";
 import { Conversation, ConversationContent, ConversationEmptyState } from "@/components/ai-elements/conversation";
 import { Composer, type ComposerImage } from "@/components/composer";
-import { pendingAttachmentTurns, prepareAttachmentText, type ChatDocument } from "@/components/chat-attachments";
+import { pendingAttachmentNotices, pendingAttachmentTurns, prepareAttachments, type ChatDocument } from "@/components/chat-attachments";
 import { joinDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
-import { StatsBar } from "@/components/stats-bar";
+import { StatsBar, type SourceField } from "@/components/stats-bar";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
-import type { ChatSettings, GraphSnapshot } from "@/src/core";
+import type { ChatSettings, GraphSnapshot, KnowledgeSearchScope } from "@/src/core";
 import { catalogFor, type UiLanguage } from "@/src/core";
 
 /** The draft's pick set (owner round 10): the SAME shape the home pick
@@ -40,6 +40,25 @@ const DOCK = "mx-auto w-full max-w-[46rem] px-4";
  * Returns null on empty text; rethrows on transport failure (the caller's
  * busy flag resets).
  */
+/** Web research and office knowledge start OFF on every new session (owner, 2026-11-16). */
+export const DRAFT_SOURCES_OFF: ChatSettings = { webResearchEnabled: false, officeKnowledgeEnabled: false, knowledgeScope: "all" };
+
+/**
+ * Save the new-session screen's switches to the just-created session BEFORE its
+ * first reply runs (the session page sends turn 1 on arrival). Nothing to do
+ * when both are off. Throws on failure so the first reply never silently runs
+ * without what the user ticked.
+ */
+export async function applyDraftSources(chatId: string, sources: ChatSettings, fetchLike: typeof fetch): Promise<void> {
+	if (!sources.webResearchEnabled && !sources.officeKnowledgeEnabled) return;
+	const response = await fetchLike(`/api/chats/${encodeURIComponent(chatId)}/settings`, {
+		method: "PUT",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ webResearchEnabled: sources.webResearchEnabled === true, officeKnowledgeEnabled: sources.officeKnowledgeEnabled === true, knowledgeScope: sources.knowledgeScope ?? "all" }),
+	});
+	if (!response.ok) throw new Error("Unable to save the session's web/knowledge settings.");
+}
+
 export async function startDraftSession(
 	text: string,
 	fetchLike: typeof fetch,
@@ -91,6 +110,8 @@ export function DraftShell({
 	onClearPicks,
 	overlay,
 	attachments,
+	sources,
+	onSourcesChange,
 }: {
 	busy: boolean;
 	text: string;
@@ -121,6 +142,9 @@ export function DraftShell({
 	 *  the graph view (the overlay fills its column, never the sidebar).
 	 *  Passed as a node so the pick state stays in NewSession. */
 	overlay?: ReactNode;
+	/** Web/knowledge switches for the session about to start (both off by default). */
+	sources?: ChatSettings;
+	onSourcesChange?: (field: SourceField, value: boolean | KnowledgeSearchScope) => void;
 }) {
 	const copy = catalogFor(uiLanguage);
 	// Voice dictation (STT wave, 2026-09-17): finals append at the end of the
@@ -226,6 +250,7 @@ export function DraftShell({
 								</div>
 								<StatsBar
 									turns={[]}
+									{...(sources && onSourcesChange ? { draftSources: { settings: sources, onChange: onSourcesChange } } : {})}
 								/>
 							</div>
 						</div>
@@ -263,6 +288,9 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 	const [images, setImages] = useState<ComposerImage[]>([]);
 	const [documents, setDocuments] = useState<ChatDocument[]>([]);
 	const [uploadError, setUploadError] = useState<string>();
+	// Web/knowledge for the session about to start: off every time (owner, 2026-11-16).
+	const [sources, setSources] = useState<ChatSettings>(DRAFT_SOURCES_OFF);
+	const changeSource = (field: SourceField, value: boolean | KnowledgeSearchScope) => setSources((current) => ({ ...current, [field]: value }));
 	// THE PICK BAR (owner round 10): the draft's lifted pick set + the
 	// snapshot the standalone chain-table picker reads. Lazy — the graph
 	// is fetched on FIRST open only, then reused.
@@ -298,13 +326,17 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 		setBusy(true);
 		setUploadError(undefined);
 		try {
-			const prompt = await prepareAttachmentText(draft, documents);
+			const { text: prompt, imageIssues } = await prepareAttachments(draft, documents);
 			const target = await startDraftSession(draft, fetch, mode === "practice" ? "practice" : mode === "chat" ? "chat" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage);
 			if (!target) throw new Error("Unable to create the session.");
+			const pathname = target.split("?")[0]!;
+			const chatId = pathname.slice("/chat/".length);
+			// Saved before navigating: the session page sends turn 1 on arrival, so the
+			// first reply already has the web/knowledge the user ticked here.
+			await applyDraftSources(chatId, sources, fetch);
 			if (hasAttachments) {
-				const pathname = target.split("?")[0]!;
-				const chatId = pathname.slice("/chat/".length);
 				pendingAttachmentTurns.set(chatId, { type: "text", text: prompt, images: images.map(({ data, mimeType }) => ({ data, mimeType })) });
+				if (imageIssues.length) pendingAttachmentNotices.set(chatId, imageIssues);
 				router.push(pathname);
 			} else {
 				router.push(target);
@@ -314,7 +346,7 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 			setBusy(false);
 			setUploadError((error as Error).message);
 		}
-	}, [documents, images, router, mode, teachingLanguage]);
+	}, [documents, images, router, mode, teachingLanguage, sources]);
 
 	return (
 		<>
@@ -327,6 +359,8 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 				onChange={applyText}
 				onSend={send}
 				attachments={{ images, onImagesChange: setImages, documents, onDocumentsChange: setDocuments, uploading: busy && documents.length > 0, uploadError }}
+				sources={sources}
+				onSourcesChange={changeSource}
 				mode={mode}
 				picks={picks}
 				onOpenPicker={openPicker}

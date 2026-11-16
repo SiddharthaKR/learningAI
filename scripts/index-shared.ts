@@ -3,12 +3,13 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot } from "../src/knowledge/index-store.ts";
 import { indexKnowledgeDocument, unreadableKnowledgeDocument } from "../src/knowledge/service.ts";
+import { describeImageLocations, visionConfigFromEnv, type VisionConfig } from "../src/knowledge/vision-job.ts";
 
 function ignored(name: string): boolean {
 	return name.startsWith(".") || name.startsWith("~$") || name.endsWith("~") || /\.(tmp|part|swp)$/iu.test(name);
 }
 
-export async function indexSharedKnowledge({ sourceDir, indexFile }: { sourceDir: string; indexFile: string }): Promise<KnowledgeSnapshot> {
+export async function indexSharedKnowledge({ sourceDir, indexFile, visionConfig }: { sourceDir: string; indexFile: string; visionConfig?: VisionConfig }): Promise<KnowledgeSnapshot> {
 	// Win32 ordinary and extended-length paths must share the same namespace
 	// before relative-path comparison; path.relative also handles casing.
 	const source = path.toNamespacedPath(path.resolve(sourceDir));
@@ -30,7 +31,10 @@ export async function indexSharedKnowledge({ sourceDir, indexFile }: { sourceDir
 		let data: Uint8Array;
 		try { data = await readFile(path.join(source, fileName)); }
 		catch { snapshot.documents.push(unreadableKnowledgeDocument(fileName)); continue; }
-		const indexed = await indexKnowledgeDocument({ fileName, data });
+		const indexed = await indexKnowledgeDocument({ fileName, data, ...(visionConfig ? { vision: { config: visionConfig } } : {}) });
+		const failed = indexed.imageReport?.failed ?? [];
+		if (failed.length) console.warn(`${fileName}: pictures at ${describeImageLocations(failed)} could not be read; indexed the text.`);
+		if (indexed.imageReport?.skipped) console.warn(`${fileName}: ${indexed.imageReport.skipped} images over the per-document limit were not read.`);
 		snapshot.documents.push(indexed.document);
 		snapshot.chunks.push(...indexed.chunks);
 	}
@@ -43,7 +47,7 @@ export async function runIndexShared(env: Record<string, string | undefined> = p
 	const indexFile = env.KNOWLEDGE_INDEX_FILE?.trim();
 	if (!sourceDir) throw new Error("KNOWLEDGE_SHARED_DIR is required: set the shared source folder.");
 	if (!indexFile) throw new Error("KNOWLEDGE_INDEX_FILE is required: set the shared snapshot file.");
-	await indexSharedKnowledge({ sourceDir, indexFile });
+	await indexSharedKnowledge({ sourceDir, indexFile, visionConfig: visionConfigFromEnv(env) });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

@@ -2,7 +2,19 @@ import { extractSelectedZipEntries, KnowledgeArchiveError } from "../archive.ts"
 import type { ExtractedBlock } from "../contracts.ts";
 import { descendants, officeElements, paragraphText, tableRows, type OfficeElement } from "./office.ts";
 
+/** Where a picture sits in the body: its paragraph (same numbering as the text) and the heading above it. */
+export interface DocxPlacement { paragraph: number; heading?: string; section: string[] }
+
 export function extractDocx(fileName: string, data: Uint8Array): ExtractedBlock[] {
+	return parseDocx(fileName, data).blocks;
+}
+
+/** Picture relationship id (r:embed / r:id) → its first placement in the body. Headers, footers and unused media are absent. */
+export function docxImagePlacements(data: Uint8Array): Map<string, DocxPlacement> {
+	return parseDocx("placements.docx", data).placements;
+}
+
+function parseDocx(fileName: string, data: Uint8Array): { blocks: ExtractedBlock[]; placements: Map<string, DocxPlacement> } {
 	const entries = extractSelectedZipEntries(data, (name) => name === "word/document.xml" || name === "word/styles.xml");
 	const document = entries.get("word/document.xml");
 	if (!document) throw new KnowledgeArchiveError("XML_INVALID", "The DOCX archive is missing word/document.xml.");
@@ -18,6 +30,18 @@ export function extractDocx(fileName: string, data: Uint8Array): ExtractedBlock[
 		}
 	}
 	const blocks: ExtractedBlock[] = [];
+	const placements = new Map<string, DocxPlacement>();
+	function place(paragraph: OfficeElement, index: number) {
+		const ids = [
+			...descendants(paragraph.children, "a:blip").map((blip) => blip.attributes["@_r:embed"]),
+			...descendants(paragraph.children, "v:imagedata").map((legacy) => legacy.attributes["@_r:id"]),
+		];
+		for (const id of ids) {
+			if (!id || placements.has(id)) continue;
+			const heading = citationHeading();
+			placements.set(id, { paragraph: index, ...(heading === undefined ? {} : { heading }), section: [...path] });
+		}
+	}
 	// Heading path, outermost first. Headings are never body text; they only feed `section`.
 	const path: string[] = [];
 	let pending: { lines: string[]; paragraph: number; heading?: string; section: string[] } | undefined;
@@ -38,6 +62,7 @@ export function extractDocx(fileName: string, data: Uint8Array): ExtractedBlock[
 		for (const element of elements) {
 			if (element.name === "w:p") {
 				const index = ++paragraphCount;
+				place(element, index);
 				const text = paragraphText(element, "w:t");
 				if (!text.trim()) continue;
 				const styleId = descendants(element.children, "w:pStyle")[0]?.attributes["@_w:val"] ?? "";
@@ -53,7 +78,9 @@ export function extractDocx(fileName: string, data: Uint8Array): ExtractedBlock[
 			} else if (element.name === "w:tbl") {
 				flush();
 				const firstParagraph = paragraphCount + 1;
-				paragraphCount += descendants(element.children, "w:p").length;
+				const tableParagraphs = descendants(element.children, "w:p");
+				tableParagraphs.forEach((paragraph, offset) => place(paragraph, firstParagraph + offset));
+				paragraphCount += tableParagraphs.length;
 				const rows = tableRows(element, { row: "w:tr", cell: "w:tc", paragraph: "w:p", text: "w:t" });
 				if (!rows.length) continue;
 				const heading = citationHeading();
@@ -71,5 +98,5 @@ export function extractDocx(fileName: string, data: Uint8Array): ExtractedBlock[
 	}
 	walk(body.children);
 	flush();
-	return blocks;
+	return { blocks, placements };
 }

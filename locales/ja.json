@@ -184,7 +184,24 @@
     "sharedKnowledge": "共有ナレッジ（ログイン済みの全ユーザー）",
     "removeAttachment": "添付ファイルを削除",
     "uploadingAttachments": "添付ファイルを準備中…",
-    "sessionPlaceholder": "質問・回答・指示を入力…"
+    "sessionPlaceholder": "質問・回答・指示を入力…",
+    "picturesUnreadable": "{file} の画像を読み取れませんでした（{where}）。テキストで続行します。",
+    "whereSlide": "スライド {list}",
+    "whereSlides": "スライド {list}",
+    "wherePage": "{list} ページ",
+    "wherePages": "{list} ページ",
+    "whereNear": "{list} 付近",
+    "whereParagraph": "{list} 段落目",
+    "whereParagraphs": "{list} 段落目",
+    "quote": "「{text}」",
+    "readPictures": "画像も読み取る（時間がかかります）",
+    "readPicturesHint": "このファイル内の画像を画像認識モデルで説明し、質問や検索に使えるようにします。画像1枚につき数秒かかります。",
+    "readPicturesAction": "画像を読み取る",
+    "readingPictures": "画像を読み取り中…",
+    "picturesReadBadge": "画像読み取り済み",
+    "imagesSkipped": "{file}：最初の {max} 枚の画像のみ読み取りました。",
+    "dismissNotice": "閉じる",
+    "readingAttachmentImages": "添付ファイルを準備中… スライド内の画像の読み取りには少し時間がかかります。"
   },
   "coverage": {
     "extracting": "抽出中…",
@@ -461,7 +478,8 @@
     "knowledgeScopeShared": "共有のみ",
     "knowledgeScopePersonal": "個人のみ",
     "loadControlsError": "セッション設定を読み込めませんでした。",
-    "saveControlsError": "セッション設定を保存できませんでした。"
+    "saveControlsError": "セッション設定を保存できませんでした。",
+    "enableWebSearch": "ウェブ検索を有効にする"
   },
   "graphUi": {
     "title": "ナレッジグラフ",

@@ -17,7 +17,6 @@
 - No layout, navigation or behavior changes.
 - Every new copy key exists in both `en.json` and `ja.json`.
 - Leave alone: `bg-white` diagram holders, `bg-black/50` backdrop, `ui/button.tsx` destructive `text-white`, green "Next problem" button.
-- Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## Review Focus
 
