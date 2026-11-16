@@ -5,7 +5,7 @@ Official `searxng/searxng:latest` from Docker Hub, version 2026.11.15-2d500cb6b
 saved with `docker save | gzip` for servers that cannot reach Docker Hub.
 
 File: searxng-2026.11.15.tar.gz (96.9 MB)
-sha256: \cfa7f570ecaed419e01e725db2fc208c94b05d0d066ef93c9e4cae3ffab7f2cd
+sha256: cfa7f570ecaed419e01e725db2fc208c94b05d0d066ef93c9e4cae3ffab7f2cd
 
 This branch is standalone: it shares no history with office and must never be merged.
 
