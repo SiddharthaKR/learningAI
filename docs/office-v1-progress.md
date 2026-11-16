@@ -304,4 +304,13 @@ These are UI polish changes. All acceptance items remain at their prior status; 
 | `/source` route | Implemented, host-untested | AGPL compliance route: unauthenticated archive download of the app source, excluding `.env`, `data/`, knowledge files, indexes, and secrets. |
 | Deployment on .126 | Pending | `DEPLOY.md` and `deploy/learnharness.service` are written; the host run and acceptance checks have not been done. |
 | Concurrency limits | Untested | `MAX_CONCURRENT_LLM=2` is set but not host-tested with multiple users. |
-| Shared knowledge index | Operator-configured | Paths are set in the host `.env` by the operator (decided 2026-11-11); empty means off. Currently not wired: `KNOWLEDGE_SHARED_DIR` and `KNOWLEDGE_INDEX_FILE` are not pointed at real directories; only personal uploads work. |
+| Shared knowledge index | Operator-configured | Paths are set in the host `.env` by the operator (decided 2026-11-11); empty means off. Optional admin-built index. Separately, users upload to the Shared pool on the Knowledge page (`data/shared/`, audited). |
+
+## Admin pages and password reset (2026-11-16)
+
+- **Admin identity:** `LH_ADMIN_USERNAME` (`src/server/admin.ts`: `adminUsername`, `isAdminUsername`); `isAdminUser` in `knowledge-audit.ts` uses the same check. No role is stored on accounts. Guards: `withOfficeAdmin` (route-scope, 401/403) and `withOfficeAdminPage` (page-scope, redirects to /login or /).
+- **Accounts:** `list()` and `resetPassword(username, newPassword)` (same 12-character rule as signup).
+- **Admin UI/API:** `/admin` (users, reset password, delete), `PUT /api/admin/users/[username]/password`, `DELETE /api/admin/users/[username]` (refuses the admin account; removes only the account record). Login page shows "Forgot password? Contact your administrator."
+- **`/admin/knowledge`:** totals, uploads per day and uploader per document, from `sharedKnowledgeStore` plus the audit log (`computeKnowledgeStats` in `src/knowledge/stats.ts`).
+- **Graph:** Graph/Table toggle on the graph page (`components/graph-table.tsx`): search, per-row and bulk delete through the existing delete dialog.
+- **Known gaps:** no sidebar link to `/admin`.

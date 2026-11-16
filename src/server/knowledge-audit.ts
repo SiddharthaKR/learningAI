@@ -2,6 +2,7 @@ import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { PATHS } from "../../config.ts";
 import { createAccountStore } from "./accounts.ts";
+import { isAdminUsername } from "./admin.ts";
 
 /** One line of the shared-knowledge audit log (data/shared/knowledge/audit.jsonl). */
 export interface SharedKnowledgeAuditEvent {
@@ -59,8 +60,6 @@ export async function usernameForUserId(userId: string): Promise<string> {
 
 /** True iff the account's username exactly equals LH_ADMIN_USERNAME (trimmed). Unset or empty means no admin. */
 export async function isAdminUser(userId: string): Promise<boolean> {
-  const adminUsername = (process.env.LH_ADMIN_USERNAME ?? "").trim();
-  if (!adminUsername) return false;
   const account = await createAccountStore(PATHS.data).byId(userId);
-  return account !== null && account.username === adminUsername;
+  return account !== null && isAdminUsername(account.username);
 }

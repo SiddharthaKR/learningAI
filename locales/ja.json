@@ -41,7 +41,22 @@
     "closePanel": "閉じる",
     "citationPage": "{n} ページ",
     "citationSlide": "スライド {n}",
-    "citationLines": "{from}–{to} 行"
+    "citationLines": "{from}–{to} 行",
+    "adminUnknown": "不明",
+    "adminTitle": "ナレッジライブラリ",
+    "adminTotalItems": "アイテム総数",
+    "adminTotalChunks": "チャンク総数",
+    "adminUploadsOverTime": "アップロード数の推移",
+    "adminDay": "日付",
+    "adminCount": "アップロード数",
+    "adminSharedItems": "共有アイテム",
+    "adminEmpty": "共有アイテムはありません。",
+    "adminFileName": "ファイル名",
+    "adminFormat": "形式",
+    "adminStatus": "状態",
+    "adminChunks": "チャンク数",
+    "adminUploadedBy": "アップロード者",
+    "adminUploadedAt": "日付"
   },
   "common": {
     "english": "英語",
@@ -59,7 +74,8 @@
     "toLogin": "ログインへ",
     "toSignup": "アカウント作成",
     "requestFailed": "リクエストに失敗しました",
-    "pending": "…"
+    "pending": "…",
+    "forgotPassword": "パスワードをお忘れですか？管理者にお問い合わせください。"
   },
   "sidebar": {
     "open": "サイドバーを開く",
@@ -544,7 +560,12 @@
     "depthSpacing": "深度の間隔",
     "baseRingRadius": "基準リング半径",
     "sessions": "セッション",
-    "noSessions": "記録されたセッションはありません。"
+    "noSessions": "記録されたセッションはありません。",
+    "viewGraph": "グラフ表示",
+    "viewTable": "テーブル表示",
+    "statement": "記述",
+    "selectAllNodes": "すべてのノードを選択",
+    "deleteNodeRow": "ノード {name} を削除"
   },
   "artifactUi": {
     "researchAgent": "リサーチエージェント",
@@ -651,5 +672,24 @@
   "notesImport": {
     "invalidResponse": "取り込み結果の形式が正しくありません。ファイルを再試行してください。",
     "requestFailed": "取り込みリクエストに失敗しました（HTTP {status}）{detail}。ファイルを再試行してください。"
+  },
+  "admin": {
+    "title": "管理",
+    "users": "ユーザー",
+    "username": "ユーザー名",
+    "role": "役割",
+    "created": "作成日",
+    "admin": "管理者",
+    "user": "ユーザー",
+    "resetPassword": "パスワードをリセット",
+    "newPassword": "新しいパスワード（12文字以上）",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "confirmDelete": "{name} を削除しますか？この操作は元に戻せません。",
+    "passwordReset": "{name} のパスワードをリセットしました。",
+    "failed": "リクエストに失敗しました",
+    "actions": "操作",
+    "knowledge": "共有ナレッジ"
   }
 }
