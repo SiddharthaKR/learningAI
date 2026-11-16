@@ -19,10 +19,16 @@ export interface IndexVision {
 	runSlot?: VisionSlot;
 }
 
-/** Per-document outcome the UI turns into a notice. Slides are 1-based, sorted, unique. */
+/** Where a picture is, in the words the user knows for that format. */
+export type ImageLocation =
+	| { kind: "slide"; number: number }
+	| { kind: "page"; number: number }
+	| { kind: "paragraph"; number: number; heading?: string };
+
+/** Per-document outcome the UI turns into a notice. `failed` is unique and in document order. */
 export interface ImageReport {
 	described: number;
-	failedSlides: number[];
+	failed: ImageLocation[];
 	skipped: number;
 }
 
@@ -53,12 +59,12 @@ export function visionConfigFromEnv(env: Record<string, string | undefined>): Vi
 	return undefined;
 }
 
-function imageSlide(image: ExtractedImage): number {
+function imageLocation(image: ExtractedImage): ImageLocation {
 	const citation = image.citation;
-	if (citation.format === "pptx") return citation.slide;
-	if (citation.format === "pdf") return citation.page;
-	if (citation.format === "docx") return citation.paragraph;
-	return 1;
+	if (citation.format === "pptx") return { kind: "slide", number: citation.slide };
+	if (citation.format === "pdf") return { kind: "page", number: citation.page };
+	if (citation.format === "docx") return { kind: "paragraph", number: citation.paragraph, ...(citation.heading ? { heading: citation.heading } : {}) };
+	return { kind: "page", number: 1 };
 }
 
 /**
@@ -88,7 +94,7 @@ export async function describeImagesReport(
 				: defaultVisionCall(base64, image.mimeType, DESCRIBE_PROMPT, config);
 			const description = (await (options.runSlot ? options.runSlot(call) : call())).trim();
 			if (!description) return null;
-			return { text: description, citation: { ...image.citation, imageDescription: true } as ExtractedBlock["citation"] };
+			return { text: description, citation: { ...image.citation, imageDescription: true } as ExtractedBlock["citation"], ...(image.section?.length ? { section: [...image.section] } : {}) };
 		} catch {
 			return null;
 		}
@@ -102,9 +108,13 @@ export async function describeImagesReport(
 		await Promise.all(Array.from({ length: Math.min(LOCAL_CONCURRENCY, selected.length) }, worker));
 	}
 	const blocks: ExtractedBlock[] = [];
-	const failed = new Set<number>();
-	results.forEach((block, index) => { if (block) blocks.push(block); else failed.add(imageSlide(selected[index]!)); });
-	return { blocks, described: blocks.length, failedSlides: [...failed].sort((a, b) => a - b), skipped: unique.length - selected.length };
+	const failed = new Map<string, ImageLocation>();
+	results.forEach((block, index) => {
+		if (block) { blocks.push(block); return; }
+		const location = imageLocation(selected[index]!);
+		failed.set(`${location.kind}:${location.number}`, location);
+	});
+	return { blocks, described: blocks.length, failed: [...failed.values()].sort((a, b) => a.number - b.number), skipped: unique.length - selected.length };
 }
 
 const DESCRIBE_PROMPT = "Describe this image in detail for a text search index. Include all visible text, diagrams, charts, labels, and key visual elements. Be concise but thorough.";
@@ -153,4 +163,11 @@ async function defaultVisionCall(imageBase64: string, mimeType: string, prompt: 
 /** Best-effort descriptions only (no report): failed pictures are skipped. */
 export async function describeImages(images: ExtractedImage[], config: VisionConfig, callFn?: VisionCallFn): Promise<ExtractedBlock[]> {
 	return (await describeImagesReport(images, config, callFn ? { callFn } : {})).blocks;
+}
+
+/** Plain-English list of picture locations, for the model's note and server logs ("slide 3, page 12, paragraph 4 (“Results”)"). */
+export function describeImageLocations(locations: ImageLocation[]): string {
+	return locations.map((location) => location.kind === "paragraph"
+		? `paragraph ${location.number}${location.heading ? ` (“${location.heading}”)` : ""}`
+		: `${location.kind} ${location.number}`).join(", ");
 }

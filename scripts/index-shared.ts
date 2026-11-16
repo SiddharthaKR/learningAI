@@ -3,7 +3,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot } from "../src/knowledge/index-store.ts";
 import { indexKnowledgeDocument, unreadableKnowledgeDocument } from "../src/knowledge/service.ts";
-import { visionConfigFromEnv, type VisionConfig } from "../src/knowledge/vision-job.ts";
+import { describeImageLocations, visionConfigFromEnv, type VisionConfig } from "../src/knowledge/vision-job.ts";
 
 function ignored(name: string): boolean {
 	return name.startsWith(".") || name.startsWith("~$") || name.endsWith("~") || /\.(tmp|part|swp)$/iu.test(name);
@@ -32,8 +32,8 @@ export async function indexSharedKnowledge({ sourceDir, indexFile, visionConfig 
 		try { data = await readFile(path.join(source, fileName)); }
 		catch { snapshot.documents.push(unreadableKnowledgeDocument(fileName)); continue; }
 		const indexed = await indexKnowledgeDocument({ fileName, data, ...(visionConfig ? { vision: { config: visionConfig } } : {}) });
-		const failed = indexed.imageReport?.failedSlides ?? [];
-		if (failed.length) console.warn(`${fileName}: images on slides ${failed.join(", ")} could not be read; indexed the slide text.`);
+		const failed = indexed.imageReport?.failed ?? [];
+		if (failed.length) console.warn(`${fileName}: pictures at ${describeImageLocations(failed)} could not be read; indexed the text.`);
 		if (indexed.imageReport?.skipped) console.warn(`${fileName}: ${indexed.imageReport.skipped} images over the per-document limit were not read.`);
 		snapshot.documents.push(indexed.document);
 		snapshot.chunks.push(...indexed.chunks);

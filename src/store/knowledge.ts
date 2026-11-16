@@ -1,7 +1,7 @@
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { renameSync } from "node:fs";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { readKnowledgeSnapshot, writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot, type KnowledgeDocumentRecord } from "../knowledge/index-store.ts";
 import type { KnowledgeChunk } from "../knowledge/contracts.ts";
 import { indexKnowledgeDocument } from "../knowledge/service.ts";
@@ -83,6 +83,33 @@ if (!snapshot.documents.some((document) => document.id === id)) return false;
 			await unlink(path.join(sourceDirectory, id)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
 			await refreshVault(next);
 			return true;
+		}),
+		/**
+		 * Re-index a saved document from its stored source with `index` (the vision-aware
+		 * indexer) and replace its record and chunks in place: same id, no duplicate.
+		 * Null when the document or its source file is gone.
+		 */
+		reindexDocument: <T extends { document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[] }>(id: string, index: (fileName: string, data: Uint8Array) => Promise<T>): Promise<{ document: KnowledgeDocumentRecord; result: T } | null> => serialized(root, async () => {
+			beforePublish();
+			const snapshot = await readKnowledgeSnapshot(indexFile);
+			const current = snapshot.documents.find((document) => document.id === id);
+			if (!current) return null;
+			let data: Uint8Array;
+			try { data = new Uint8Array(await readFile(path.join(sourceDirectory, id))); }
+			catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+			const result = await index(current.fileName, data);
+			const document: KnowledgeDocumentRecord = { ...result.document, id, ...(current.contentHash ? { contentHash: current.contentHash } : {}) };
+			const chunks = result.chunks.map((chunk) => ({ ...chunk, sourceId: id }));
+			const next = {
+				...snapshot,
+				generatedAt: new Date().toISOString(),
+				documents: snapshot.documents.map((item) => item.id === id ? document : item),
+				chunks: [...snapshot.chunks.filter((chunk) => chunk.sourceId !== id), ...chunks],
+			};
+			beforePublish();
+			await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);
+			await refreshVault(next);
+			return { document, result };
 		}),
 	};
 }

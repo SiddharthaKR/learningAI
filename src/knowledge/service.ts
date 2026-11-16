@@ -22,37 +22,59 @@ export function unreadableKnowledgeDocument(fileName: string): KnowledgeDocument
 	return { id, fileName, ...(format ? { format } : {}), status: "rejected", error: "Document could not be read. Check that the source file exists and is readable." };
 }
 
-function blockSlide(block: ExtractedBlock): number {
-	return block.citation.format === "pptx" ? block.citation.slide : 0;
+/** A block's place in the document: slide (PPTX), page (PDF) or first paragraph (Word). */
+function position(block: ExtractedBlock): number {
+	const citation = block.citation;
+	if (citation.format === "pptx") return citation.slide;
+	if (citation.format === "pdf") return citation.page;
+	if (citation.format === "docx") return citation.paragraph;
+	return 0;
 }
 
 /**
- * Slot each picture description in right after its slide's text, inheriting that
- * slide's title and section, so one chunking pass yields valid ids and ordinals.
- * Pictures on slides without text go in slide order.
+ * Slot each picture description in after the last text block at or before its place
+ * (after its slide's or page's text; in Word, after the text above it), inheriting
+ * that block's section (and PPTX title, Word heading), so one chunking pass yields
+ * valid ids and ordinals.
  */
 function withPictures(blocks: ExtractedBlock[], pictures: ExtractedBlock[]): ExtractedBlock[] {
-	const pending = [...pictures].sort((a, b) => blockSlide(a) - blockSlide(b));
+	const pending = [...pictures].sort((a, b) => position(a) - position(b));
 	const out: ExtractedBlock[] = [];
-	blocks.forEach((block, index) => {
-		const slide = blockSlide(block);
-		while (pending.length && blockSlide(pending[0]!) < slide) out.push(pending.shift()!);
+	let previous: ExtractedBlock | undefined;
+	const placeBefore = (limit: number) => {
+		while (pending.length && position(pending[0]!) < limit) out.push(inherit(pending.shift()!, previous));
+	};
+	for (const block of blocks) {
+		placeBefore(position(block));
 		out.push(block);
-		const next = blocks[index + 1];
-		if (next && blockSlide(next) === slide) return;
-		while (pending.length && blockSlide(pending[0]!) === slide) {
-			const picture = pending.shift()!;
-			const title = block.citation.format === "pptx" ? block.citation.title : "";
-			out.push({ ...picture, citation: { ...picture.citation, title } as ExtractedBlock["citation"], ...(block.section?.length ? { section: [...block.section] } : {}) });
-		}
-	});
-	return [...out, ...pending];
+		previous = block;
+	}
+	placeBefore(Number.POSITIVE_INFINITY);
+	return out;
+}
+
+function inherit(picture: ExtractedBlock, context: ExtractedBlock | undefined): ExtractedBlock {
+	if (!context) return picture;
+	let citation = picture.citation;
+	if (citation.format === "pptx" && context.citation.format === "pptx" && context.citation.slide === citation.slide) citation = { ...citation, title: context.citation.title };
+	if (citation.format === "docx" && citation.heading === undefined && context.citation.format === "docx" && context.citation.heading !== undefined) citation = { ...citation, heading: context.citation.heading };
+	// A picture that knows its own heading path (Word) keeps it; otherwise it takes its neighbour's.
+	return { ...picture, citation, ...(!picture.section?.length && context.section?.length ? { section: [...context.section] } : {}) };
+}
+
+/** Formats whose pictures can be read: PowerPoint, Word, and PDFs with a real text layer (not scanned/OCR). */
+export function picturesEligible(extracted: { format: KnowledgeFormat; status: string; blocks: ExtractedBlock[] }): boolean {
+	if (extracted.status !== "ready") return false;
+	if (extracted.format === "pptx" || extracted.format === "docx") return true;
+	return extracted.format === "pdf" && !extracted.blocks.some((block) => block.citation.format === "pdf" && block.citation.ocr);
 }
 
 /**
- * Extract and chunk one document. With `vision`, PPTX pictures placed on slides are
- * described and indexed under their slide; `imageReport` then says what was read,
- * which slides failed, and how many were over the cap. Pictures never fail a document.
+ * Extract and chunk one document. `hasPictures` records whether it has pictures that
+ * could be read. With `vision` (the user opted in and the server has a vision model),
+ * those pictures are described and indexed in place; `imageReport` then says what
+ * was read, where reading failed, and how many were over the cap. Pictures never
+ * fail a document.
  */
 export async function indexKnowledgeDocument({ fileName, data, visionConfig, vision }: { fileName: string; data: Uint8Array; visionConfig?: VisionConfig; vision?: IndexVision }): Promise<{ document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[]; imageReport?: ImageReport }> {
 	fileName = normalizeKnowledgeFileName(fileName);
@@ -63,13 +85,12 @@ export async function indexKnowledgeDocument({ fileName, data, visionConfig, vis
 	const activeVision = vision ?? (visionConfig ? { config: visionConfig } : undefined);
 	try {
 		const extracted = await extractDocument({ fileName, data });
-		if (!activeVision || format !== "pptx" || extracted.status !== "ready") {
-			return { document: { id, fileName, format, status: extracted.status }, chunks: chunkDocument(extracted, id) };
-		}
-		const report = await describeImagesReport(extracted.images ?? [], activeVision.config, { ...(activeVision.callFn ? { callFn: activeVision.callFn } : {}), ...(activeVision.runSlot ? { runSlot: activeVision.runSlot } : {}) });
-		const { blocks: pictures, ...imageReport } = report;
+		const images = picturesEligible(extracted) ? extracted.images ?? [] : [];
+		const document: KnowledgeDocumentRecord = { id, fileName, format, status: extracted.status, ...(images.length ? { hasPictures: true } : {}) };
+		if (!activeVision || !images.length || extracted.status !== "ready") return { document, chunks: chunkDocument(extracted, id) };
+		const { blocks: pictures, ...imageReport } = await describeImagesReport(images, activeVision.config, { ...(activeVision.callFn ? { callFn: activeVision.callFn } : {}), ...(activeVision.runSlot ? { runSlot: activeVision.runSlot } : {}) });
 		const chunks = chunkDocument({ ...extracted, blocks: withPictures(extracted.blocks, pictures) }, id);
-		return { document: { id, fileName, format, status: extracted.status }, chunks, imageReport };
+		return { document: { ...document, picturesRead: true }, chunks, imageReport };
 	} catch {
 		return { document: { id, fileName, format, status: "rejected", error: "Document extraction failed. Check that the file is valid, readable, and within supported extraction limits." }, chunks: [] };
 	}

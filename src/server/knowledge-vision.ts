@@ -1,5 +1,6 @@
 import { withBgLlmSlot } from "../agent/subagents/bg-llm-semaphore.ts";
 import { visionConfigFromEnv, type IndexVision } from "../knowledge/vision-job.ts";
+export { describeImageLocations, type ImageLocation, type ImageReport } from "../knowledge/vision-job.ts";
 
 /**
  * Vision for document indexing, from .env (VISION_* or the main model when

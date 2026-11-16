@@ -61,7 +61,7 @@ describe("describeImagesReport", () => {
 		});
 		assert.equal(calls.length, 2, "identical bytes on slide 4 reuse slide 1's description");
 		assert.deepEqual(report.blocks.map((b) => (b.citation as { slide: number }).slide), [1, 2]);
-		assert.deepEqual(report.failedSlides, []);
+		assert.deepEqual(report.failed, []);
 		assert.equal(report.described, 2);
 		assert.equal(report.skipped, 0);
 	});
@@ -70,13 +70,13 @@ describe("describeImagesReport", () => {
 		const report = await describeImagesReport([image(1, 1), image(3, 2), image(5, 3)], { baseUrl: "http://x/v1", model: "m" }, {
 			callFn: async (b64) => { if (b64 === Buffer.from(png(2)).toString("base64")) throw new Error("proxy dropped image"); return "ok"; },
 		});
-		assert.deepEqual(report.failedSlides, [3]);
+		assert.deepEqual(report.failed, [{ kind: "slide", number: 3 }]);
 		assert.equal(report.blocks.length, 2);
 	});
 
 	it("treats an empty answer as a failure", async () => {
 		const report = await describeImagesReport([image(2, 1)], { baseUrl: "http://x/v1", model: "m" }, { callFn: async () => "   " });
-		assert.deepEqual(report.failedSlides, [2]);
+		assert.deepEqual(report.failed, [{ kind: "slide", number: 2 }]);
 	});
 
 	it(`caps at ${MAX_DESCRIBED_IMAGES} pictures and counts the rest as skipped`, async () => {
@@ -112,14 +112,14 @@ describe("indexKnowledgeDocument with vision", () => {
 		const slide2Text = indexed.chunks.findIndex((c) => (c.citation as { slide: number }).slide === 2 && !(c.citation as { imageDescription?: boolean }).imageDescription);
 		assert.equal(indexed.chunks.indexOf(slide2), slide2Text + 1, "the picture follows its slide's text");
 		validateKnowledgeSnapshot({ version: 1, generatedAt: new Date().toISOString(), documents: [indexed.document], chunks: indexed.chunks });
-		assert.deepEqual(indexed.imageReport, { described: 2, failedSlides: [], skipped: 0 });
+		assert.deepEqual(indexed.imageReport, { described: 2, failed: [], skipped: 0 });
 	});
 
 	it("keeps the document ready when every picture fails, and reports the slides", async () => {
 		const indexed = await indexKnowledgeDocument({ fileName: "d.pptx", data: deck(), vision: { config: { baseUrl: "http://x/v1", model: "m" }, callFn: async () => { throw new Error("vision down"); } } });
 		assert.equal(indexed.document.status, "ready");
 		assert.ok(indexed.chunks.length > 0, "slide text is still indexed");
-		assert.deepEqual(indexed.imageReport, { described: 0, failedSlides: [1, 2], skipped: 0 });
+		assert.deepEqual(indexed.imageReport, { described: 0, failed: [{ kind: "slide", number: 1 }, { kind: "slide", number: 2 }], skipped: 0 });
 	});
 
 	it("without vision: text only and no report (today's behaviour)", async () => {

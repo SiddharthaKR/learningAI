@@ -6,6 +6,7 @@ import { PATHS } from "../config.ts";
 import { createAccountStore, type Account } from "../src/server/accounts.ts";
 import { createSessionToken } from "../src/server/session-auth.ts";
 import { POST } from "../app/api/knowledge/documents/route.ts";
+import { POST as PICTURES } from "../app/api/knowledge/documents/[id]/pictures/route.ts";
 import { officeZip, slideXml } from "./fixtures/knowledge/builders.ts";
 
 function png(seed: number): Uint8Array {
@@ -59,35 +60,49 @@ after(async () => {
 	}
 });
 
-function upload(data: Uint8Array, destination: string | null) {
+function upload(data: Uint8Array, destination: string | null, readImages = true) {
 	const form = new FormData();
 	form.set("file", new Blob([new Uint8Array(data)]), "lesson.pptx");
 	if (destination) form.set("destination", destination);
+	if (readImages) form.set("readImages", "true");
 	return POST(new Request("http://office.test/api/knowledge/documents", {
 		method: "POST",
 		headers: { cookie: `lh_session=${createSessionToken(account.id, process.env.SESSION_SECRET!)}` },
 		body: form,
 	}));
 }
+const readPictures = (id: string) => PICTURES(new Request(`http://office.test/api/knowledge/documents/${id}/pictures`, {
+	method: "POST",
+	headers: { cookie: `lh_session=${createSessionToken(account.id, process.env.SESSION_SECRET!)}` },
+}), { params: Promise.resolve({ id }) });
 
-it("chat attachment: the picture's description reaches the chat text, marked as an image on its slide", async () => {
+it("chat attachment with pictures ticked: the description reaches the chat text, marked as an image on its slide", async () => {
 	mode = "ok"; calls = 0;
 	const response = await upload(deck(1), "chat");
 	assert.equal(response.status, 200);
-	const body = await response.json() as { text: string; imageReport: { described: number; failedSlides: number[] } };
-	assert.match(body.text, /Slide 2 \(image\)\n§ Timing\nTiming diagram: clock edge/u, "marked as an image, under its slide's section");
-	assert.deepEqual(body.imageReport, { described: 1, failedSlides: [], skipped: 0 });
+	const body = await response.json() as { text: string; imageReport: unknown };
+	assert.ok(body.text.includes("Slide 2 (image)\n§ Timing\nTiming diagram: clock edge"), "marked as an image, under its slide's section");
+	assert.deepEqual(body.imageReport, { described: 1, failed: [], skipped: 0 });
 	assert.equal(calls, 1);
+});
+
+it("pictures not ticked: no model calls and no report, even with vision available", async () => {
+	mode = "ok"; calls = 0;
+	const response = await upload(deck(5), "chat", false);
+	const body = await response.json() as { text: string; imageReport?: unknown };
+	assert.equal(calls, 0);
+	assert.equal(body.imageReport, undefined);
+	assert.ok(!body.text.includes("(image)"));
 });
 
 it("vision failure: the upload still succeeds with the slide text, and the report names the slide", async () => {
 	mode = "fail"; calls = 0;
 	const response = await upload(deck(2), "chat");
 	assert.equal(response.status, 200);
-	const body = await response.json() as { text: string; imageReport: { failedSlides: number[] } };
+	const body = await response.json() as { text: string; imageReport: { failed: unknown[] } };
 	assert.match(body.text, /See the diagram/u);
-	assert.match(body.text, /\[The image on slide 2 could not be read\.\]/u, "the model is told too");
-	assert.deepEqual(body.imageReport.failedSlides, [2]);
+	assert.ok(body.text.includes("[Pictures that could not be read: slide 2.]"), "the model is told too");
+	assert.deepEqual(body.imageReport.failed, [{ kind: "slide", number: 2 }]);
 });
 
 it("saved to My Knowledge: described once; re-attaching the same deck makes no model calls", async () => {
@@ -98,14 +113,47 @@ it("saved to My Knowledge: described once; re-attaching the same deck makes no m
 	const again = await upload(deck(3), "personal");
 	const body = await again.json() as { text: string; imageReport?: unknown };
 	assert.equal(calls, 1, "the stored copy is reused");
-	assert.match(body.text, /Slide 2 \(image\)\n§ Timing\nTiming diagram/u, "earlier descriptions come back from the store");
+	assert.ok(body.text.includes("Slide 2 (image)\n§ Timing\nTiming diagram"), "earlier descriptions come back from the store");
 	assert.equal(body.imageReport, undefined);
+});
+
+it("upgrade: a deck saved without pictures gets them read in place when re-attached with pictures ticked", async () => {
+	mode = "ok"; calls = 0;
+	const first = await upload(deck(6), "personal", false);
+	const saved = await first.json() as { document: { id: string; hasPictures?: boolean; picturesRead?: boolean } };
+	assert.equal(saved.document.hasPictures, true);
+	assert.equal(saved.document.picturesRead, undefined);
+	assert.equal(calls, 0);
+	const again = await upload(deck(6), "personal");
+	const body = await again.json() as { document: { id: string; picturesRead?: boolean }; text: string; imageReport: unknown };
+	assert.equal(calls, 1);
+	assert.equal(body.document.id, saved.document.id, "same document, no duplicate");
+	assert.equal(body.document.picturesRead, true);
+	assert.ok(body.text.includes("Slide 2 (image)"));
+	assert.deepEqual(body.imageReport, { described: 1, failed: [], skipped: 0 });
 });
 
 it("Knowledge page upload (no destination) also returns the report", async () => {
 	mode = "fail"; calls = 0;
 	const response = await upload(deck(4), null);
-	const body = await response.json() as { document: { status: string }; imageReport: { failedSlides: number[] } };
+	const body = await response.json() as { document: { status: string }; imageReport: { failed: unknown[] } };
 	assert.equal(body.document.status, "ready");
-	assert.deepEqual(body.imageReport.failedSlides, [2]);
+	assert.deepEqual(body.imageReport.failed, [{ kind: "slide", number: 2 }]);
+});
+
+it("Read pictures on a saved document: reads them in place; refuses files without pictures", async () => {
+	mode = "ok"; calls = 0;
+	const saved = await (await upload(deck(7), null, false)).json() as { document: { id: string } };
+	const response = await readPictures(saved.document.id);
+	assert.equal(response.status, 200);
+	const body = await response.json() as { document: { id: string; picturesRead?: boolean }; imageReport: unknown };
+	assert.equal(body.document.id, saved.document.id);
+	assert.equal(body.document.picturesRead, true);
+	assert.deepEqual(body.imageReport, { described: 1, failed: [], skipped: 0 });
+	assert.equal(calls, 1);
+	const form = new FormData();
+	form.set("file", new Blob(["plain notes"]), "notes.txt");
+	const text = await (await POST(new Request("http://office.test/api/knowledge/documents", { method: "POST", headers: { cookie: `lh_session=${createSessionToken(account.id, process.env.SESSION_SECRET!)}` }, body: form }))).json() as { document: { id: string } };
+	assert.equal((await readPictures(text.document.id)).status, 409);
+	assert.equal((await readPictures("f".repeat(64))).status, 404);
 });

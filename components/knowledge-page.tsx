@@ -7,7 +7,8 @@ import { KnowledgeMap } from "@/components/knowledge-map";
 import type { KnowledgeDocumentRecord } from "@/src/core";
 import { validateKnowledgeUpload } from "@/src/core";
 import { XIcon } from "lucide-react";
-import { formatImageNotice } from "@/components/chat-attachments";
+import { formatImageNotice, imageIssue, type PictureLocation } from "@/components/chat-attachments";
+import { usePictureReading } from "@/components/picture-reading";
 
 const FORMAT_LABELS: Record<string, string> = { pdf: "PDF", pptx: "PPTX", docx: "DOCX", md: "MD", txt: "TXT" };
 
@@ -31,6 +32,12 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
   const copy = catalog.knowledge;
   // Pictures in the last upload that could not be read (the document itself was saved).
   const [imageNotice, setImageNotice] = useState<string | undefined>();
+  const pictures = usePictureReading();
+  const [readingKey, setReadingKey] = useState<string | null>(null);
+  const showReport = useCallback((fileName: string, report: { failed: PictureLocation[]; skipped: number } | undefined) => {
+    const issue = imageIssue(fileName, report);
+    setImageNotice(issue ? formatImageNotice([issue], catalog) : undefined);
+  }, [catalog]);
   const [documents, setDocuments] = useState(initialDocuments);
   const [shared, setShared] = useState(sharedDocuments);
   const [destination, setDestination] = useState<Destination>("personal");
@@ -78,10 +85,11 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
       const form = new FormData();
       form.set("file", file);
       if (destination === "shared") form.set("destination", "shared");
+      if (pictures.available && pictures.enabled) form.set("readImages", "true");
       const response = await fetch("/api/knowledge/documents", { method: "POST", body: form });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
-      if (result.imageReport) setImageNotice(formatImageNotice([{ fileName: file.name, failedSlides: result.imageReport.failedSlides, skipped: result.imageReport.skipped }], catalog));
+      showReport(file.name, result.imageReport);
       if (destination === "shared") {
         setShared((prev) => prev.some((d) => d.id === result.document.id) ? prev : [...prev, result.document]);
         void loadAudit();
@@ -91,7 +99,7 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (failure) { setError(message(failure instanceof Error ? failure.message : "upload_failed")); }
     finally { setBusy(false); }
-  }, [copy, catalog, destination, loadAudit]);
+  }, [copy, destination, loadAudit, pictures.available, pictures.enabled, showReport]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,6 +136,23 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
     finally { setDeletingKey(null); }
   }
 
+  /** "Read pictures" on a saved document: read them in place, then show what could not be read. */
+  async function readPicturesOf(doc: KnowledgeDocumentRecord, scope: Destination) {
+    const key = `${scope}:${doc.id}`;
+    setReadingKey(key);
+    setError("");
+    setImageNotice(undefined);
+    try {
+      const response = await fetch(`/api/knowledge/documents/${encodeURIComponent(doc.id)}/pictures${scope === "shared" ? "?scope=shared" : ""}`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      const update = (list: KnowledgeDocumentRecord[]) => list.map((item) => item.id === doc.id ? { ...item, ...result.document } : item);
+      if (scope === "shared") setShared(update); else setDocuments(update);
+      showReport(doc.fileName, result.imageReport);
+    } catch { setError(copy.upload_failed); }
+    finally { setReadingKey(null); }
+  }
+
   function documentRow(doc: KnowledgeDocumentRecord, scope: Destination) {
     const key = `${scope}:${doc.id}`;
     return <li key={key} className="group flex items-center gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/40">
@@ -136,8 +161,21 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
           <FormatBadge format={doc.format} />
           <p className="truncate font-medium">{doc.fileName}</p>
         </div>
-        <div className="mt-1"><StatusBadge status={doc.status} copy={copy} /></div>
+        <div className="mt-1 flex items-center gap-2">
+          <StatusBadge status={doc.status} copy={copy} />
+          {doc.picturesRead && <span className="text-xs text-muted-foreground">· {catalog.composer.picturesReadBadge}</span>}
+        </div>
       </div>
+      {pictures.available && doc.hasPictures && !doc.picturesRead && (
+        <button
+          type="button"
+          disabled={readingKey !== null}
+          onClick={() => void readPicturesOf(doc, scope)}
+          title={catalog.composer.readPicturesHint}
+          className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+          aria-label={`${catalog.composer.readPicturesAction}: ${doc.fileName}`}
+        >{readingKey === key ? catalog.composer.readingPictures : catalog.composer.readPicturesAction}</button>
+      )}
       <button
         type="button"
         disabled={deletingKey === key}
@@ -183,6 +221,12 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
           >{option === "personal" ? copy.personal : copy.shared}</button>)}
         </div>
       </div>
+      {pictures.available && (
+        <label className="-mt-5 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground" title={catalog.composer.readPicturesHint}>
+          <input type="checkbox" checked={pictures.enabled} disabled={busy} onChange={(event) => pictures.setEnabled(event.target.checked)} className="size-4 accent-primary" />
+          {catalog.composer.readPictures}
+        </label>
+      )}
 
       {/* Upload zone */}
       <form onSubmit={handleSubmit}>
