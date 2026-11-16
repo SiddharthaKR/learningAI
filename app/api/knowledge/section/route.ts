@@ -1,5 +1,4 @@
-import { withOfficeUser, currentUserId, checkedStoresForUser, sharedKnowledgeStore } from "@/src/server";
-import { sectionText } from "@/src/knowledge/map";
+import { withOfficeUser, currentUserId, checkedStoresForUser, sharedKnowledgeStore, sectionText } from "@/src/server";
 
 export const runtime = "nodejs";
 
