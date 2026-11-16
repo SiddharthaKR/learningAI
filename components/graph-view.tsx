@@ -66,7 +66,7 @@
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { NotesImportErrors, useNotesImport } from "@/components/notes-import.tsx";
 import Link from "next/link";
-import { ChevronDownIcon, FileTextIcon, HistoryIcon, ListTreeIcon, Loader2Icon, PencilIcon, SearchIcon, SettingsIcon, UploadIcon, WaypointsIcon } from "lucide-react";
+import { ChevronDownIcon, FileTextIcon, HistoryIcon, ListTreeIcon, Loader2Icon, PencilIcon, SearchIcon, SettingsIcon, TableIcon, UploadIcon, WaypointsIcon } from "lucide-react";
 import { EditNodeDialog } from "@/components/edit-node-dialog";
 import { incrementalLayout, propositionSessionHref, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
 import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
@@ -75,6 +75,7 @@ import { useActivity } from "@/components/activity-dock";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { MenuShell } from "@/components/menu-shell.tsx";
 import { DeleteNodeDialog } from "@/components/delete-node-dialog.tsx";
+import { GraphTable } from "@/components/graph-table.tsx";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { Hint } from "@/components/ui/hint";
 import { useI18n } from "@/components/i18n-provider";
@@ -846,8 +847,11 @@ export function GraphChromeRow({
 	settings,
 	changeSettings,
 	onOpenChains,
+	hideSearch = false,
 }: {
 	isEmpty: boolean;
+	/** True while the table view is open: the table has its own search box. */
+	hideSearch?: boolean;
 	query: string;
 	onQuery: (v: string) => void;
 	/** The search panel's "No matching nodes." note (computed by the
@@ -866,7 +870,7 @@ export function GraphChromeRow({
 	const copy = useI18n().graphUi;
 	return (
 		<>
-			{!isEmpty && (
+			{!isEmpty && !hideSearch && (
 				<div className="graph-chrome-fade-in w-56 min-w-0 shrink rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
 					<Hint
 						// ⌘F focuses node search (surface-scoped registry action).
@@ -1112,6 +1116,8 @@ export function GraphView({
 	// The chain table overlay (chains-overlay plan, 2026-09-29) —
 	// component-local: a browsing surface, not graph state.
 	const [chainsOpen, setChainsOpen] = useState(false);
+	// Graph / table view toggle (the table is a searchable list of nodes).
+	const [tableView, setTableView] = useState(false);
 	// PRACTICE SELECT (2026-10-04): the parent's chip drives the select
 	// mode; closing (either the picker's confirm or its X) reports back so
 	// the chip's open state and the table's never disagree.
@@ -1652,6 +1658,17 @@ export function GraphView({
 			    and clickable on top of them. The row is a stacking context, so
 			    its open dropdowns cover the number; clicks land on the panel. */}
 			<div className="relative z-20 flex min-w-0 items-start gap-2">
+					{!isEmpty && (
+						<button
+							type="button"
+							data-testid="graph-view-toggle"
+							onClick={() => setTableView((v) => !v)}
+							className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border bg-card/85 px-3 text-xs text-muted-foreground shadow-lg backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
+						>
+							{tableView ? <WaypointsIcon className="size-3.5" /> : <TableIcon className="size-3.5" />}
+							{tableView ? copy.viewGraph : copy.viewTable}
+						</button>
+					)}
 				{/* The actions row (empty-graph chrome wave, owner 2026-09-25):
 				    Import Notes always — the empty graph's entry point; search +
 				    settings only when nodes exist, fading in on their mount. */}
@@ -1667,6 +1684,7 @@ export function GraphView({
 					settings={settings}
 					changeSettings={changeSettings}
 					onOpenChains={() => setChainsOpen(true)}
+					hideSearch={tableView}
 				/>
 			</div>
 
@@ -1691,6 +1709,22 @@ export function GraphView({
 			))}
 			</div>
 
+			{/* Table view: an overlay UNDER the z-10 chrome column (the canvas
+			    stays mounted, so toggling back loses no camera/layout state). */}
+			{tableView && !isEmpty && (
+				<div className="lh-no-drag absolute inset-0 z-[5] bg-background">
+					<GraphTable
+						nodes={snapshot?.propositions ?? []}
+						nodeSessions={snapshot?.nodeSessions ?? {}}
+						sessions={snapshot?.sessions ?? {}}
+						fileSources={snapshot?.fileSources ?? {}}
+						onDeleted={(nodeIds, graphRevision) => {
+							if (selected && nodeIds.includes(selected.node.id)) setSelected(null);
+							window.dispatchEvent(new CustomEvent("lh:graph-revision", { detail: { graphRevision } }));
+						}}
+					/>
+				</div>
+			)}
 			{selected && !isEmpty && (
 				<div
 					ref={cardRef}

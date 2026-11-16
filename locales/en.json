@@ -41,7 +41,22 @@
     "closePanel": "Close",
     "citationPage": "page {n}",
     "citationSlide": "slide {n}",
-    "citationLines": "lines {from}–{to}"
+    "citationLines": "lines {from}–{to}",
+    "adminUnknown": "unknown",
+    "adminTitle": "Knowledge library",
+    "adminTotalItems": "Total items",
+    "adminTotalChunks": "Total chunks",
+    "adminUploadsOverTime": "Uploads over time",
+    "adminDay": "Day",
+    "adminCount": "Uploads",
+    "adminSharedItems": "Shared items",
+    "adminEmpty": "No shared items.",
+    "adminFileName": "File name",
+    "adminFormat": "Format",
+    "adminStatus": "Status",
+    "adminChunks": "Chunks",
+    "adminUploadedBy": "Uploaded by",
+    "adminUploadedAt": "Date"
   },
   "common": {
     "english": "English",
@@ -59,7 +74,8 @@
     "toLogin": "Have an account? Log in",
     "toSignup": "Create an account",
     "requestFailed": "Request failed",
-    "pending": "…"
+    "pending": "…",
+    "forgotPassword": "Forgot password? Contact your administrator."
   },
   "sidebar": {
     "open": "Open sidebar",
@@ -150,7 +166,8 @@
     "askOrNext": "Ask anything, or press Enter for the next one.",
     "contextCompacted": "Context compacted",
     "historyCompacted": "History compacted",
-    "compactionTokenCount": "{count}k tok"
+    "compactionTokenCount": "{count}k tok",
+    "retryingTool": "Retrying…"
   },
   "composer": {
     "nextProblem": "Next problem",
@@ -166,7 +183,8 @@
     "personalKnowledge": "My Knowledge",
     "sharedKnowledge": "Shared Knowledge (all signed-in users)",
     "removeAttachment": "Remove attachment",
-    "uploadingAttachments": "Preparing attachments…"
+    "uploadingAttachments": "Preparing attachments…",
+    "sessionPlaceholder": "Ask, answer, or steer the lesson…"
   },
   "coverage": {
     "extracting": "extracting…",
@@ -233,7 +251,8 @@
     "whyLabel": "Why:",
     "theAnswer": "The answer:",
     "thinkingWhileReading": "Thinking while reading",
-    "readingPlaceholder": "Whatever comes to mind as you read."
+    "readingPlaceholder": "Whatever comes to mind as you read.",
+    "confidenceShort": "Confidence"
   },
   "practiceUi": {
     "problem": "Problem",
@@ -544,7 +563,12 @@
     "depthSpacing": "Depth spacing",
     "baseRingRadius": "Base ring radius",
     "sessions": "Sessions",
-    "noSessions": "No sessions recorded."
+    "noSessions": "No sessions recorded.",
+    "viewGraph": "Graph view",
+    "viewTable": "Table view",
+    "statement": "Statement",
+    "selectAllNodes": "Select all nodes",
+    "deleteNodeRow": "Delete node {name}"
   },
   "artifactUi": {
     "researchAgent": "Research agent",
@@ -651,5 +675,24 @@
   "notesImport": {
     "invalidResponse": "Invalid import response. Please retry the file.",
     "requestFailed": "Import request failed (HTTP {status}){detail}. Please retry the file."
+  },
+  "admin": {
+    "title": "Administration",
+    "users": "Users",
+    "username": "Username",
+    "role": "Role",
+    "created": "Created",
+    "admin": "Admin",
+    "user": "User",
+    "resetPassword": "Reset password",
+    "newPassword": "New password (12+ characters)",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirmDelete": "Delete {name}? This cannot be undone.",
+    "passwordReset": "Password reset for {name}.",
+    "failed": "Request failed",
+    "actions": "Actions",
+    "knowledge": "Shared knowledge"
   }
 }

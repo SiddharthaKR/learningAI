@@ -18,6 +18,10 @@ export function accountExistsSync(root: string, userId: string): boolean {
   } catch { return false; }
 }
 
+function validatePassword(password: string): void {
+  if (password.length < 12) throw new Error("Password must contain at least 12 characters");
+}
+
 function publicAccount(account: StoredAccount): Account {
   const { passwordSalt: _salt, passwordHash: _hash, ...publicFields } = account;
   return publicFields;
@@ -59,7 +63,7 @@ export function createAccountStore(root: string) {
     async create(username: string, password: string, language: Language): Promise<Account> {
       const normalized = username.trim().toLowerCase();
       if (!/^[a-z0-9][a-z0-9_-]{2,31}$/u.test(normalized)) throw new Error("Username must be 3–32 letters, numbers, underscores, or hyphens");
-      if (password.length < 12) throw new Error("Password must contain at least 12 characters");
+      validatePassword(password);
       if (language !== "en" && language !== "ja") throw new Error("Unsupported language");
       return locked(async () => {
         const data = await read();
@@ -87,6 +91,22 @@ export function createAccountStore(root: string) {
     async byUsername(username: string): Promise<Account | null> {
       const found = (await read()).accounts.find((item) => item.username === username.trim().toLowerCase());
       return found ? publicAccount(found) : null;
+    },
+    async list(): Promise<Account[]> {
+      return (await read()).accounts.map(publicAccount);
+    },
+    async resetPassword(username: string, newPassword: string): Promise<Account> {
+      validatePassword(newPassword);
+      return locked(async () => {
+        const data = await read();
+        const found = data.accounts.find((item) => item.username === username.trim().toLowerCase());
+        if (!found) throw new Error("Account not found");
+        const salt = randomBytes(16);
+        found.passwordSalt = salt.toString("hex");
+        found.passwordHash = (await scrypt(newPassword, salt, 64) as Buffer).toString("hex");
+        await write(data);
+        return publicAccount(found);
+      });
     },
     async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string }): Promise<Account> {
       for (const language of [changes.uiLanguage, changes.teachingLanguage]) {

@@ -39,6 +39,7 @@ export function AuthForm({ mode, initialLanguage }: { mode: "login" | "signup"; 
           {error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button type="submit" disabled={pending} className="mt-1 h-11 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">{pending ? copy.auth.pending : signup ? copy.auth.signup : copy.auth.login}</button>
         </form>
+        {!signup && <p className="mt-4 text-center text-xs text-muted-foreground">{copy.auth.forgotPassword}</p>}
       </div>
       <p className="text-center text-sm text-muted-foreground"><a href={signup ? "/login" : "/signup"} className="font-medium text-foreground underline underline-offset-2 hover:no-underline">{signup ? copy.auth.toLogin : copy.auth.toSignup}</a></p>
     </div>

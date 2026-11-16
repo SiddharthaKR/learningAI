@@ -17,7 +17,17 @@ npm ci && npm run build && npm run build:source
 cp .env.example .env && chmod 600 .env
 openssl rand -hex 32   # paste as SESSION_SECRET
 ```
-Fill the placeholders in `.env`: `LLM_MODEL`, `LLM_CONTEXT_WINDOW`, `LLM_MAX_TOKENS` (smaller than the window), `LLM_VISION`, `LLM_REASONING`, and `VISION_BASE_URL`/`VISION_MODEL` if used. Set `HTTPS_PROXY` (URL-encode special characters) only on the host. Optionally set `KNOWLEDGE_SHARED_DIR` (directory of shared documents) and `KNOWLEDGE_INDEX_FILE` (output index path), then run `npm run index:shared`. Left empty, shared knowledge is off and only personal uploads work.
+Fill the placeholders in `.env`: `LLM_MODEL`, `LLM_CONTEXT_WINDOW`, `LLM_MAX_TOKENS` (smaller than the window), `LLM_VISION`, `LLM_REASONING`, and `VISION_BASE_URL`/`VISION_MODEL` if used. Set `HTTPS_PROXY` (URL-encode special characters) only on the host. Set `LH_ADMIN_USERNAME` to the username of the admin account (see Administration below). Optionally set `KNOWLEDGE_SHARED_DIR` (directory of shared documents) and `KNOWLEDGE_INDEX_FILE` (output index path), then run `npm run index:shared` to add an admin-built folder index. Without them, users still share documents by uploading to the Shared pool on the Knowledge page.
+
+### Administration
+There is no admin role stored in accounts: the admin is whichever account's username exactly equals `LH_ADMIN_USERNAME` (whitespace trimmed). Left empty, there is no admin. Because signup is open, **sign up that username yourself right after the first start**, before anyone else can claim it. Changing the variable (and restarting) moves admin rights to another existing account.
+
+The admin can:
+- open `/admin` to list users, reset a user's password, and delete users. There is no email reset; the login page tells users to contact their administrator. The admin account itself cannot be deleted, and deleting a user removes only the account, not their data under `data/users/`.
+- open `/admin/knowledge` for shared-library stats: item and chunk totals, uploads per day, and who uploaded each document.
+- see the Shared activity list on the Knowledge page (every shared add and delete, from `data/shared/knowledge/audit.jsonl`).
+
+Shared uploads live in `data/shared/`. Any signed-in user can upload to or delete from the Shared pool; every add and delete is logged.
 
 ## 4. Data directory
 `data/` lives in the app folder and is created by the service user:
@@ -78,4 +88,4 @@ grep -rIl -e "$(grep ^SESSION_SECRET .env | cut -d= -f2)" .next || echo "no secr
 Also verify in the UI: Web toggle works, live search returns cited URLs, Web + Knowledge ON pauses for Allow/Deny, and observe outbound connections are only the LLM endpoint, the proxy and SearXNG.
 
 ## Not done yet
-- Shared knowledge (set paths later; see `.env.example`).
+- No sidebar link to `/admin`; open it by URL.
