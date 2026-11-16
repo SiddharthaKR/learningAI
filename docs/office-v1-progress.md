@@ -317,7 +317,7 @@ These are UI polish changes. All acceptance items remain at their prior status; 
 
 ## Picture reading, new-session switches, search label (2026-11-16)
 
-Branch `claude/pptx-image-reading` (not yet merged into `office`; open the PR from GitHub). CI checks pass locally: typecheck, lint, 2108 tests (four clean full runs), production build.
+Merged into `office` as PR #3 (`a6d5681f`). CI checks passed locally: typecheck, lint, 2108 tests (four clean full runs), production build.
 
 - **Picture reading (opt-in).** A "Read pictures (slower)" box on each PPTX/Word/PDF attachment in the chat box and on the Knowledge page upload. Shown only when the server has vision (`LLM_VISION=true`, or `VISION_BASE_URL` + `VISION_MODEL`). Off by default; each user's choice is saved on their account (`readPictures` in `accounts.json`, `PATCH /api/preferences`).
   - Pictures are described by the vision model and indexed as text where they appear: slide (PPTX), page (PDF), paragraph under its heading (Word). Template/header/footer art and duplicates are skipped; at most 30 per file; calls share the background LLM limit.
@@ -351,7 +351,7 @@ With `LLM_VISION=true` on .126, every picture "description" came back as *"Pleas
 **Code (proposed, needs the owner's go-ahead)**
 1. Vision self-check at server start: send one small test picture with a known word; if the model can't read it back, keep picture reading off (box hidden) and log why.
 2. Per-picture check: the describe prompt asks for a fixed marker when no image is visible; that marker, or replies asking for an image, count as failed (they show in the "couldn't read" note and are never stored).
-3. Merge `claude/pptx-image-reading` into `office` (after 1–2, or with `LLM_VISION=false` on .126 meanwhile).
+3. Picture reading is already in `office` (PR #3), so until 1–2 land, .126 must run with `LLM_VISION=false` (operator step 1).
 
 **Known gaps / later**
 - No sidebar link to `/admin` (open by URL).
