@@ -1,7 +1,7 @@
 import { withOfficeUser } from "@/src/server";
 import { currentUserId } from "@/src/server";
 import { checkedStoresForUser } from "@/src/server";
-import { appendSharedKnowledgeAudit, indexKnowledgeDocument, sharedKnowledgeStore, usernameForUserId } from "@/src/server";
+import { appendSharedKnowledgeAudit, indexKnowledgeDocument, knowledgeVision, sharedKnowledgeStore, usernameForUserId } from "@/src/server";
 import { MAX_KNOWLEDGE_MULTIPART_BYTES, validateKnowledgeUpload } from "@/src/core";
 import type { KnowledgeDocumentRecord } from "@/src/core";
 
@@ -48,24 +48,37 @@ export const POST = withOfficeUser(async (request: Request) => {
     if (destination !== null && destination !== "chat" && destination !== "personal" && destination !== "shared") {
       return Response.json({ error: "invalid_upload" }, { status: 400 });
     }
+    // One extraction per upload (pictures are described once), shared by the chat text and the store.
+    const vision = knowledgeVision();
+    let indexing: ReturnType<typeof indexKnowledgeDocument> | undefined;
+    const indexOnce = () => (indexing ??= indexKnowledgeDocument({ fileName: file.name, data, ...(vision ? { vision } : {}) }));
     if (destination === null) {
-      const document = await checkedStoresForUser(currentUserId()).knowledgeStore.uploadDocument({ fileName: file.name, data, contentType: file.type });
-      return Response.json({ document: publicDocument(document) });
+      const document = await checkedStoresForUser(currentUserId()).knowledgeStore.uploadDocument({ fileName: file.name, data, contentType: file.type, index: indexOnce });
+      const imageReport = indexing ? (await indexing).imageReport : undefined;
+      return Response.json({ document: publicDocument(document), ...(imageReport ? { imageReport } : {}) });
     }
-    const indexed = await indexKnowledgeDocument({ fileName: file.name, data });
-    const text = indexed.chunks.map(({ citation, text }) => {
-      if (citation.format === "pptx") return `Slide ${citation.slide}\n${text}`;
-      if (citation.format === "pdf") return `Page ${citation.page}\n${text}`;
-      return text;
-    }).join("\n\n");
-    if (!text.trim()) return Response.json({ error: "no_readable_text" }, { status: 422 });
     const store = destination === "shared" ? sharedKnowledgeStore : checkedStoresForUser(currentUserId()).knowledgeStore;
-    const document = destination === "chat" ? indexed.document : await store.uploadDocument({ fileName: file.name, data, contentType: file.type });
+    // Already saved? Reuse its chunks (and earlier picture descriptions) instead of re-describing.
+    const stored = destination === "chat" ? null : await store.findByContent(data);
+    const indexed = stored ? null : await indexOnce();
+    const chunks = stored?.chunks ?? indexed!.chunks;
+    const imageReport = indexed?.imageReport;
+    const sections = chunks.map(({ citation, text }) => {
+      const picture = "imageDescription" in citation && citation.imageDescription ? " (image)" : "";
+      if (citation.format === "pptx") return `Slide ${citation.slide}${picture}\n${text}`;
+      if (citation.format === "pdf") return `Page ${citation.page}${picture}\n${text}`;
+      return text;
+    });
+    const failed = imageReport?.failedSlides ?? [];
+    if (failed.length) sections.push(failed.length === 1 ? `[The image on slide ${failed[0]} could not be read.]` : `[Images on slides ${failed.join(", ")} could not be read.]`);
+    const text = sections.join("\n\n");
+    if (!text.trim()) return Response.json({ error: "no_readable_text" }, { status: 422 });
+    const document = destination === "chat" ? indexed!.document : await store.uploadDocument({ fileName: file.name, data, contentType: file.type, index: indexOnce });
     if (destination === "shared") {
       const userId = currentUserId();
       await appendSharedKnowledgeAudit({ at: new Date().toISOString(), userId, username: await usernameForUserId(userId), action: "add", fileName: document.fileName, documentId: document.id });
     }
-    return Response.json({ document: publicDocument(document), text: text.slice(0, 24_000), truncated: text.length > 24_000 });
+    return Response.json({ document: publicDocument(document), text: text.slice(0, 24_000), truncated: text.length > 24_000, ...(imageReport ? { imageReport } : {}) });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
     if (code === "too_large") return Response.json({ error: code }, { status: 413 });

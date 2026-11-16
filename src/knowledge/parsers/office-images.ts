@@ -96,19 +96,24 @@ export function extractPptxImages(fileName: string, data: Uint8Array): Extracted
 			const resolved = target.startsWith("/")
 				? target.slice(1)
 				: posix.normalize(posix.join("ppt/slides", target));
-			if (/^ppt\/media\//u.test(resolved)) mediaToSlide.set(resolved, slideNumber);
+			if (!/^ppt\/media\//u.test(resolved)) continue;
+			// A picture reused on several slides is labelled with its first slide.
+			const known = mediaToSlide.get(resolved);
+			if (known === undefined || slideNumber < known) mediaToSlide.set(resolved, slideNumber);
 		}
 	}
 
 	const images: ExtractedImage[] = [];
 	for (const [entryName, entryData] of entries) {
 		if (!/^ppt\/media\//u.test(entryName)) continue;
+		// Only pictures placed on a slide: template/layout/master art (backgrounds, logos) is skipped.
+		const slide = mediaToSlide.get(entryName);
+		if (slide === undefined) continue;
 		const mimeType = imageMimeType(entryName);
 		if (!mimeType) continue;
 		const dims = imageDimensions(mimeType, entryData);
 		if (!dims) continue;
 		if (!meetsMinimumSize(entryData.length, dims.width, dims.height)) continue;
-		const slide = mediaToSlide.get(entryName) ?? 1;
 		images.push({
 			data: entryData,
 			mimeType,
@@ -117,7 +122,7 @@ export function extractPptxImages(fileName: string, data: Uint8Array): Extracted
 			citation: { format: "pptx", fileName, slide, title: "" },
 		});
 	}
-	return images;
+	return images.sort((a, b) => (a.citation as { slide: number }).slide - (b.citation as { slide: number }).slide);
 }
 
 export function extractDocxImages(fileName: string, data: Uint8Array): ExtractedImage[] {

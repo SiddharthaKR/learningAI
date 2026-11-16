@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation";
 import { Conversation, ConversationContent, ConversationEmptyState } from "@/components/ai-elements/conversation";
 import { Composer, type ComposerImage } from "@/components/composer";
-import { pendingAttachmentTurns, prepareAttachmentText, type ChatDocument } from "@/components/chat-attachments";
+import { pendingAttachmentNotices, pendingAttachmentTurns, prepareAttachments, type ChatDocument } from "@/components/chat-attachments";
 import { joinDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
@@ -298,13 +298,14 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 		setBusy(true);
 		setUploadError(undefined);
 		try {
-			const prompt = await prepareAttachmentText(draft, documents);
+			const { text: prompt, imageIssues } = await prepareAttachments(draft, documents);
 			const target = await startDraftSession(draft, fetch, mode === "practice" ? "practice" : mode === "chat" ? "chat" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage);
 			if (!target) throw new Error("Unable to create the session.");
 			if (hasAttachments) {
 				const pathname = target.split("?")[0]!;
 				const chatId = pathname.slice("/chat/".length);
 				pendingAttachmentTurns.set(chatId, { type: "text", text: prompt, images: images.map(({ data, mimeType }) => ({ data, mimeType })) });
+				if (imageIssues.length) pendingAttachmentNotices.set(chatId, imageIssues);
 				router.push(pathname);
 			} else {
 				router.push(target);

@@ -66,6 +66,8 @@ export function Composer({
 	onDocumentsChange,
 	uploading,
 	uploadError,
+	notice,
+	onDismissNotice,
 }: {
 	busy: boolean;
 	value: string;
@@ -97,6 +99,9 @@ export function Composer({
 	onDocumentsChange?: (documents: ChatDocument[]) => void;
 	uploading?: boolean;
 	uploadError?: string;
+	/** A non-blocking note (e.g. pictures that could not be read); shown above the input until dismissed. */
+	notice?: string;
+	onDismissNotice?: () => void;
 }) {
 	const copy = useI18n();
 	const fileInputRef = useReactRef<HTMLInputElement | null>(null);
@@ -162,8 +167,18 @@ export function Composer({
 					</div>
 				</div>
 			))}
-			{uploading && <p role="status" className="px-3 pt-2 text-sm">{copy.composer.uploadingAttachments}</p>}
+			{uploading && <p role="status" className="px-3 pt-2 text-sm">{documents?.some(({ file }) => /\.pptx$/iu.test(file.name)) ? copy.composer.readingAttachmentImages : copy.composer.uploadingAttachments}</p>}
 			{uploadError && <p role="alert" className="px-3 pt-2 text-sm text-destructive">{uploadError}</p>}
+			{notice && (
+				<div role="status" data-testid="image-notice" className="mx-3 mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+					<p className="min-w-0 flex-1">{notice}</p>
+					{onDismissNotice && (
+						<button type="button" aria-label={copy.composer.dismissNotice} onClick={onDismissNotice} className="-mr-1 grid size-5 shrink-0 place-items-center rounded transition-colors hover:bg-amber-500/20">
+							<XIcon aria-hidden className="size-3.5" />
+						</button>
+					)}
+				</div>
+			)}
 			{images && images.length > 0 && (
 				<div className="flex flex-wrap gap-1.5 px-3 pt-2">
 					{images.map((img, i) => (

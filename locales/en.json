@@ -184,7 +184,12 @@
     "sharedKnowledge": "Shared Knowledge (all signed-in users)",
     "removeAttachment": "Remove attachment",
     "uploadingAttachments": "Preparing attachments…",
-    "sessionPlaceholder": "Ask, answer, or steer the lesson…"
+    "sessionPlaceholder": "Ask, answer, or steer the lesson…",
+    "imageUnreadableSlide": "Couldn't read the image on slide {slides} of {file}. Continuing with the slide text.",
+    "imagesUnreadableSlides": "Couldn't read the images on slides {slides} of {file}. Continuing with the slide text.",
+    "imagesSkipped": "{file}: only the first {max} images were read.",
+    "dismissNotice": "Dismiss",
+    "readingAttachmentImages": "Preparing attachments… pictures in slides can take a little longer."
   },
   "coverage": {
     "extracting": "extracting…",

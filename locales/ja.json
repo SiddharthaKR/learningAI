@@ -184,7 +184,12 @@
     "sharedKnowledge": "共有ナレッジ（ログイン済みの全ユーザー）",
     "removeAttachment": "添付ファイルを削除",
     "uploadingAttachments": "添付ファイルを準備中…",
-    "sessionPlaceholder": "質問・回答・指示を入力…"
+    "sessionPlaceholder": "質問・回答・指示を入力…",
+    "imageUnreadableSlide": "{file} のスライド {slides} の画像を読み取れませんでした。スライドのテキストで続行します。",
+    "imagesUnreadableSlides": "{file} のスライド {slides} の画像を読み取れませんでした。スライドのテキストで続行します。",
+    "imagesSkipped": "{file}：最初の {max} 枚の画像のみ読み取りました。",
+    "dismissNotice": "閉じる",
+    "readingAttachmentImages": "添付ファイルを準備中… スライド内の画像の読み取りには少し時間がかかります。"
   },
   "coverage": {
     "extracting": "抽出中…",

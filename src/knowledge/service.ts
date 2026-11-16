@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import type { KnowledgeSearchScope } from "../core/contracts/chat.ts";
-import type { KnowledgeChunk, KnowledgeFormat } from "./contracts.ts";
+import type { ExtractedBlock, KnowledgeChunk, KnowledgeFormat } from "./contracts.ts";
 import { processKnowledgeCache, type CachedStore, type KnowledgeCache } from "./cache.ts";
 import type { ChunkPart } from "./search.ts";
 import { chunkDocument } from "./chunk.ts";
 import { extractDocument } from "./extract.ts";
 import { normalizeKnowledgeFileName, validateKnowledgeSnapshot, type KnowledgeDocumentRecord, type KnowledgeSnapshot } from "./index-store.ts";
 import { resolveOpenSection, type OpenSectionResult } from "./open-section.ts";
-import { describeImages, type VisionConfig } from "./vision-job.ts";
+import { describeImagesReport, type ImageReport, type IndexVision, type VisionConfig } from "./vision-job.ts";
 
 function acceptedFormat(fileName: string): KnowledgeFormat | undefined {
 	const extension = /\.([^.\/]+)$/u.exec(fileName)?.[1]?.toLowerCase();
@@ -22,21 +22,54 @@ export function unreadableKnowledgeDocument(fileName: string): KnowledgeDocument
 	return { id, fileName, ...(format ? { format } : {}), status: "rejected", error: "Document could not be read. Check that the source file exists and is readable." };
 }
 
-export async function indexKnowledgeDocument({ fileName, data, visionConfig }: { fileName: string; data: Uint8Array; visionConfig?: VisionConfig }): Promise<{ document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[] }> {
+function blockSlide(block: ExtractedBlock): number {
+	return block.citation.format === "pptx" ? block.citation.slide : 0;
+}
+
+/**
+ * Slot each picture description in right after its slide's text, inheriting that
+ * slide's title and section, so one chunking pass yields valid ids and ordinals.
+ * Pictures on slides without text go in slide order.
+ */
+function withPictures(blocks: ExtractedBlock[], pictures: ExtractedBlock[]): ExtractedBlock[] {
+	const pending = [...pictures].sort((a, b) => blockSlide(a) - blockSlide(b));
+	const out: ExtractedBlock[] = [];
+	blocks.forEach((block, index) => {
+		const slide = blockSlide(block);
+		while (pending.length && blockSlide(pending[0]!) < slide) out.push(pending.shift()!);
+		out.push(block);
+		const next = blocks[index + 1];
+		if (next && blockSlide(next) === slide) return;
+		while (pending.length && blockSlide(pending[0]!) === slide) {
+			const picture = pending.shift()!;
+			const title = block.citation.format === "pptx" ? block.citation.title : "";
+			out.push({ ...picture, citation: { ...picture.citation, title } as ExtractedBlock["citation"], ...(block.section?.length ? { section: [...block.section] } : {}) });
+		}
+	});
+	return [...out, ...pending];
+}
+
+/**
+ * Extract and chunk one document. With `vision`, PPTX pictures placed on slides are
+ * described and indexed under their slide; `imageReport` then says what was read,
+ * which slides failed, and how many were over the cap. Pictures never fail a document.
+ */
+export async function indexKnowledgeDocument({ fileName, data, visionConfig, vision }: { fileName: string; data: Uint8Array; visionConfig?: VisionConfig; vision?: IndexVision }): Promise<{ document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[]; imageReport?: ImageReport }> {
 	fileName = normalizeKnowledgeFileName(fileName);
 	const contentHash = createHash("sha256").update(data).digest("hex");
 	const id = createHash("sha256").update(JSON.stringify([fileName, contentHash])).digest("hex");
 	const format = acceptedFormat(fileName);
 	if (!format) return { document: { id, fileName, status: "rejected", error: "Unsupported document format. Accepted formats: PDF, PPTX, DOCX, MD, TXT." }, chunks: [] };
+	const activeVision = vision ?? (visionConfig ? { config: visionConfig } : undefined);
 	try {
 		const extracted = await extractDocument({ fileName, data });
-		const textChunks = chunkDocument(extracted, id);
-		let imageChunks: KnowledgeChunk[] = [];
-		if (visionConfig && extracted.images?.length) {
-			const imageBlocks = await describeImages(extracted.images, visionConfig);
-			if (imageBlocks.length) imageChunks = chunkDocument({ fileName, format, status: "ready", blocks: imageBlocks }, id + "-img");
+		if (!activeVision || format !== "pptx" || extracted.status !== "ready") {
+			return { document: { id, fileName, format, status: extracted.status }, chunks: chunkDocument(extracted, id) };
 		}
-		return { document: { id, fileName, format, status: extracted.status }, chunks: [...textChunks, ...imageChunks] };
+		const report = await describeImagesReport(extracted.images ?? [], activeVision.config, { ...(activeVision.callFn ? { callFn: activeVision.callFn } : {}), ...(activeVision.runSlot ? { runSlot: activeVision.runSlot } : {}) });
+		const { blocks: pictures, ...imageReport } = report;
+		const chunks = chunkDocument({ ...extracted, blocks: withPictures(extracted.blocks, pictures) }, id);
+		return { document: { id, fileName, format, status: extracted.status }, chunks, imageReport };
 	} catch {
 		return { document: { id, fileName, format, status: "rejected", error: "Document extraction failed. Check that the file is valid, readable, and within supported extraction limits." }, chunks: [] };
 	}

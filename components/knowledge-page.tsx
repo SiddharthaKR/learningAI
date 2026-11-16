@@ -6,6 +6,8 @@ import { SidebarToggle } from "@/components/sidebar";
 import { KnowledgeMap } from "@/components/knowledge-map";
 import type { KnowledgeDocumentRecord } from "@/src/core";
 import { validateKnowledgeUpload } from "@/src/core";
+import { XIcon } from "lucide-react";
+import { formatImageNotice } from "@/components/chat-attachments";
 
 const FORMAT_LABELS: Record<string, string> = { pdf: "PDF", pptx: "PPTX", docx: "DOCX", md: "MD", txt: "TXT" };
 
@@ -25,7 +27,10 @@ function StatusBadge({ status, copy }: { status: string; copy: { ready: string; 
 }
 
 export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin = false }: { initialDocuments: KnowledgeDocumentRecord[]; sharedDocuments?: KnowledgeDocumentRecord[]; isAdmin?: boolean }) {
-  const copy = useI18n().knowledge;
+  const catalog = useI18n();
+  const copy = catalog.knowledge;
+  // Pictures in the last upload that could not be read (the document itself was saved).
+  const [imageNotice, setImageNotice] = useState<string | undefined>();
   const [documents, setDocuments] = useState(initialDocuments);
   const [shared, setShared] = useState(sharedDocuments);
   const [destination, setDestination] = useState<Destination>("personal");
@@ -65,6 +70,7 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
 
   const uploadFile = useCallback(async (file: File) => {
     setError("");
+    setImageNotice(undefined);
     try { validateKnowledgeUpload(file.name, file.size, file.type); }
     catch (failure) { setError(message(failure instanceof Error ? failure.message : "invalid_upload")); return; }
     setBusy(true);
@@ -75,6 +81,7 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
       const response = await fetch("/api/knowledge/documents", { method: "POST", body: form });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
+      if (result.imageReport) setImageNotice(formatImageNotice([{ fileName: file.name, failedSlides: result.imageReport.failedSlides, skipped: result.imageReport.skipped }], catalog));
       if (destination === "shared") {
         setShared((prev) => prev.some((d) => d.id === result.document.id) ? prev : [...prev, result.document]);
         void loadAudit();
@@ -84,7 +91,7 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (failure) { setError(message(failure instanceof Error ? failure.message : "upload_failed")); }
     finally { setBusy(false); }
-  }, [copy, destination, loadAudit]);
+  }, [copy, catalog, destination, loadAudit]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -197,6 +204,12 @@ export function KnowledgePage({ initialDocuments, sharedDocuments = [], isAdmin 
         <input ref={fileInputRef} name="file" type="file" accept=".pdf,.pptx,.docx,.md,.txt" disabled={busy} className="hidden" onChange={(e) => { if (e.target.files?.[0]) void uploadFile(e.target.files[0]); }} />
       </form>
 
+      {imageNotice && (
+        <div role="status" data-testid="image-notice" className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          <p className="min-w-0 flex-1">{imageNotice}</p>
+          <button type="button" aria-label={catalog.composer.dismissNotice} onClick={() => setImageNotice(undefined)} className="-mr-1 grid size-6 shrink-0 place-items-center rounded transition-colors hover:bg-amber-500/20"><XIcon aria-hidden className="size-4" /></button>
+        </div>
+      )}
       {error && <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
 
       {/* Documents list */}
