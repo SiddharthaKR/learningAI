@@ -11,8 +11,8 @@ import {
 	type KnowledgeMapNode,
 	type KnowledgeMapResponse,
 	type KnowledgeScope,
+	type KnowledgeCitation,
 } from "@/src/core";
-import type { KnowledgeCitation } from "../src/knowledge/contracts.ts";
 
 /** Colors: shared = teal, personal = purple (readable on light and dark). */
 export const SCOPE_COLORS: Record<KnowledgeScope, string> = {
