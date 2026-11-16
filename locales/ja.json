@@ -166,7 +166,8 @@
     "askOrNext": "質問を入力するか、Enterキーで次の問題へ進みます。",
     "contextCompacted": "履歴を整理しました",
     "historyCompacted": "履歴を整理済み",
-    "compactionTokenCount": "約{count}千トークン"
+    "compactionTokenCount": "約{count}千トークン",
+    "retryingTool": "再試行中…"
   },
   "composer": {
     "nextProblem": "次の問題",
@@ -182,7 +183,8 @@
     "personalKnowledge": "自分のナレッジ",
     "sharedKnowledge": "共有ナレッジ（ログイン済みの全ユーザー）",
     "removeAttachment": "添付ファイルを削除",
-    "uploadingAttachments": "添付ファイルを準備中…"
+    "uploadingAttachments": "添付ファイルを準備中…",
+    "sessionPlaceholder": "質問・回答・指示を入力…"
   },
   "coverage": {
     "extracting": "抽出中…",
@@ -249,7 +251,8 @@
     "whyLabel": "理由:",
     "theAnswer": "答え:",
     "thinkingWhileReading": "読みながら考えたこと",
-    "readingPlaceholder": "読みながら思いついたことを書いてください。"
+    "readingPlaceholder": "読みながら思いついたことを書いてください。",
+    "confidenceShort": "確信度"
   },
   "practiceUi": {
     "problem": "問題",

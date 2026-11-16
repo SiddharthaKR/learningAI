@@ -57,7 +57,7 @@ export function Composer({
 	autoFocus,
 	inputRef,
 	onEscape,
-	placeholder = "Ask, answer, or steer the lesson…",
+	placeholder,
 	nextProblem = false,
 	onNext,
 	images,
@@ -81,7 +81,7 @@ export function Composer({
 	 *  when absent — Esc otherwise means nothing in the composer. */
 	onEscape?: () => void;
 	/** The textarea's placeholder (owner refinement round, 2026-09-24):
-	 *  active sessions read "Ask, answer, or steer the lesson…"; the fresh
+	 *  active sessions read copy.composer.sessionPlaceholder (localized); the fresh
 	 *  new-session page asks the graph view's opening question instead. */
 	placeholder?: string;
 	/** The practice pause is live (owner round 16): Enter on the empty
@@ -226,7 +226,7 @@ export function Composer({
 						act();
 					}
 				}}
-				placeholder={placeholder}
+				placeholder={placeholder ?? copy.composer.sessionPlaceholder}
 				autoFocus={autoFocus}
 				rows={1}
 				className="field-sizing-content lh-input max-h-48 min-h-10 flex-1 resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"

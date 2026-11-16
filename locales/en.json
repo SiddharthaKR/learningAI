@@ -166,7 +166,8 @@
     "askOrNext": "Ask anything, or press Enter for the next one.",
     "contextCompacted": "Context compacted",
     "historyCompacted": "History compacted",
-    "compactionTokenCount": "{count}k tok"
+    "compactionTokenCount": "{count}k tok",
+    "retryingTool": "Retrying…"
   },
   "composer": {
     "nextProblem": "Next problem",
@@ -182,7 +183,8 @@
     "personalKnowledge": "My Knowledge",
     "sharedKnowledge": "Shared Knowledge (all signed-in users)",
     "removeAttachment": "Remove attachment",
-    "uploadingAttachments": "Preparing attachments…"
+    "uploadingAttachments": "Preparing attachments…",
+    "sessionPlaceholder": "Ask, answer, or steer the lesson…"
   },
   "coverage": {
     "extracting": "extracting…",
@@ -249,7 +251,8 @@
     "whyLabel": "Why:",
     "theAnswer": "The answer:",
     "thinkingWhileReading": "Thinking while reading",
-    "readingPlaceholder": "Whatever comes to mind as you read."
+    "readingPlaceholder": "Whatever comes to mind as you read.",
+    "confidenceShort": "Confidence"
   },
   "practiceUi": {
     "problem": "Problem",
