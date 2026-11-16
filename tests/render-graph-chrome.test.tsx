@@ -67,4 +67,12 @@ describe("GraphChromeRow — the empty-graph ruling (owner, 2026-09-25)", () => 
 		);
 		assert.ok(!quiet.includes("No matching nodes."));
 	});
+
+	it("TABLE view: hideSearch drops the top-bar search (the table has its own); the rest stays", () => {
+		const html = renderToStaticMarkup(createElement(GraphChromeRow, { ...PROPS, isEmpty: false, hideSearch: true }));
+		assert.ok(!html.includes("Search nodes…"), "no top-bar search while the table is open");
+		assert.ok(html.includes('data-testid="import-notes"'));
+		assert.ok(html.includes('data-testid="open-chain-table"'));
+		assert.ok(html.includes("lucide-settings"));
+	});
 });

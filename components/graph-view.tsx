@@ -847,8 +847,11 @@ export function GraphChromeRow({
 	settings,
 	changeSettings,
 	onOpenChains,
+	hideSearch = false,
 }: {
 	isEmpty: boolean;
+	/** True while the table view is open: the table has its own search box. */
+	hideSearch?: boolean;
 	query: string;
 	onQuery: (v: string) => void;
 	/** The search panel's "No matching nodes." note (computed by the
@@ -867,7 +870,7 @@ export function GraphChromeRow({
 	const copy = useI18n().graphUi;
 	return (
 		<>
-			{!isEmpty && (
+			{!isEmpty && !hideSearch && (
 				<div className="graph-chrome-fade-in w-56 min-w-0 shrink rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
 					<Hint
 						// ⌘F focuses node search (surface-scoped registry action).
@@ -1681,6 +1684,7 @@ export function GraphView({
 					settings={settings}
 					changeSettings={changeSettings}
 					onOpenChains={() => setChainsOpen(true)}
+					hideSearch={tableView}
 				/>
 			</div>
 

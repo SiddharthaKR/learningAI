@@ -565,7 +565,7 @@
     "viewTable": "テーブル表示",
     "statement": "記述",
     "selectAllNodes": "すべてのノードを選択",
-    "deleteNodeRow": "ノード {name} を削除"
+    "deleteNodeRow": "ノード{name}を削除"
   },
   "artifactUi": {
     "researchAgent": "リサーチエージェント",

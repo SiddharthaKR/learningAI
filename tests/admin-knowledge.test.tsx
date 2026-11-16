@@ -51,6 +51,7 @@ for (const language of ["en", "ja"] as const) {
     const copy = catalogFor(language).knowledge;
     const html = renderToStaticMarkup(<I18nProvider language={language}><AdminKnowledge stats={computeKnowledgeStats(snapshot, audit)} /></I18nProvider>);
     for (const text of [copy.adminTitle, copy.adminTotalItems, copy.adminUploadsOverTime, "a.txt", "ann", "bob", "2026-11-03"]) assert.ok(html.includes(text), text);
+    assert.ok(html.includes(`aria-label="${catalogFor(language).sidebar.open}"`), "header carries the sidebar toggle, like /admin");
     assert.ok(!html.includes("undefined"));
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/i18n-provider";
+import { SidebarToggle } from "@/components/sidebar";
 import type { KnowledgeStats } from "@/src/core";
 
 export function AdminKnowledge({ stats }: { stats: KnowledgeStats }) {
@@ -9,7 +10,10 @@ export function AdminKnowledge({ stats }: { stats: KnowledgeStats }) {
   const th = "px-3 py-2 text-left font-medium text-muted-foreground";
   const td = "px-3 py-2";
   return <main className="flex min-w-0 flex-1 flex-col overflow-auto">
-    <header className="border-b border-border px-6 py-4"><h1 className="text-lg font-semibold">{copy.adminTitle}</h1></header>
+    <header className="lh-drag flex items-center gap-3 border-b border-border px-6 py-4">
+      <SidebarToggle />
+      <h1 className="text-lg font-semibold">{copy.adminTitle}</h1>
+    </header>
     <div className="mx-auto w-full max-w-4xl space-y-8 p-6 pb-16">
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">{copy.adminTotalItems}</p><p data-testid="total-items" className="text-2xl font-semibold">{stats.totalItems}</p></div>
