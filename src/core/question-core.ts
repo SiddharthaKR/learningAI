@@ -141,6 +141,29 @@ export function quizInputProblems(input: {
 	return problems;
 }
 
+/** A NEW quiz from the model: the gradeability contract above plus the
+ *  placeholder-value rule (owner, 2026-11-19). Gemma 4 26B named every option
+ *  "a"/"b"/"c" and keyed the wrong letter in 2 of 6 quizzes (its own
+ *  explanation backed another option); a value that names the option makes
+ *  that slip visible while the key is written. A one-character or all-digit
+ *  value is rejected only when it stands in for a longer label. Authoring
+ *  boundary ONLY — saved quizzes display through quizInputProblems, so old
+ *  records with "a"/"b"/"c" values keep rendering. */
+export function quizAuthoringProblems(input: Parameters<typeof quizInputProblems>[0]): string[] {
+	const problems = quizInputProblems(input);
+	const placeholders = input.options
+		.map((option, i) => ({ i, value: option.value?.trim() ?? "", label: option.label.trim() }))
+		.filter(({ value, label }) => value && (/^[\p{L}\p{N}]$/u.test(value) || /^\d+$/u.test(value)) && value.toLowerCase() !== label.toLowerCase());
+	if (placeholders.length > 0) {
+		problems.push(
+			`${placeholders.map(({ i, value }) => `options[${i}].value "${value}"`).join(", ")} ${placeholders.length === 1 ? "is a placeholder" : "are placeholders"}. ` +
+				"Give every option a short value that names what it says (e.g. \"receiver-buffer\", \"network-path\"), " +
+				"then set correctAnswer to the value of the option your explanation supports.",
+		);
+	}
+	return problems;
+}
+
 // The SHARED quiz authoring fields — everything except `nodeId`. The probe
 // and teach agents use DIFFERENT tools under the same name (docs/probe-teach-
 // split.md §1): the prober's quiz has NO nodeId field at all (there is no

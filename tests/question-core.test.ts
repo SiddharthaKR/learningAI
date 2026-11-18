@@ -18,6 +18,7 @@ import {
 	DEFAULT_CONFIDENCE_INDEX,
 	isCorrect,
 	normalizeOptions,
+	quizAuthoringProblems,
 	quizInputProblems,
 	explainInputBase,
 	explainInputObject,
@@ -88,6 +89,38 @@ describe("quizInputSchema / quizInputProblems (the authoring contract)", () => {
 	it("accepts a valid single-select quiz (label as correctAnswer)", () => {
 		assert.equal(boundaryOk(quizInputSchema, valid, quizInputProblems(valid)), true);
 		assert.deepEqual(quizInputProblems(valid), []);
+	});
+
+	it("rejects placeholder values (a/b/c, 1/2/3) that stand in for longer labels (owner, 2026-11-19)", () => {
+		// Gemma 4 26B wrote values "a"/"b"/"c" on every probing quiz and set the
+		// wrong letter as the key in 2 of 6 (its own explanation backed another
+		// option). Values that name the option make that slip visible to it.
+		const lettered = {
+			...valid,
+			options: [
+				{ label: "Flow control follows the receiver's buffer", value: "a" },
+				{ label: "Flow control follows the network path", value: "b" },
+			],
+			correctAnswer: "b",
+		};
+		const problems = quizAuthoringProblems(lettered);
+		assert.equal(problems.length, 1);
+		assert.match(problems[0]!, /options\[0\]\.value "a".*options\[1\]\.value "b"/su);
+		const numbered = { ...lettered, options: lettered.options.map((o, i) => ({ ...o, value: String(i + 1) })), correctAnswer: "2" };
+		assert.equal(quizAuthoringProblems(numbered).length, 1);
+		const named = {
+			...lettered,
+			options: [
+				{ label: "Flow control follows the receiver's buffer", value: "receiver-buffer" },
+				{ label: "Flow control follows the network path", value: "network-path" },
+			],
+			correctAnswer: "receiver-buffer",
+		};
+		assert.deepEqual(quizAuthoringProblems(named), []);
+		// No values at all: the labels are the keys — fine.
+		assert.deepEqual(quizAuthoringProblems(valid), []);
+		// SAVED quizzes keep displaying: the gradeability check (used by the display parse) does not apply the rule.
+		assert.deepEqual(quizInputProblems(lettered), []);
 	});
 
 	it("accepts explicit values and multi-select arrays (incl. JSON-stringified)", () => {

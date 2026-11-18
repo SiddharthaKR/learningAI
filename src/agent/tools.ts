@@ -10,6 +10,7 @@ import {
 	parseOptionsIfString,
 	probeQuizInputSchema,
 	quizInputObject,
+	quizAuthoringProblems,
 	quizInputProblems,
 } from "../core/question-core.ts";
 import { filterEnabledTools, type EnabledTools } from "../core/pending.ts";
@@ -137,13 +138,15 @@ export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 export const quizExampleBody = {
 	question: "A signal is $y=\\sin(2x)$ and $\\frac{dx}{dt}=3$. What is $\\frac{dy}{dt}$?",
 	options: [
-		{ label: "$6\\cos(2x)$", value: "a" },
-		{ label: "$2\\cos(2x)$", value: "b" },
-		{ label: "$3\\cos(2x)$", value: "c" },
+		// Values name their options (owner, 2026-11-19): models copied the old
+		// "a"/"b"/"c" here, and placeholder values are now rejected.
+		{ label: "$6\\cos(2x)$", value: "6cos2x" },
+		{ label: "$2\\cos(2x)$", value: "2cos2x" },
+		{ label: "$3\\cos(2x)$", value: "3cos2x" },
 	],
 	explanation:
 		"The phase changes twice as fast as $x$; multiply by the sine's slope:\n$$\n\\frac{dy}{dt}=\\cos(2x)\\cdot2\\cdot3=6\\cos(2x)\n$$",
-	correctAnswer: "a",
+	correctAnswer: "6cos2x",
 };
 
 /** The quiz mechanics every variant shares; `delta` appends the variant's
@@ -220,7 +223,7 @@ export const probeQuizTool: AgentTool<typeof probeQuizInputSchema> = {
 	prepareArguments: prepareQuestionArguments,
 	executionMode: "sequential",
 	execute: async (_toolCallId, input) => {
-		const problems = quizInputProblems(input);
+		const problems = quizAuthoringProblems(input);
 		if (problems.length > 0) return invalidInputResult("probe", problems);
 		return questionResult();
 	},
@@ -390,7 +393,7 @@ export function teachQuizToolFor(ctx: Pick<PlanToolContext, "chatId" | "chatStor
 		prepareArguments: prepareTeachQuestionArguments,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
-			const problems = [...quizInputProblems(input)];
+			const problems = [...quizAuthoringProblems(input)];
 			const nodeIdProblemText = nodeIdProblem(ctx, input.nodeId);
 			if (nodeIdProblemText) problems.push(nodeIdProblemText);
 			if (problems.length > 0) return invalidInputResult("quiz", problems);
