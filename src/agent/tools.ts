@@ -73,6 +73,19 @@ function prepareQuestionArguments<T extends object>(args: unknown): T {
 	return args as T;
 }
 
+/** Teach-side quiz/explain (owner, 2026-11-19): a call that leaves out
+ *  `type` is a "check" — the reading the UI already gives a typeless
+ *  question (normalizeQuizType). Rejecting it cost a whole extra model call
+ *  and the model apologised to the learner for a "system problem". Every
+ *  other field is still validated as before. */
+function prepareTeachQuestionArguments<T extends object>(args: unknown): T {
+	const prepared = prepareQuestionArguments<T>(args);
+	if (prepared && typeof prepared === "object" && !Array.isArray(prepared) && (prepared as { type?: unknown }).type === undefined) {
+		return { ...prepared, type: "check" } as T;
+	}
+	return prepared;
+}
+
 export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 	name: "ask_user_question",
 	label: "ask_user_question",
@@ -223,7 +236,7 @@ export function teachExplainToolFor(
 		label: "explain",
 		description: explainDescription("explain", true),
 		parameters: explainInputObject,
-		prepareArguments: prepareQuestionArguments,
+		prepareArguments: prepareTeachQuestionArguments,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
 			const problems = [...explainInputProblems(input)];
@@ -374,7 +387,7 @@ export function teachQuizToolFor(ctx: Pick<PlanToolContext, "chatId" | "chatStor
 		label: "quiz",
 		description: quizDescription({ name: "quiz", nodeId: true, types: true }),
 		parameters: quizInputObject,
-		prepareArguments: prepareQuestionArguments,
+		prepareArguments: prepareTeachQuestionArguments,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
 			const problems = [...quizInputProblems(input)];

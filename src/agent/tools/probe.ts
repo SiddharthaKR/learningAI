@@ -46,6 +46,7 @@ function probeConcluded(messages: readonly LhMessage[]): boolean {
  * from that message on, every request builds the TEACHER agent.
  */
 export function probeDoneTool(ctx: ProbeDoneContext): Record<string, AgentTool<any>> {
+	const execute = probeDoneExecute(ctx);
 	return {
 		probe_done: {
 			name: "probe_done",
@@ -61,38 +62,49 @@ export function probeDoneTool(ctx: ProbeDoneContext): Record<string, AgentTool<a
 			// The core-owned schema (contracts/probe.ts) — the SAME schema the UI
 			// parse seam (tool-parts.ts) runs, so boundary-valid ⇔ consumer-parseable.
 			parameters: probeDoneInputSchema,
-			execute: serverExecute("probe_done", probeDoneInputSchema, async (input) => {
-				const record = ctx.chatStore.getChat(ctx.chatId);
-				if (!record) return { ok: false, error: `Chat not found: ${ctx.chatId}` };
-
-				if (danglingQuestionOf(record.messages) !== null) {
-					return {
-						ok: false,
-						error:
-							"A question is still open — resolve it (or let him answer) before concluding the probe. " +
-							"probe_done only fires with no question outstanding.",
-					};
-				}
-				if (probeConcluded(record.messages)) {
-					return { ok: false, error: "The probe is already concluded — probe_done fires exactly once." };
-				}
-				try {
-					ctx.deliver(buildProbeHandoffSteer(ctx.chatId));
-				} catch (err) {
-					console.error(`[chat ${ctx.chatId}] probe handoff queueing failed:`, err);
-					// The handoff is recoverable-by-design (the next client message
-					// constructs the teacher off the transcript seam) — record the
-					// assessment anyway; the wake is an optimization, not a gate.
-				}
-				// Context diet (owner, 2026-10-09): the assessment lives ONCE — as
-				// this call's arguments. content is the fixed ack (the agent never
-				// sees an echo); details = {ok:true} for the record/UI — the
-				// probe-done card reads the call's input, which it always preferred.
-				return {
-					text: PROBE_DONE_ACK_TEXT,
-					details: { ok: true },
-				};
-			}),
+			// A SUCCESSFUL conclusion ends the prober's turn (owner, 2026-11-19):
+			// Gemma 4 26B kept teaching after probe_done and wrote its own outline,
+			// competing with the teacher's plan; the handoff wakes the teacher the
+			// moment this turn ends. A refusal leaves the turn open to fix course.
+			execute: async (...args: Parameters<typeof execute>) => {
+				const result = await execute(...args);
+				return (result.details as { ok?: boolean } | null)?.ok === true ? { ...result, terminate: true } : result;
+			},
 		},
 	};
+}
+
+function probeDoneExecute(ctx: ProbeDoneContext) {
+	return serverExecute("probe_done", probeDoneInputSchema, async (input) => {
+		const record = ctx.chatStore.getChat(ctx.chatId);
+		if (!record) return { ok: false, error: `Chat not found: ${ctx.chatId}` };
+
+		if (danglingQuestionOf(record.messages) !== null) {
+			return {
+				ok: false,
+				error:
+					"A question is still open — resolve it (or let him answer) before concluding the probe. " +
+					"probe_done only fires with no question outstanding.",
+			};
+		}
+		if (probeConcluded(record.messages)) {
+			return { ok: false, error: "The probe is already concluded — probe_done fires exactly once." };
+		}
+		try {
+			ctx.deliver(buildProbeHandoffSteer(ctx.chatId));
+		} catch (err) {
+			console.error(`[chat ${ctx.chatId}] probe handoff queueing failed:`, err);
+			// The handoff is recoverable-by-design (the next client message
+			// constructs the teacher off the transcript seam) — record the
+			// assessment anyway; the wake is an optimization, not a gate.
+		}
+		// Context diet (owner, 2026-10-09): the assessment lives ONCE — as
+		// this call's arguments. content is the fixed ack (the agent never
+		// sees an echo); details = {ok:true} for the record/UI — the
+		// probe-done card reads the call's input, which it always preferred.
+		return {
+			text: PROBE_DONE_ACK_TEXT,
+			details: { ok: true },
+		};
+	});
 }

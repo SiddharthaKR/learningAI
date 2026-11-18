@@ -85,6 +85,23 @@ describe("probe_done: the probe→planning seam", () => {
 		assert.equal((delivered[0]!.details as { chatId: string }).chatId, chatId);
 	});
 
+	it("a successful conclusion ENDS the prober's turn; a refusal does not (owner, 2026-11-19)", async () => {
+		// Gemma 4 26B kept teaching after probe_done (and wrote its own outline),
+		// competing with the teacher's plan. The handoff wakes the teacher the
+		// moment the prober's turn ends, so ending here also starts planning sooner.
+		const okChat = newChat("Probe: terminate");
+		const ok = await probeDoneTool({ chatId: okChat, chatStore, deliver: () => {} }).probe_done!.execute("t1", { assessment: ASSESSMENT });
+		assert.equal(ok.terminate, true);
+
+		const openChat = newChat("Probe: open question, no terminate");
+		chatStore.saveMessages(openChat, [
+			assistantWithCall("m1", "quiz", { question: "q?", options: [{ label: "a" }], correctAnswer: "a" }),
+		]);
+		const refused = await probeDoneTool({ chatId: openChat, chatStore, deliver: () => {} }).probe_done!.execute("t2", { assessment: ASSESSMENT });
+		assert.equal((refused.details as { ok: boolean }).ok, false);
+		assert.notEqual(refused.terminate, true, "a refused call lets the prober fix course in the same turn");
+	});
+
 	it("REFUSES while a question is still open — resolve it first", async () => {
 		const chatId = newChat("Probe: open question");
 		chatStore.saveMessages(chatId, [

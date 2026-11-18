@@ -167,7 +167,8 @@
     "contextCompacted": "Context compacted",
     "historyCompacted": "History compacted",
     "compactionTokenCount": "{count}k tok",
-    "retryingTool": "Retrying…"
+    "retryingTool": "Retrying…",
+    "errorPrefix": "Something went wrong:"
   },
   "composer": {
     "nextProblem": "Next problem",

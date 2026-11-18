@@ -58,4 +58,13 @@ describe("in-session strings follow the UI language", () => {
 		assert.ok(!/>\s*Retrying…\s*</u.test(source), "no hard-coded Retrying… in chat.tsx");
 		assert.match(source, /copy\.chat\.retryingTool/u);
 	});
+
+	it("the error line and the thinking label read from the catalog (owner, 2026-11-19)", () => {
+		assert.equal(catalogFor("ja").chat.errorPrefix, "エラーが発生しました：");
+		assert.equal(catalogFor("en").chat.errorPrefix, "Something went wrong:");
+		const source = readFileSync(new URL("../components/chat.tsx", import.meta.url), "utf8");
+		assert.ok(!source.includes("Something went wrong:"), "no hard-coded English error prefix");
+		assert.ok(!source.includes("THINKING…"), "no hard-coded English thinking label");
+		assert.match(source, /copy\.chat\.errorPrefix/u);
+	});
 });

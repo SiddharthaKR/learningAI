@@ -1531,6 +1531,15 @@ export function Chat({
 														if (teachBoundary)
 															return <PhaseDivider key={`teach-step-${pi}`} phase="teach" />;
 														return pi > 0 ? <Separator key={pi} className="my-3" /> : null;
+													case "data-turn-error":
+														// A saved failed turn (owner report, 2026-11-19): same
+														// line as the live error, so a failure seen after a
+														// reload or reattach is never a blank chat.
+														return (
+															<div key={part.id || pi} data-testid="turn-error" className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
+																{copy.chat.errorPrefix} {(part.data as { message?: string } | undefined)?.message}
+															</div>
+														);
 													case "data-plan-block":
 														// The plan in the chat (wave 4): a frozen snapshot
 														// block — rendered as carried, never re-derived.
@@ -1632,13 +1641,13 @@ export function Chat({
 								<span className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
 									<BrailleSpinner label={copy.chat.thinking} />
 									<Shimmer duration={1}>
-										THINKING…
+										{`${copy.chat.thinking}…`}
 									</Shimmer>
 								</span>
 							)}
-							{error && (
+							{error && messages.at(-1)?.parts.at(-1)?.type !== "data-turn-error" && (
 								<div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
-									Something went wrong: {error.message}
+									{copy.chat.errorPrefix} {error.message}
 								</div>
 							)}
 						</div>
