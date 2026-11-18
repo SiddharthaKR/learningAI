@@ -440,3 +440,20 @@ With `LLM_VISION=true` on .126, every picture "description" came back as *"Pleas
 **UX gaps seen:**
 - "Something went wrong: Connection error." shows in English on the Japanese screen.
 - When the very first model call failed with HTTP 400, the chat stayed empty with no error.
+
+### Update 2026-11-19 (evening): teaching fixes and the 26B measurement
+**Done** (commit `7beb0ea5`; 2128/2128 tests pass):
+- A successful `probe_done` now ends the prober's turn, so it can no longer keep teaching or write its own outline after the assessment. A refused `probe_done` still lets it fix course in the same turn.
+- A teaching `quiz`/`explain` call without `type` is read as `"check"`, the UI's existing reading of a typeless question, instead of being rejected.
+- A saved failed turn (`stopReason: "error"`) shows an error line instead of a blank chat. Checked in the browser on the earlier HTTP 400 chat.
+- The error prefix and the thinking label come from the locale files (ja: `エラーが発生しました：`, `考え中`).
+- No prompt changes (owner: not for now).
+
+**Measured only — issues 1 and 2, no change made (owner):**
+- **Method:** the real prober instructions and tools on Gemma 4 26B (AI Studio), 3 topics × 2 runs, first probing question after the goal is set.
+- **Results:**
+  - **Wrong answer key: 1 of 5 quizzes.** TCP flow vs congestion control: `correctAnswer` "b", but the explanation supports "a". Together with the black-hole case seen in the browser, that is 2 wrong keys in 6 quizzes seen.
+  - **One-letter option values ("a"/"b"/"c"): 5 of 5.**
+  - **The correct option was written first: 4 of 5.** The app shuffles options on screen, so this does not leak to the learner.
+  - **Answer given away before the first question: 0 of 5.** The earlier give-away came later, after the learner answered: the model explained, then asked about what it had just explained. A first-question test cannot catch that; it needs multi-turn runs.
+  - **No question at all: 1 of 6 runs** (black holes #1). The model only planned in its thinking and ended the turn without calling a tool, leaving the learner with nothing to answer.
