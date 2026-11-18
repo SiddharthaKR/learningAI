@@ -360,3 +360,54 @@ With `LLM_VISION=true` on .126, every picture "description" came back as *"Pleas
 - `npm audit`: 2 high from `linkify-it` via the unused dependency `ansi-to-react` (remove it); 3 moderate from `minimatch` in ESLint tooling (dev only). Do not run `npm audit fix --force`.
 - `fast-xml-parser` is pinned at 5.12.0 (5.12.1 available; bump in its own PR with the extraction tests).
 - Teaching on the small laptop model skipped `plan_init` even after the retry nudge; retest planning on the 26B.
+
+## Tool calls typed as text, slow replies, proxy (2026-11-19)
+
+### What users saw on .126
+- A quiz showed as raw JSON, including `correctAnswer` and the explanation ("the question had the answer").
+- The plan appeared twice: the model drew it as a ```mermaid block instead of calling `plan_init`, then the retry nudge made it present the whole plan again.
+- With web research on, "latest version" questions (Vivado, DOCA) were answered from memory.
+- Probing and planning showed "THINKING…" for a long time with nothing appearing.
+
+### Causes found
+- **`gemma4_proxy.py` (the :8088 proxy between the app and LM Studio :1234):**
+  - **No streaming:** it waits for the whole reply (thinking included) and sends it in one go (`# stream=true: emit the finished result as SSE chunks`). That is the long blank wait.
+  - **Only Gemma's native call format is recognised** (`<|tool_call>call:name{…}<tool_call|>`). A call the model writes as a JSON or mermaid block reaches the app as plain text. That explains the leaked quiz, the duplicate plan and research never being dispatched.
+  - **It drops images** (`normalize`: "content parts -> text only"). It renders a raw prompt for LM Studio's `/v1/completions`, which cannot carry images. That is the real cause of "Please provide the image".
+- **Tested on Gemma 4 26B through Google AI Studio** (`GEMINI_API_KEY`, model `gemma-4-26b-a4b-it`), using the app's own Chat prompt and research tool: the model called `research` every time. The model is fine; the calls get lost in the proxy path. Free tier allows only 16k input tokens per minute and one planning request is ~13k, so repeated planning runs there are slow.
+- **Other contributors:**
+  - With `LLM_REASONING=true`, every turn uses the "medium" thinking level by default (`src/core/settings.ts` `DEFAULT_THINKING_ORDER`).
+  - The teacher instructions are ~39k characters (~10k tokens) per request.
+  - The handoff tells the model to "take your time".
+  - The owner wants no accuracy loss, so the thinking level stays as it is.
+
+### Done (this branch, not yet in `office`)
+- **App-side safety net:** `src/agent/tool-salvage-stream.ts`, wired for native tool mode in `src/agent/models.ts`, with 10 tests in `tests/tool-salvage-stream.test.ts`. Typecheck and lint are clean.
+  - Holds back ```json / ```mermaid / bare ``` blocks while the reply streams. Other code blocks stream as before.
+  - If the reply has **no real tool call**, a held block becomes the call it unambiguously is:
+    - `{name, arguments}` naming an available tool;
+    - an object that fits exactly one tool's schema (required fields present, no unknown keys, schema check passes);
+    - a mermaid `graph`/`flowchart` block while no plan exists yet → `plan_init`.
+  - The converted call goes through the normal tool path, with the same validation as a real call.
+  - Everything else is shown exactly as written.
+- Full test suite not yet re-run after this change.
+
+### Plan (approved by the owner 2026-11-19: "approve all")
+1. **New proxy in the repo** (`deploy/gemma4-proxy/`). It **replaces** the existing one on :8088; the owner wants one proxy for opencode and LearnHarness, run the same way as before (`UPSTREAM=… TEMPLATE=… uvicorn gemma4_proxy:app --port 8088`).
+   - Real token streaming: request `/v1/completions` with `stream:true`, and forward text and thinking deltas as they arrive. Hold back only a tool call until it is complete, then parse it with the existing `CALL_RE`/`_P` code (identical results). Pass `stream_options.include_usage` through.
+   - `stream:false` must stay byte-for-byte the same as today, for opencode.
+   - `STREAM=0` turns streaming back to the old behaviour.
+   - Optional JSON tool-call fallback behind `JSON_TOOL_CALLS=1`, **off by default** so opencode is never affected. LearnHarness has the app-side net.
+   - Python tests with a fake LM Studio. Local Python is `py` (3.14); use `uv run --with fastapi --with httpx --with jinja2 --with uvicorn`. Local Ollama is not a faithful raw-completions backend (it strips Gemma's special tokens), so tests use a fake upstream.
+2. **Pictures:** set `VISION_BASE_URL=http://127.0.0.1:1234/v1` (LM Studio directly, not the proxy) plus `VISION_MODEL`, and load the mmproj. Document in `DEPLOY.md`, then run the image `curl` there.
+3. **End-to-end chat tests** for speed, accuracy and visuals:
+   - the dev server against the new proxy with the fake upstream (streaming visible, quiz card not JSON, single plan);
+   - the dev server against AI Studio Gemma 26B for a real Teaching run;
+   - screenshots in English and Japanese.
+4. Re-run the full suite, commit (no Claude co-author line), push, and open a PR to `office`.
+5. On .126 (operator): stop the old proxy, start the new one on :8088 with the same command, and check opencode still works. Then retest the black-hole Teaching flow and the DOCA question with web search on.
+
+**Speed ideas that keep accuracy (later, need go-ahead):**
+- Pause background knowledge extraction while a live reply is being written.
+- Speculative decoding in LM Studio with Gemma 4 E2B/E4B as the draft model.
+- Match LM Studio parallel slots to `MAX_CONCURRENT_LLM`.
