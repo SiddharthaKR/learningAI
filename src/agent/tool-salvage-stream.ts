@@ -27,6 +27,10 @@ import { Value } from "typebox/value";
  * The converted call runs through the normal tool path — the same validation
  * as a real call. Anything else is shown exactly as written. Ordinary code
  * blocks (```python, …) are never held, so they stream as before.
+ *
+ * Real calls with a namespaced name (`default:probe`, `functions.quiz`) are
+ * renamed to the active tool they plainly mean — Gemma 4 26B did this and the
+ * "not found" round trip cost a whole extra model call.
  */
 
 const HELD_LANGS = new Set(["", "json", "jsonc", "mermaid"]);
@@ -57,6 +61,13 @@ function planExists(context: Parameters<StreamFunction>[1]): boolean {
 			: String(m.content ?? "");
 		return /"ok"\s*:\s*true/u.test(text);
 	});
+}
+
+/** `default:probe` / `functions.quiz` → the active tool it plainly means, else unchanged. */
+function healToolName(name: string, tools: Map<string, Tool>): string {
+	if (tools.has(name)) return name;
+	const bare = name.slice(Math.max(name.lastIndexOf(":"), name.lastIndexOf(".")) + 1);
+	return bare && tools.has(bare) ? bare : name;
 }
 
 function schemaKeys(tool: Tool): { properties: Set<string>; required: string[] } {
@@ -272,8 +283,10 @@ export function toolSalvageStream(upstream: StreamFunction): StreamFunction {
 						case "toolcall_end": {
 							const ours = index.get(event.contentIndex);
 							if (ours === undefined || !partial) break;
-							partial.content[ours] = event.toolCall;
-							output.push({ type: "toolcall_end", contentIndex: ours, toolCall: event.toolCall, partial });
+							const name = healToolName(event.toolCall.name, tools);
+							const toolCall = name === event.toolCall.name ? event.toolCall : { ...event.toolCall, name };
+							partial.content[ours] = toolCall;
+							output.push({ type: "toolcall_end", contentIndex: ours, toolCall, partial });
 							break;
 						}
 						case "done": {

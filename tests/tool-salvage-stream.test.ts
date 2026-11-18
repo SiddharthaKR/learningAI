@@ -154,6 +154,17 @@ it("ordinary code blocks stream through as they arrive", async () => {
 	assert.ok(firstDelta > 0 && closeDelta > firstDelta, "the python block streams before its closing fence arrives");
 });
 
+it("a real call with a namespaced tool name (default:probe) is renamed to the tool it means", async () => {
+	// Gemma 4 26B, 2026-11-19: called `default:probe`; the app answered
+	// "Tool default:probe not found", costing a whole extra model call.
+	for (const name of ["default:quiz", "functions.quiz", "default_api:quiz"]) {
+		const { calls } = await run("", contextWith(), { calls: [{ name, arguments: QUIZ }] });
+		assert.deepEqual(calls.map((c) => c.name), ["quiz"], name);
+	}
+	const unknown = await run("", contextWith(), { calls: [{ name: "default:nothing", arguments: {} }] });
+	assert.deepEqual(unknown.calls.map((c) => c.name), ["default:nothing"], "no guess when the bare name is not a tool either");
+});
+
 it("an unclosed held block is shown as written at the end", async () => {
 	const text = "Look:\n```json\n{\"type\": \"check\"";
 	const { finalText, calls } = await run(text, contextWith(), { chunk: 2 });
