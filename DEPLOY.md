@@ -4,7 +4,22 @@ Host-specific values are placeholders (`<USER>`, model IDs, proxy URL). Never co
 
 ## 1. Prerequisites
 - Node.js 20+ and npm, git, Docker (for SearXNG).
-- The Gemma 4 proxy must already be running at `http://127.0.0.1:8088/v1` (managed separately on this host).
+- The Gemma 4 proxy must be running at `http://127.0.0.1:8088/v1`, in front of LM Studio (`:1234`). Use the version in `deploy/gemma4-proxy/` (see below).
+
+### The Gemma 4 proxy (`deploy/gemma4-proxy/gemma4_proxy.py`)
+One proxy serves every client on the host (LearnHarness, opencode, …). It replaces the earlier `gemma4_proxy.py`; start it exactly as before:
+```bash
+cd ~/app/deploy/gemma4-proxy
+UPSTREAM=http://172.20.1.126:1234 TEMPLATE=./gemma4_chat_template.jinja \
+  uvicorn gemma4_proxy:app --host 127.0.0.1 --port 8088
+```
+What changed, and the switches (environment variables):
+- **Streaming:** `stream=true` requests now get text and thinking **as the model writes them** (before, nothing arrived until the whole reply was finished). Tool calls are sent once complete and parsed exactly as before. `STREAM=0` restores the old behaviour.
+- `stream=false` requests are answered exactly as before.
+- Tool names may contain `:` (Gemma sometimes writes `call:default:probe{…}`; before, that call leaked into the reply as text).
+- `JSON_TOOL_CALLS=1` (off by default) also accepts a tool call written as a ```json block. LearnHarness does not need it (the app handles this itself); leave it off unless another client wants it.
+
+Check after switching: opencode still edits files (tool calls work), and in LearnHarness the reply text appears while it is being written. Tests (no LM Studio needed): `uv run --with fastapi --with httpx --with jinja2 python -m unittest discover -s tests` in `deploy/gemma4-proxy`; they compare every answer with the previous proxy (`tests/legacy_proxy.py`).
 
 ## 2. Get the code
 ```bash
@@ -22,10 +37,18 @@ Fill the placeholders in `.env`: `LLM_MODEL`, `LLM_CONTEXT_WINDOW`, `LLM_MAX_TOK
 ### Pictures in PowerPoint, Word and PDF files
 Picture reading is **opt-in per upload**: a "Read pictures (slower)" box appears on each attached PPTX, Word or PDF file in the chat box and on the Knowledge page, but only when the server has a vision model. It is off until a user ticks it; each user's choice is remembered on their account (`readPictures` in `accounts.json`). Ticked pictures are described by the vision model and indexed as text where they appear: under their slide (PPTX), page (PDF) or heading (Word), for chat attachments and saved knowledge alike. Scanned PDFs are skipped (their pages are already read by OCR), as are template/header/footer art and duplicates; at most 30 pictures per file, each call sharing the background model limit so chats stay responsive. A saved file read as text only shows a **Read pictures** button on the Knowledge page (owner for personal files, anyone for shared ones); re-attaching it with the box ticked does the same, in place. A picture that cannot be read never fails the upload: the text is kept and the user sees a note naming the slides, pages or headings.
 
-The vision model is `VISION_BASE_URL` + `VISION_MODEL` when both are set, otherwise the main model when `LLM_VISION=true`; with neither, files are read as text only and the box is hidden. Check that the model accepts images before relying on it (LM Studio needs Gemma 4's vision projector loaded, and the proxy must pass images through):
+The vision model is `VISION_BASE_URL` + `VISION_MODEL` when both are set, otherwise the main model when `LLM_VISION=true`; with neither, files are read as text only and the box is hidden.
+
+**On a host with the Gemma 4 proxy, send pictures straight to LM Studio, not through the proxy.** The proxy turns each chat into a plain-text prompt for LM Studio's `/v1/completions`, which cannot carry images, so through the proxy the model never sees the picture (it answers "Please provide the image…"). Set:
+```bash
+LLM_VISION=false
+VISION_BASE_URL=http://127.0.0.1:1234/v1     # LM Studio itself
+VISION_MODEL=<the model id LM Studio lists>
+```
+LM Studio needs Gemma 4's vision projector (mmproj) loaded. Check before relying on it:
 ```bash
 IMG=$(base64 -w0 some-small.png)
-curl -s http://127.0.0.1:8088/v1/chat/completions -H 'content-type: application/json'   -d '{"model":"<LLM_MODEL>","max_tokens":200,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,'"$IMG"'"}},{"type":"text","text":"Describe this image."}]}]}' | head -c 600
+curl -s http://127.0.0.1:1234/v1/chat/completions -H 'content-type: application/json'   -d '{"model":"<VISION_MODEL>","max_tokens":1024,"reasoning_effort":"none","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,'"$IMG"'"}},{"type":"text","text":"Describe this image."}]}]}' | head -c 600
 ```
 A description in `choices[0].message.content` means pictures will work. Decks uploaded before vision was on keep their text-only index; upload them again to add picture descriptions.
 

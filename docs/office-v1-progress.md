@@ -411,3 +411,32 @@ With `LLM_VISION=true` on .126, every picture "description" came back as *"Pleas
 - Pause background knowledge extraction while a live reply is being written.
 - Speculative decoding in LM Studio with Gemma 4 E2B/E4B as the draft model.
 - Match LM Studio parallel slots to `MAX_CONCURRENT_LLM`.
+
+### Update 2026-11-19 (later): proxy built and tested
+**Done:**
+- `deploy/gemma4-proxy/gemma4_proxy.py` — the new single proxy (replaces the old one on :8088, same start command). Real streaming; `stream=false` unchanged; `STREAM=0` restores the old stream; `:` allowed in tool names; `JSON_TOOL_CALLS=1` opt-in (off). 12 tests in `deploy/gemma4-proxy/tests/` compare every answer with the original proxy (`tests/legacy_proxy.py`) across plain text, thinking, one/two tool calls, Japanese, whitespace and stray `<`, at 1/2/5/64-character chunking.
+- The app also renames a real call with a namespaced tool name (`default:probe` → `probe`). Gemma 4 26B did this in testing; the "not found" round trip cost an extra call, and the model told the learner there was a "system glitch".
+- `DEPLOY.md`: proxy section, and pictures go straight to LM Studio (`VISION_BASE_URL=http://127.0.0.1:1234/v1`, `LLM_VISION=false`), because the proxy's raw-prompt path cannot carry images.
+
+**Measured:**
+- **Fake slow LM Studio:** the old proxy showed nothing for 4.3 s (the whole reply); the new proxy showed the first text at 0.6 s, with identical content.
+- **App + real Gemma 4 26B (AI Studio):** probing calls showed the first text in 1.0–1.7 s; whole turns took 10–24 s. Planning could not run there: one planning request is ~100k characters (~25k tokens), more than the free tier's 16k tokens per minute.
+- **App + laptop Ollama `gemma4-e4b`:**
+  - first planning call (20.7k tokens): 16.6 s to the first text, 48.5 s total;
+  - next call (24k tokens): 0.9 s to the first text, because Ollama reused the already-processed start of the prompt;
+  - probing (6k tokens): 2.3 s, then 0.6 s.
+- **On .126, prompt reuse decides speed.** Every teaching call re-sends ~20–25k tokens. LM Studio (llama.cpp) reuses a cached prompt start only if it is unchanged and the slot has not been taken by another chat. Check LM Studio's log for how many tokens are reused per call.
+
+**Seen working in the browser:**
+- A quiz the model typed as ```json became a real quiz card: no answer or explanation visible, graded correctly, explanation shown after answering.
+- On Ollama, the model typed the plan as a ```mermaid block → converted to `plan_init` (`salvaged_…` id) → plan created once, map drawn once, no retry, no repeated presentation.
+
+**Accuracy findings, not fixed (need decisions):**
+1. **Answer key contradicts its own explanation (Gemma 4 26B):** the explanation said the "cosmic vacuum cleaner" idea is wrong, yet `correctAnswer` pointed at that option, so a learner's correct answer was graded wrong.
+2. **The prober taught the answer right before asking** (a "why can't light escape" question after the text had just explained it). This is the other form of "the question had the answer".
+3. **The prober kept teaching after its assessment,** and wrote its own outline as text before planning started.
+4. **The small model dropped the quiz's required `type` field** twice, then apologised to the learner for a "system problem". Each rejection costs a full call.
+
+**UX gaps seen:**
+- "Something went wrong: Connection error." shows in English on the Japanese screen.
+- When the very first model call failed with HTTP 400, the chat stayed empty with no error.
