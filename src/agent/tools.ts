@@ -10,6 +10,7 @@ import {
 	parseOptionsIfString,
 	probeQuizInputSchema,
 	quizInputObject,
+	answerKeyMismatch,
 	quizAuthoringProblems,
 	quizInputProblems,
 } from "../core/question-core.ts";
@@ -215,19 +216,46 @@ function explainDescription(name: "explain" | "recall", nodeId: boolean): string
  *  that habit (the tools_fails_2 incident). Distinct names make the
  *  phase boundary visible in the transcript itself: history written by
  *  `probe` never lies about what `quiz` requires. */
-export const probeQuizTool: AgentTool<typeof probeQuizInputSchema> = {
-	name: "probe",
-	label: "probe",
-	description: quizDescription({ name: "probe", nodeId: false, types: false }),
-	parameters: probeQuizInputSchema,
-	prepareArguments: prepareQuestionArguments,
-	executionMode: "sequential",
-	execute: async (_toolCallId, input) => {
-		const problems = quizAuthoringProblems(input);
-		if (problems.length > 0) return invalidInputResult("probe", problems);
-		return questionResult();
-	},
-};
+export function probeQuizToolFor(checkAnswerKey?: AnswerKeyCheck): AgentTool<typeof probeQuizInputSchema> {
+	return {
+		name: "probe",
+		label: "probe",
+		description: quizDescription({ name: "probe", nodeId: false, types: false }),
+		parameters: probeQuizInputSchema,
+		prepareArguments: prepareQuestionArguments,
+		executionMode: "sequential",
+		execute: async (_toolCallId, input, signal) => {
+			const problems = quizAuthoringProblems(input);
+			if (problems.length > 0) return invalidInputResult("probe", problems);
+			const keyProblem = await runAnswerKeyCheck(checkAnswerKey, input, signal);
+			if (keyProblem) return invalidInputResult("probe", [keyProblem]);
+			return questionResult();
+		},
+	};
+}
+
+/** The probe quiz without the answer-key check (tests, and servers with
+ *  QUIZ_ANSWER_CHECK=false build it the same way). */
+export const probeQuizTool: AgentTool<typeof probeQuizInputSchema> = probeQuizToolFor();
+
+/** The quiz answer-key check hook (owner, 2026-11-19): returns the problem
+ *  to send back, or null. Injected by the server (QUIZ_ANSWER_CHECK); absent
+ *  = no check. */
+export type AnswerKeyCheck = (input: Parameters<typeof answerKeyMismatch>[0], signal?: AbortSignal) => Promise<string | null>;
+
+/** Run the check fail-open: any error (timeout, model down) lets the quiz through. */
+async function runAnswerKeyCheck(
+	check: AnswerKeyCheck | undefined,
+	input: Parameters<typeof answerKeyMismatch>[0],
+	signal?: AbortSignal,
+): Promise<string | null> {
+	if (!check) return null;
+	try {
+		return await check(input, signal);
+	} catch {
+		return null;
+	}
+}
 
 /** The teacher's free-recall variant (nodeId-validated, same seam as the
  *  teach quiz — phases/plan recognize BOTH tool names). */
@@ -293,6 +321,8 @@ export interface ProberToolContext extends ProbeDoneContext {
 	/** Knowledge tool context (Task 6B): present = officeKnowledgeEnabled is
 	 *  ON for this session; absent = OFF, no search_knowledge in the registry. */
 	knowledge?: KnowledgeToolContext;
+	/** The quiz answer-key check (QUIZ_ANSWER_CHECK); absent = off. */
+	checkAnswerKey?: AnswerKeyCheck;
 }
 
 /** The prober's tool set: probe quiz (no nodeId) + ask + the learner-fs
@@ -322,7 +352,7 @@ export function createProberTools(
 	// differently-typed literals makes the whole object's type a union —
 	// unusable as Record<string, AgentTool<any>> downstream).
 	const quizzing: Record<string, AgentTool<any>> =
-		mechanics === "free" ? { recall: probeExplainTool } : { probe: probeQuizTool };
+		mechanics === "free" ? { recall: probeExplainTool } : { probe: probeQuizToolFor(ctx.checkAnswerKey) };
 	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
 	// the standard argument heal over the WHOLE registry — every tool,
 	// not just the one the latest wobble incident landed on.
@@ -384,7 +414,9 @@ function nodeIdProblem(ctx: Pick<PlanToolContext, "chatId" | "chatStore">, nodeI
  *  nodeId is REQUIRED (owner ruling 2026-09-26): the untagged ad-hoc quiz is
  *  gone — off-map checks route through ask_user_question, and the teach
  *  seam (first tagged quiz) is structurally guaranteed. */
-export function teachQuizToolFor(ctx: Pick<PlanToolContext, "chatId" | "chatStore">): AgentTool<typeof quizInputObject> {
+export function teachQuizToolFor(
+	ctx: Pick<PlanToolContext, "chatId" | "chatStore"> & { checkAnswerKey?: AnswerKeyCheck },
+): AgentTool<typeof quizInputObject> {
 	return {
 		name: "quiz",
 		label: "quiz",
@@ -392,17 +424,21 @@ export function teachQuizToolFor(ctx: Pick<PlanToolContext, "chatId" | "chatStor
 		parameters: quizInputObject,
 		prepareArguments: prepareTeachQuestionArguments,
 		executionMode: "sequential",
-		execute: async (_toolCallId, input) => {
+		execute: async (_toolCallId, input, signal) => {
 			const problems = [...quizAuthoringProblems(input)];
 			const nodeIdProblemText = nodeIdProblem(ctx, input.nodeId);
 			if (nodeIdProblemText) problems.push(nodeIdProblemText);
 			if (problems.length > 0) return invalidInputResult("quiz", problems);
+			const keyProblem = await runAnswerKeyCheck(ctx.checkAnswerKey, input, signal);
+			if (keyProblem) return invalidInputResult("quiz", [keyProblem]);
 			return questionResult();
 		},
 	};
 }
 
 export interface TeacherToolContext extends PlanToolContext {
+	/** The quiz answer-key check (QUIZ_ANSWER_CHECK); absent = off. */
+	checkAnswerKey?: AnswerKeyCheck;
 	/** Job-tool wiring (sub-agent dispatch): the job store + the runner's
 	 *  spawn seam. The composition root injects both. */
 	jobStore: JobStore;

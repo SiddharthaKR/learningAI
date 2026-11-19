@@ -164,6 +164,61 @@ export function quizAuthoringProblems(input: Parameters<typeof quizInputProblems
 	return problems;
 }
 
+// ─── the quiz answer-key check (owner, 2026-11-19) ────────────────────────
+// Before a quiz reaches the learner, one small model call reads the question,
+// options and explanation (never the key) and names the option the
+// explanation supports. A disagreement with correctAnswer sends the quiz back
+// to the model. Gemma 4 26B keyed the wrong option in 2 of 6 probing quizzes.
+// Switched by QUIZ_ANSWER_CHECK (server .env, on by default). Fail-open: an
+// unclear reply never blocks a quiz.
+
+export const ANSWER_KEY_CHECK_SYSTEM =
+	"You check multiple-choice quizzes. Read the question, the options and the explanation. " +
+	"Reply with only the value of the option that the explanation shows to be correct, exactly as written, and nothing else.";
+
+type CheckableQuiz = {
+	question: string;
+	options: Array<{ label: string; value?: string }>;
+	explanation?: string;
+	correctAnswer: string | string[];
+	multiSelect?: boolean;
+};
+
+function optionKeys(options: CheckableQuiz["options"]): string[] {
+	return options.map((o) => o.value?.trim() || o.label.trim());
+}
+
+/** The checker's user message: question, `value: label` lines, explanation. */
+export function answerKeyCheckPrompt(input: CheckableQuiz): string {
+	const keys = optionKeys(input.options);
+	return [
+		`Question: ${input.question}`,
+		"Options (value: label):",
+		...input.options.map((o, i) => `- ${keys[i]}: ${o.label.trim()}`),
+		`Explanation: ${input.explanation ?? ""}`,
+	].join("\n");
+}
+
+/** The problem to send back when the checker's reply names a different
+ *  option than correctAnswer; null when they agree or the reply is unclear
+ *  (fail-open), and for multi-select quizzes (not checked). */
+export function answerKeyMismatch(input: CheckableQuiz, reply: string): string | null {
+	if (input.multiSelect === true) return null;
+	const keys = optionKeys(input.options);
+	const clean = reply.trim().replace(/^[`"'*\s]+|[`"'*.\s]+$/gu, "").toLowerCase();
+	if (!clean) return null;
+	let named = keys.filter((k) => k.toLowerCase() === clean);
+	if (named.length === 0) named = keys.filter((k) => clean.includes(k.toLowerCase()));
+	if (named.length !== 1) return null;
+	const supported = named[0]!;
+	const key = coerceCorrectAnswer(input.correctAnswer, keys)[0];
+	if (!key || key.toLowerCase() === supported.toLowerCase()) return null;
+	return (
+		`Answer-key check: the explanation supports option "${supported}", but correctAnswer is "${key}". ` +
+		"Make correctAnswer and the explanation agree, then ask again."
+	);
+}
+
 // The SHARED quiz authoring fields — everything except `nodeId`. The probe
 // and teach agents use DIFFERENT tools under the same name (docs/probe-teach-
 // split.md §1): the prober's quiz has NO nodeId field at all (there is no

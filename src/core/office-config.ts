@@ -15,6 +15,8 @@ export interface OfficeConfig {
   sessionSecret: string;
   maxConcurrentLlm: number;
   llmToolMode: "native" | "prompt";
+  /** The quiz answer-key check (owner, 2026-11-19): QUIZ_ANSWER_CHECK, on unless "false". */
+  quizAnswerCheck: boolean;
 }
 
 function positiveInt(value: string | undefined, fallback: number, name: string): number {
@@ -66,6 +68,7 @@ export function officeConfig(): OfficeConfig {
     sessionSecret,
     maxConcurrentLlm: positiveInt(process.env.MAX_CONCURRENT_LLM, 4, 'MAX_CONCURRENT_LLM'),
     llmToolMode,
+    quizAnswerCheck: process.env.QUIZ_ANSWER_CHECK === undefined || process.env.QUIZ_ANSWER_CHECK.trim() === "" ? true : requiredBoolean(process.env.QUIZ_ANSWER_CHECK.trim(), "QUIZ_ANSWER_CHECK"),
   };
 }
 

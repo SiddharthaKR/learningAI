@@ -472,3 +472,21 @@ With `LLM_VISION=true` on .126, every picture "description" came back as *"Pleas
   - Before the change: 2 wrong keys in 6 quizzes.
 - **No question at all: 2 of 12 runs.** The app now sends the reminder for this case. This test does not include the reminder, so it shows how often the reminder will fire, not the result after it.
 - **Not done:** the extra answer-key check call (about 1–2 s per quiz) is waiting for the owner's decision.
+
+### Update 2026-11-19 (late): quiz answer-key check
+**Done:**
+- Before a quiz reaches the learner, one small extra call to the same model asks which option the explanation supports. The call has no tools, thinking is off where the server allows it, and it allows up to 1024 output tokens.
+- If the answer differs from `correctAnswer`, the quiz goes back to the model. Single-select quizzes only.
+- **Fail-open:** a 10 s timeout, an error or an unclear reply lets the quiz through.
+- **Switch:** `QUIZ_ANSWER_CHECK` in `.env` (owner: server setting, on by default; `false` turns it off). Documented in `DEPLOY.md` and `.env.example`; tests run with it off.
+- Files: `src/server/answer-key-check.ts`, `answerKeyCheckPrompt`/`answerKeyMismatch` in `src/core/question-core.ts`, hooked into the probing and teaching quiz tools.
+
+**Verified once on Gemma 4 26B (AI Studio), on three quizzes Gemma wrote earlier:**
+- **Wrong key** (TCP flow vs congestion control, key "b" while the explanation backs "a"): **caught** in 5.3 s, and the model was told "the explanation supports option "a", but correctAnswer is "b"".
+- **Correct key:** passed in 5.1 s.
+- **Doubtful cache quiz** (no option fits its explanation): Gemma deliberated without settling, so the check let it through (fail-open). The check catches keys that contradict the explanation, not questions with no right option.
+
+**Notes:**
+- **Google:** Gemma 4 always thinks first there ("Thinking budget is not supported" when asked to stop). The first version allowed 200 tokens, all of them went to thinking, and nothing was checked. Hence 1024.
+- **On .126:** the proxy runs with thinking off unless `THINKING=1`, so the check should reply in about a second there. This is not yet measured on .126.
+- Google returned 503 "high demand" during testing; two calls hit the 10 s limit because of retries, not because of the check.

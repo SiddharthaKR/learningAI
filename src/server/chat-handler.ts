@@ -38,6 +38,7 @@ import { validateRestrictedWebTarget } from "../agent/tools/restricted-web-fetch
 import { createAccountStore } from "./accounts.ts";
 import { PATHS } from "../../config.ts";
 import { fixedOfficeModelSpec } from "./office-config.ts";
+import { answerKeyCheck } from "./answer-key-check.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
 	extractionEnabled,
@@ -471,6 +472,8 @@ export async function handleChatInput(
 						// = no research tool in the teacher's registry.
 						searchAvailable: () => researchAvailable(chatId),
 						knowledge: knowledgeCtx,
+						// The quiz answer-key check (QUIZ_ANSWER_CHECK, owner 2026-11-19).
+						checkAnswerKey: answerKeyCheck(),
 					},
 					agentOpts,
 				)
@@ -490,6 +493,7 @@ export async function handleChatInput(
 						// graph master switch AND the agent.graphTools toggle.
 						...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
 						knowledge: knowledgeCtx,
+						checkAnswerKey: answerKeyCheck(),
 					},
 					agentOpts,
 				);
