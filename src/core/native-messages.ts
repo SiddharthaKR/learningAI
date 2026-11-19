@@ -114,6 +114,22 @@ export function randomSuffix(): string {
 	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Chat images described by the vision model (owner, 2026-11-19): one entry
+ *  per image part, in order; null = the picture could not be read. Stored on
+ *  the user message; only the MODEL sees them (toLlmMessages swaps each image
+ *  for its description) — the learner's message still shows the image. */
+export type ImageDescriptions = (string | null)[];
+
+export function withImageDescriptions<M extends LhMessage>(message: M, descriptions: ImageDescriptions): M {
+	return { ...message, imageDescriptions: descriptions };
+}
+
+function describedImageText(index: number, description: string | null): string {
+	return description
+		? `[Image ${index + 1}, described by the vision model: ${description}]`
+		: `[Image ${index + 1} could not be read by the vision model.]`;
+}
+
 /** The app-wide message id shape (same as the UIMessage-era mint). */
 export function newMessageId(): string {
 	return `msg_${Date.now().toString(36)}_${randomSuffix()}`;
@@ -675,7 +691,19 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			continue;
 		}
 		// Strip the record id: the wire carries the native shape only.
-		const { id: _id, ...native } = m as LhMessage;
+		const { id: _id, imageDescriptions, ...native } = m as LhMessage & { imageDescriptions?: ImageDescriptions };
+		if (role === "user" && imageDescriptions && Array.isArray((native as UserMessage).content)) {
+			// Described chat images (owner, 2026-11-19): the text model gets
+			// each picture's description in its place, never the bytes.
+			let imageIndex = 0;
+			const content = ((native as UserMessage).content as (TextContent | ImageContent)[]).map((part) =>
+				part.type === "image"
+					? ({ type: "text", text: describedImageText(imageIndex, imageDescriptions[imageIndex++] ?? null) } as TextContent)
+					: part,
+			);
+			out.push({ ...(native as UserMessage), content });
+			continue;
+		}
 		out.push(native as Message);
 		// Dangling-call synthesis: an assistant message whose toolCalls have
 		// no results in the remaining tail (abort mid-question) — the
