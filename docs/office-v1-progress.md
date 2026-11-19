@@ -490,3 +490,15 @@ With `LLM_VISION=true` on .126, every picture "description" came back as *"Pleas
 - **Google:** Gemma 4 always thinks first there ("Thinking budget is not supported" when asked to stop). The first version allowed 200 tokens, all of them went to thinking, and nothing was checked. Hence 1024.
 - **On .126:** the proxy runs with thinking off unless `THINKING=1`, so the check should reply in about a second there. This is not yet measured on .126.
 - Google returned 503 "high demand" during testing; two calls hit the 10 s limit because of retries, not because of the check.
+
+### Update 2026-11-19 (end of day): chat images, reminder fix, sidebar filter
+- **Chat images go through the vision route** (`f3f5a3d0`). With `LLM_VISION=false` and `VISION_*` set, an image attached in any session (chat, teaching, practice) is described once by the vision model, which is LM Studio directly, not the proxy (the proxy cannot carry images). The description is stored on the message and given to the chat model in place of the picture; the learner still sees the image.
+  - Verified with the owner's flow-chart screenshot on local Gemma 4: the model described the five steps. About 21 s on the laptop, including the description.
+- **Probing reminder** (`1bb1c6d5`): it now fires only when a probing turn showed nothing.
+  - Owner report: the 26B wrote its goal question as a text list, the reminder fired, and the model apologised and asked again.
+  - A question written as text can be answered by typing, so it is left alone.
+- **Sidebar "Filter by type" follows the session you're in.**
+  - Opening a session, or a new Teaching/Practice/Chat draft, switches the filter to that type.
+  - A filter picked by hand stays until you move to another session or draft.
+  - Checked in the browser, all 6 steps as intended.
+- **Tests:** 2154/2154 pass.

@@ -48,6 +48,8 @@ LLM_VISION=false
 VISION_BASE_URL=http://127.0.0.1:1234/v1     # LM Studio itself
 VISION_MODEL=<the model id LM Studio lists>
 ```
+The same route also serves **images attached in a chat** (PNG, JPEG, WebP) in any session — Chat, Teaching, Practice. With `LLM_VISION=false` and `VISION_*` set, each attached image is described once by the vision model and the chat model reads the description; the learner still sees the image. Without `VISION_*`, the chat model is told the image was omitted. (With `LLM_VISION=true` and the proxy in front, the image is silently lost — the model answers as if nothing was attached.)
+
 LM Studio needs Gemma 4's vision projector (mmproj) loaded. Check before relying on it:
 ```bash
 IMG=$(base64 -w0 some-small.png)
