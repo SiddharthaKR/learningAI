@@ -40,6 +40,7 @@ import {
 	CONCLUDE_ACK_TEXT,
 	HANDOFF_TEXT,
 	planRetryText,
+	PROBE_QUESTION_NUDGE_TEXT,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
@@ -71,6 +72,7 @@ export interface LhMarkerMessage {
 		| "graph-context"
 		| "probe-handoff"
 		| "plan-retry"
+		| "probe-nudge"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
@@ -234,6 +236,41 @@ export function planRetryOwed(chatId: string, messages: readonly LhMessage[]): s
 		}
 	}
 	return lastError;
+}
+
+/** The probe-nudge (owner, 2026-11-19): one reminder when a probing turn
+ *  ends with no tool call. `position` (the record length when it fires)
+ *  makes the id deterministic per state, so a double settle cannot send two. */
+export function newProbeNudgeMessage(chatId: string, position: number): LhMarkerMessage {
+	return {
+		id: `steer_probenudge_${chatId}_${position}`,
+		role: "custom",
+		customType: "probe-nudge",
+		content: PROBE_QUESTION_NUDGE_TEXT,
+		display: true,
+		details: { chatId },
+		timestamp: Date.now(),
+	};
+}
+
+/** Should the probe-nudge fire now? Only while probing (no probe_done yet),
+ *  only when the last message is a finished assistant reply with NO tool call
+ *  (a dispatched research job is a legitimate wait), and at most once per
+ *  learner input: walking back to the last user message or question answer,
+ *  an earlier nudge means it already fired. */
+export function probeNudgeOwed(messages: readonly LhMessage[]): boolean {
+	if (hasProbeDone(messages)) return false;
+	const last = messages.at(-1) as AssistantMessage | undefined;
+	if (!last || (last as { role?: string }).role !== "assistant") return false;
+	if (last.stopReason === "error" || last.stopReason === "aborted") return false;
+	if (last.content.some((block) => block.type === "toolCall")) return false;
+	for (let i = messages.length - 2; i >= 0; i--) {
+		const m = messages[i] as { role?: string; customType?: string; toolName?: string };
+		if (m.role === "custom" && m.customType === "probe-nudge") return false;
+		if (m.role === "user") break;
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName ?? "")) break;
+	}
+	return true;
 }
 
 /** The plan presentation block: pure UI history (a frozen snapshot), no

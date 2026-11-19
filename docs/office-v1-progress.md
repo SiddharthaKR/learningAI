@@ -300,9 +300,9 @@ These are UI polish changes. All acceptance items remain at their prior status; 
 
 | Item | Status | Notes |
 |---|---|---|
-| Web research | Code done, host-untested | SearXNG is called directly (Tavily/Brave removed). Needs `SEARCH_PROVIDER=searxng` and SearXNG in Docker on .126; see `DEPLOY.md` section 5. |
+| Web research | SearXNG working on .126 (2026-11-16) | SearXNG returns results on .126 (`curl --noproxy '*' 127.0.0.1:8080/search?q=fpga&format=json`). Image installed offline from the `searxng-image` branch; `general.contact_url` and `outgoing.proxies` set in `~/searxng/settings.yml`. App side: set `SEARCH_PROVIDER=searxng`, restart, then the in-app test (see plan below). |
 | `/source` route | Implemented, host-untested | AGPL compliance route: unauthenticated archive download of the app source, excluding `.env`, `data/`, knowledge files, indexes, and secrets. |
-| Deployment on .126 | Pending | `DEPLOY.md` and `deploy/learnharness.service` are written; the host run and acceptance checks have not been done. |
+| Deployment on .126 | In progress (2026-11-16) | App updated from `office` and running; SearXNG running. Picture reading is NOT working on .126 yet (images do not reach the model; see "Picture reading on .126" below). Full acceptance checks (`DEPLOY.md` section 8) not yet run. |
 | Concurrency limits | Untested | `MAX_CONCURRENT_LLM=2` is set but not host-tested with multiple users. |
 | Shared knowledge index | Operator-configured | Paths are set in the host `.env` by the operator (decided 2026-11-11); empty means off. Optional admin-built index. Separately, users upload to the Shared pool on the Knowledge page (`data/shared/`, audited). |
 
@@ -314,3 +314,179 @@ These are UI polish changes. All acceptance items remain at their prior status; 
 - **`/admin/knowledge`:** totals, uploads per day and uploader per document, from `sharedKnowledgeStore` plus the audit log (`computeKnowledgeStats` in `src/knowledge/stats.ts`).
 - **Graph:** Graph/Table toggle on the graph page (`components/graph-table.tsx`): search, per-row and bulk delete through the existing delete dialog.
 - **Known gaps:** no sidebar link to `/admin`.
+
+## Picture reading, new-session switches, search label (2026-11-16)
+
+Merged into `office` as PR #3 (`a6d5681f`). CI checks passed locally: typecheck, lint, 2108 tests (four clean full runs), production build.
+
+- **Picture reading (opt-in).** A "Read pictures (slower)" box on each PPTX/Word/PDF attachment in the chat box and on the Knowledge page upload. Shown only when the server has vision (`LLM_VISION=true`, or `VISION_BASE_URL` + `VISION_MODEL`). Off by default; each user's choice is saved on their account (`readPictures` in `accounts.json`, `PATCH /api/preferences`).
+  - Pictures are described by the vision model and indexed as text where they appear: slide (PPTX), page (PDF), paragraph under its heading (Word). Template/header/footer art and duplicates are skipped; at most 30 per file; calls share the background LLM limit.
+  - The vision call asks for `reasoning_effort: "none"` (measured on Gemma 4 e4b: 8 s vs 20 s, and thinking can no longer consume the whole answer), retrying once without it if the server rejects the option.
+  - Scanned PDFs are skipped (already read by OCR). Word pictures now cite their real paragraph and heading (were all "paragraph 1").
+  - Documents record `hasPictures` / `picturesRead`. A saved text-only file shows **Read pictures** on the Knowledge page (`POST /api/knowledge/documents/[id]/pictures`; owner for personal, anyone for shared); re-attaching it with the box ticked reads them in place (same id, no duplicate). Upload extracts once (no double indexing); re-attaching a saved file reuses its stored chunks.
+  - Failure never stops the upload or the chat: the text is kept, the model is told, and the user sees a dismissible note naming the slides/pages/headings (en/ja).
+  - Fixed latent bugs: picture chunks used an invalid `sourceId` (`<id>-img`, rejected by the snapshot validator); template pictures were labelled "slide 1".
+- **New-session switches.** The new-session screen shows the same web/knowledge switches as a running session, both off every time (owner decision). Ticked switches are saved to the session (`PUT /api/chats/[id]/settings`) before its first reply, so turn 1 already uses them. Before, the switches only appeared after the first reply.
+- **Web switch label.** "Enable web search" / 「ウェブ検索を有効にする」 when a search provider is configured; "Read linked pages" when the tutor can only open pasted links. Nothing passed the mode before, so it always said "Read linked pages". Server setup reaches the UI through `ServerCapabilitiesProvider` in the root layout.
+- **Verified in the browser with the real model (laptop, Gemma 4 e4b):** knowledge ticked before the first message answered from the shared lab rules on turn 1; a picture-only value (t_setup 2 ns, t_hold 1 ns) was read from a slide; the remembered choice pre-ticked the box in a new session; "Read pictures" upgraded a saved deck in place.
+- **Commit attribution:** no Claude co-author line on commits from now on (owner, 2026-11-16); past history is left unchanged.
+
+### Picture reading on .126: not working yet
+
+With `LLM_VISION=true` on .126, every picture "description" came back as *"Please provide the image you would like me to describe"*: the model received the instruction but not the image. Either LM Studio has Gemma 4 26B loaded without its vision projector (mmproj), or `gemma4_proxy.py` (:8088) drops image parts when it re-renders the chat template. The app currently accepts that reply as a description, so it ends up in the chat text and, for saved files, in the knowledge index.
+
+## Plan (next steps)
+
+**On .126 (operator)**
+1. Set `LLM_VISION=false` in `.env` and restart until images reach the model (hides the box; decks read as text).
+2. Delete any deck saved with pictures ticked while vision was broken, and re-upload it later.
+3. Load Gemma 4 26B's vision projector in LM Studio; then run the image test:
+   `curl --noproxy '*' 127.0.0.1:8088/v1/chat/completions` with an `image_url` part, `"max_tokens":1024`, `"reasoning_effort":"none"`. A real description means it works; "please provide the image" means the proxy drops images.
+4. If the proxy drops images: make `gemma4_proxy.py` forward `image_url` parts to LM Studio. Then set `LLM_VISION=true` again and restart.
+5. Web search in the app: `SEARCH_PROVIDER=searxng`, `SEARXNG_URL=http://127.0.0.1:8080`, `NO_PROXY` includes `127.0.0.1`; restart; check `GET /api/search` reports `available: true`; in a Chat tick "Enable web search" and ask for sources. After a reboot: `deploy/searxng.sh start`.
+6. Page reading (opening result pages) needs `HTTPS_PROXY`/`HTTP_PROXY`; ask IT for a service account or an IP allowlist for .126 rather than a personal login.
+7. Check `LLM_CONTEXT_WINDOW` matches the context actually configured in LM Studio for the 26B (compaction triggers at window − 16k).
+8. Run the `DEPLOY.md` section 8 acceptance checks.
+
+**Code (proposed, needs the owner's go-ahead)**
+1. Vision self-check at server start: send one small test picture with a known word; if the model can't read it back, keep picture reading off (box hidden) and log why.
+2. Per-picture check: the describe prompt asks for a fixed marker when no image is visible; that marker, or replies asking for an image, count as failed (they show in the "couldn't read" note and are never stored).
+3. Picture reading is already in `office` (PR #3), so until 1–2 land, .126 must run with `LLM_VISION=false` (operator step 1).
+
+**Known gaps / later**
+- No sidebar link to `/admin` (open by URL).
+- The user's own message shows the whole extracted attachment text under an English "Extracted attachment content" label (the tutor uses that line as a marker, so it needs a display-only fix).
+- Quiz options: the accessible name drops emphasised words (e.g. "before"/"after"), so screen readers hear identical options.
+- `npm audit`: 2 high from `linkify-it` via the unused dependency `ansi-to-react` (remove it); 3 moderate from `minimatch` in ESLint tooling (dev only). Do not run `npm audit fix --force`.
+- `fast-xml-parser` is pinned at 5.12.0 (5.12.1 available; bump in its own PR with the extraction tests).
+- Teaching on the small laptop model skipped `plan_init` even after the retry nudge; retest planning on the 26B.
+
+## Tool calls typed as text, slow replies, proxy (2026-11-19)
+
+### What users saw on .126
+- A quiz showed as raw JSON, including `correctAnswer` and the explanation ("the question had the answer").
+- The plan appeared twice: the model drew it as a ```mermaid block instead of calling `plan_init`, then the retry nudge made it present the whole plan again.
+- With web research on, "latest version" questions (Vivado, DOCA) were answered from memory.
+- Probing and planning showed "THINKING…" for a long time with nothing appearing.
+
+### Causes found
+- **`gemma4_proxy.py` (the :8088 proxy between the app and LM Studio :1234):**
+  - **No streaming:** it waits for the whole reply (thinking included) and sends it in one go (`# stream=true: emit the finished result as SSE chunks`). That is the long blank wait.
+  - **Only Gemma's native call format is recognised** (`<|tool_call>call:name{…}<tool_call|>`). A call the model writes as a JSON or mermaid block reaches the app as plain text. That explains the leaked quiz, the duplicate plan and research never being dispatched.
+  - **It drops images** (`normalize`: "content parts -> text only"). It renders a raw prompt for LM Studio's `/v1/completions`, which cannot carry images. That is the real cause of "Please provide the image".
+- **Tested on Gemma 4 26B through Google AI Studio** (`GEMINI_API_KEY`, model `gemma-4-26b-a4b-it`), using the app's own Chat prompt and research tool: the model called `research` every time. The model is fine; the calls get lost in the proxy path. Free tier allows only 16k input tokens per minute and one planning request is ~13k, so repeated planning runs there are slow.
+- **Other contributors:**
+  - With `LLM_REASONING=true`, every turn uses the "medium" thinking level by default (`src/core/settings.ts` `DEFAULT_THINKING_ORDER`).
+  - The teacher instructions are ~39k characters (~10k tokens) per request.
+  - The handoff tells the model to "take your time".
+  - The owner wants no accuracy loss, so the thinking level stays as it is.
+
+### Done (this branch, not yet in `office`)
+- **App-side safety net:** `src/agent/tool-salvage-stream.ts`, wired for native tool mode in `src/agent/models.ts`, with 10 tests in `tests/tool-salvage-stream.test.ts`. Typecheck and lint are clean.
+  - Holds back ```json / ```mermaid / bare ``` blocks while the reply streams. Other code blocks stream as before.
+  - If the reply has **no real tool call**, a held block becomes the call it unambiguously is:
+    - `{name, arguments}` naming an available tool;
+    - an object that fits exactly one tool's schema (required fields present, no unknown keys, schema check passes);
+    - a mermaid `graph`/`flowchart` block while no plan exists yet → `plan_init`.
+  - The converted call goes through the normal tool path, with the same validation as a real call.
+  - Everything else is shown exactly as written.
+- Full test suite not yet re-run after this change.
+
+### Plan (approved by the owner 2026-11-19: "approve all")
+1. **New proxy in the repo** (`deploy/gemma4-proxy/`). It **replaces** the existing one on :8088; the owner wants one proxy for opencode and LearnHarness, run the same way as before (`UPSTREAM=… TEMPLATE=… uvicorn gemma4_proxy:app --port 8088`).
+   - Real token streaming: request `/v1/completions` with `stream:true`, and forward text and thinking deltas as they arrive. Hold back only a tool call until it is complete, then parse it with the existing `CALL_RE`/`_P` code (identical results). Pass `stream_options.include_usage` through.
+   - `stream:false` must stay byte-for-byte the same as today, for opencode.
+   - `STREAM=0` turns streaming back to the old behaviour.
+   - Optional JSON tool-call fallback behind `JSON_TOOL_CALLS=1`, **off by default** so opencode is never affected. LearnHarness has the app-side net.
+   - Python tests with a fake LM Studio. Local Python is `py` (3.14); use `uv run --with fastapi --with httpx --with jinja2 --with uvicorn`. Local Ollama is not a faithful raw-completions backend (it strips Gemma's special tokens), so tests use a fake upstream.
+2. **Pictures:** set `VISION_BASE_URL=http://127.0.0.1:1234/v1` (LM Studio directly, not the proxy) plus `VISION_MODEL`, and load the mmproj. Document in `DEPLOY.md`, then run the image `curl` there.
+3. **End-to-end chat tests** for speed, accuracy and visuals:
+   - the dev server against the new proxy with the fake upstream (streaming visible, quiz card not JSON, single plan);
+   - the dev server against AI Studio Gemma 26B for a real Teaching run;
+   - screenshots in English and Japanese.
+4. Re-run the full suite, commit (no Claude co-author line), push, and open a PR to `office`.
+5. On .126 (operator): stop the old proxy, start the new one on :8088 with the same command, and check opencode still works. Then retest the black-hole Teaching flow and the DOCA question with web search on.
+
+**Speed ideas that keep accuracy (later, need go-ahead):**
+- Pause background knowledge extraction while a live reply is being written.
+- Speculative decoding in LM Studio with Gemma 4 E2B/E4B as the draft model.
+- Match LM Studio parallel slots to `MAX_CONCURRENT_LLM`.
+
+### Update 2026-11-19 (later): proxy built and tested
+**Done:**
+- `deploy/gemma4-proxy/gemma4_proxy.py` — the new single proxy (replaces the old one on :8088, same start command). Real streaming; `stream=false` unchanged; `STREAM=0` restores the old stream; `:` allowed in tool names; `JSON_TOOL_CALLS=1` opt-in (off). 12 tests in `deploy/gemma4-proxy/tests/` compare every answer with the original proxy (`tests/legacy_proxy.py`) across plain text, thinking, one/two tool calls, Japanese, whitespace and stray `<`, at 1/2/5/64-character chunking.
+- The app also renames a real call with a namespaced tool name (`default:probe` → `probe`). Gemma 4 26B did this in testing; the "not found" round trip cost an extra call, and the model told the learner there was a "system glitch".
+- `DEPLOY.md`: proxy section, and pictures go straight to LM Studio (`VISION_BASE_URL=http://127.0.0.1:1234/v1`, `LLM_VISION=false`), because the proxy's raw-prompt path cannot carry images.
+
+**Measured:**
+- **Fake slow LM Studio:** the old proxy showed nothing for 4.3 s (the whole reply); the new proxy showed the first text at 0.6 s, with identical content.
+- **App + real Gemma 4 26B (AI Studio):** probing calls showed the first text in 1.0–1.7 s; whole turns took 10–24 s. Planning could not run there: one planning request is ~100k characters (~25k tokens), more than the free tier's 16k tokens per minute.
+- **App + laptop Ollama `gemma4-e4b`:**
+  - first planning call (20.7k tokens): 16.6 s to the first text, 48.5 s total;
+  - next call (24k tokens): 0.9 s to the first text, because Ollama reused the already-processed start of the prompt;
+  - probing (6k tokens): 2.3 s, then 0.6 s.
+- **On .126, prompt reuse decides speed.** Every teaching call re-sends ~20–25k tokens. LM Studio (llama.cpp) reuses a cached prompt start only if it is unchanged and the slot has not been taken by another chat. Check LM Studio's log for how many tokens are reused per call.
+
+**Seen working in the browser:**
+- A quiz the model typed as ```json became a real quiz card: no answer or explanation visible, graded correctly, explanation shown after answering.
+- On Ollama, the model typed the plan as a ```mermaid block → converted to `plan_init` (`salvaged_…` id) → plan created once, map drawn once, no retry, no repeated presentation.
+
+**Accuracy findings, not fixed (need decisions):**
+1. **Answer key contradicts its own explanation (Gemma 4 26B):** the explanation said the "cosmic vacuum cleaner" idea is wrong, yet `correctAnswer` pointed at that option, so a learner's correct answer was graded wrong.
+2. **The prober taught the answer right before asking** (a "why can't light escape" question after the text had just explained it). This is the other form of "the question had the answer".
+3. **The prober kept teaching after its assessment,** and wrote its own outline as text before planning started.
+4. **The small model dropped the quiz's required `type` field** twice, then apologised to the learner for a "system problem". Each rejection costs a full call.
+
+**UX gaps seen:**
+- "Something went wrong: Connection error." shows in English on the Japanese screen.
+- When the very first model call failed with HTTP 400, the chat stayed empty with no error.
+
+### Update 2026-11-19 (evening): teaching fixes and the 26B measurement
+**Done** (commit `7beb0ea5`; 2128/2128 tests pass):
+- A successful `probe_done` now ends the prober's turn, so it can no longer keep teaching or write its own outline after the assessment. A refused `probe_done` still lets it fix course in the same turn.
+- A teaching `quiz`/`explain` call without `type` is read as `"check"`, the UI's existing reading of a typeless question, instead of being rejected.
+- A saved failed turn (`stopReason: "error"`) shows an error line instead of a blank chat. Checked in the browser on the earlier HTTP 400 chat.
+- The error prefix and the thinking label come from the locale files (ja: `エラーが発生しました：`, `考え中`).
+- No prompt changes (owner: not for now).
+
+**Measured only — issues 1 and 2, no change made (owner):**
+- **Method:** the real prober instructions and tools on Gemma 4 26B (AI Studio), 3 topics × 2 runs, first probing question after the goal is set.
+- **Results:**
+  - **Wrong answer key: 1 of 5 quizzes.** TCP flow vs congestion control: `correctAnswer` "b", but the explanation supports "a". Together with the black-hole case seen in the browser, that is 2 wrong keys in 6 quizzes seen.
+  - **One-letter option values ("a"/"b"/"c"): 5 of 5.**
+  - **The correct option was written first: 4 of 5.** The app shuffles options on screen, so this does not leak to the learner.
+  - **Answer given away before the first question: 0 of 5.** The earlier give-away came later, after the learner answered: the model explained, then asked about what it had just explained. A first-question test cannot catch that; it needs multi-turn runs.
+  - **No question at all: 1 of 6 runs** (black holes #1). The model only planned in its thinking and ended the turn without calling a tool, leaving the learner with nothing to answer.
+
+### Update 2026-11-19 (night): answer keys and the probing reminder
+**Done** (commits `a008a07d`, `7ed71e9e`; 2134/2134 tests pass):
+- **New quizzes must name their option values.** A one-character or all-digit value standing in for a longer label (`"a"`, `"2"`) is rejected at the authoring boundary (`quizAuthoringProblems`). Saved quizzes still display: the display parse uses `quizInputProblems`, which is unchanged.
+- **The tool description's example quiz now uses named values** (`"6cos2x"`…), owner-approved. The model had been copying the old `"a"/"b"/"c"`.
+- **Probing reminder:** when a probing turn ends with no tool call (not stopped or failed, before `probe_done`), the app sends one reminder per learner input, with owner-approved wording, through the plan-retry path. The chat shows the usual "Retrying…" line.
+
+**Measured on Gemma 4 26B after the change** (4 topics × 3 runs, rejections replayed as the app sends them):
+- **Named values:** 10 of 10 quizzes ended up with named values. Only 1 was rejected first and fixed itself on the next try.
+- **Answer keys:**
+  - 9 of 10 match their explanation.
+  - 1 is doubtful: a CPU-cache quiz keyed "latency-bandwidth trade-off" while its explanation talks about trading capacity for latency, and no option says that. This is a badly built question more than a wrong letter.
+  - Before the change: 2 wrong keys in 6 quizzes.
+- **No question at all: 2 of 12 runs.** The app now sends the reminder for this case. This test does not include the reminder, so it shows how often the reminder will fire, not the result after it.
+- **Not done:** the extra answer-key check call (about 1–2 s per quiz) is waiting for the owner's decision.
+
+### Update 2026-11-19 (late): quiz answer-key check
+**Done:**
+- Before a quiz reaches the learner, one small extra call to the same model asks which option the explanation supports. The call has no tools, thinking is off where the server allows it, and it allows up to 1024 output tokens.
+- If the answer differs from `correctAnswer`, the quiz goes back to the model. Single-select quizzes only.
+- **Fail-open:** a 10 s timeout, an error or an unclear reply lets the quiz through.
+- **Switch:** `QUIZ_ANSWER_CHECK` in `.env` (owner: server setting, on by default; `false` turns it off). Documented in `DEPLOY.md` and `.env.example`; tests run with it off.
+- Files: `src/server/answer-key-check.ts`, `answerKeyCheckPrompt`/`answerKeyMismatch` in `src/core/question-core.ts`, hooked into the probing and teaching quiz tools.
+
+**Verified once on Gemma 4 26B (AI Studio), on three quizzes Gemma wrote earlier:**
+- **Wrong key** (TCP flow vs congestion control, key "b" while the explanation backs "a"): **caught** in 5.3 s, and the model was told "the explanation supports option "a", but correctAnswer is "b"".
+- **Correct key:** passed in 5.1 s.
+- **Doubtful cache quiz** (no option fits its explanation): Gemma deliberated without settling, so the check let it through (fail-open). The check catches keys that contradict the explanation, not questions with no right option.
+
+**Notes:**
+- **Google:** Gemma 4 always thinks first there ("Thinking budget is not supported" when asked to stop). The first version allowed 200 tokens, all of them went to thinking, and nothing was checked. Hence 1024.
+- **On .126:** the proxy runs with thinking off unless `THINKING=1`, so the check should reply in about a second there. This is not yet measured on .126.
+- Google returned 503 "high demand" during testing; two calls hit the 10 s limit because of retries, not because of the check.

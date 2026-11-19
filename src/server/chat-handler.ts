@@ -38,6 +38,7 @@ import { validateRestrictedWebTarget } from "../agent/tools/restricted-web-fetch
 import { createAccountStore } from "./accounts.ts";
 import { PATHS } from "../../config.ts";
 import { fixedOfficeModelSpec } from "./office-config.ts";
+import { answerKeyCheck } from "./answer-key-check.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
 	extractionEnabled,
@@ -50,7 +51,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, planRetryOwed } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, planRetryOwed, probeNudgeOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
@@ -471,6 +472,8 @@ export async function handleChatInput(
 						// = no research tool in the teacher's registry.
 						searchAvailable: () => researchAvailable(chatId),
 						knowledge: knowledgeCtx,
+						// The quiz answer-key check (QUIZ_ANSWER_CHECK, owner 2026-11-19).
+						checkAnswerKey: answerKeyCheck(),
 					},
 					agentOpts,
 				)
@@ -490,6 +493,7 @@ export async function handleChatInput(
 						// graph master switch AND the agent.graphTools toggle.
 						...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
 						knowledge: knowledgeCtx,
+						checkAnswerKey: answerKeyCheck(),
 					},
 					agentOpts,
 				);
@@ -601,6 +605,14 @@ export async function handleChatInput(
 					if (owed !== false) {
 						void deliverJobResult(newPlanRetryMessage(chatId, owed)).catch((err: unknown) => {
 							console.error(`[chat ${chatId}] plan-retry nudge failed:`, err);
+						});
+					}
+					// THE PROBE-NUDGE (owner, 2026-11-19): a probing turn that
+					// ended with no tool call left the learner nothing to answer —
+					// remind the model once (per learner input) to ask.
+					if (settled && probeNudgeOwed(settled.messages)) {
+						void deliverJobResult(newProbeNudgeMessage(chatId, settled.messages.length)).catch((err: unknown) => {
+							console.error(`[chat ${chatId}] probe nudge failed:`, err);
 						});
 					}
 				}

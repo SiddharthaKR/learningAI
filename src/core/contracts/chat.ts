@@ -219,6 +219,12 @@ export const HANDOFF_TEXT =
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and present the plan; I'll accept it or ask for changes.";
 
+/** The probe-nudge text (owner-approved wording, 2026-11-19): sent when a
+ *  probing turn ends with no tool call — Gemma 4 26B did that in 1 of 6 runs,
+ *  leaving the learner nothing to answer. */
+export const PROBE_QUESTION_NUDGE_TEXT =
+	"Your turn ended without a question. While probing, every turn ends with one question (the quiz tool or ask_user_question) or with probe_done. Ask your next question now.";
+
 /** The one plan-retry nudge (owner, 2026-11-13): fired once per session when
  *  a turn after the handoff settles with no successful plan_init. Carries
  *  the last rejection reason (null when plan_init was never called). */

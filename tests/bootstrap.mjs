@@ -14,6 +14,7 @@ process.env.LLM_MAX_TOKENS ??= "512";
 process.env.LLM_VISION ??= "false";
 process.env.LLM_REASONING ??= "false";
 process.env.LLM_TOOL_MODE ??= "native";
+process.env.QUIZ_ANSWER_CHECK ??= "false"; // tests never call a real model
 process.env.NO_PROXY ??= "127.0.0.1";
 process.env.SESSION_SECRET ??= "test-secret-for-local-suite-only-0123456789";
 process.on("exit", () => rmSync(root, { recursive: true, force: true }));

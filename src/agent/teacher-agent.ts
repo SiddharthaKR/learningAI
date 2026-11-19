@@ -18,7 +18,7 @@ import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
 import { jobTools, type JobToolContext } from "./tools/jobs.ts";
 import { createKnowledgeTool, type KnowledgeToolContext } from "./tools/knowledge.ts";
 import { healToolRecord } from "./tools/heal.ts";
-import { quizInputObject, quizInputProblems } from "../core/question-core.ts";
+import { quizInputObject, quizAuthoringProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
 import { toLlmMessages } from "../core/native-messages.ts";
 
@@ -302,7 +302,7 @@ export function bareQuestionTools(): Record<string, AgentTool<any>> {
 		parameters: quizInputObject,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
-			const problems = quizInputProblems(input);
+			const problems = quizAuthoringProblems(input);
 			if (problems.length > 0) return invalidInputResult("quiz", problems);
 			return questionResult();
 		},

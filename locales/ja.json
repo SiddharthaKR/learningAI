@@ -167,7 +167,8 @@
     "contextCompacted": "履歴を整理しました",
     "historyCompacted": "履歴を整理済み",
     "compactionTokenCount": "約{count}千トークン",
-    "retryingTool": "再試行中…"
+    "retryingTool": "再試行中…",
+    "errorPrefix": "エラーが発生しました："
   },
   "composer": {
     "nextProblem": "次の問題",

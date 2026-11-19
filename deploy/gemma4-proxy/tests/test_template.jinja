@@ -1,0 +1,3 @@
+{%- for m in messages -%}<|turn>{{ m.role }}
+{{ m.content }}<turn|>
+{% endfor -%}<|turn>model

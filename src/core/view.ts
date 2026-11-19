@@ -233,6 +233,14 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 					rest.push(part);
 				}
 			}
+			// A FAILED turn says so (owner report, 2026-11-19): a model call that
+			// failed (e.g. HTTP 400 on the first call) is saved as an empty
+			// assistant message with stopReason "error" — hidden as empty, the
+			// chat just stayed blank. Stops (aborted) stay silent as before.
+			if (assistant.stopReason === "error" && assistant.errorMessage) {
+				const reason = assistant.errorMessage.length > 300 ? `${assistant.errorMessage.slice(0, 300)}…` : assistant.errorMessage;
+				rest.push({ type: "data-turn-error", id: `${m.id}-err`, data: { message: reason } });
+			}
 			const parts: LhViewPart[] = [...reasoning, ...rest];
 			if (parts.length === 0) {
 				// An arrived-but-silent STREAMING message (owner, optimistic
@@ -383,6 +391,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-plan-retry", id: `pr_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
+		case "probe-nudge": {
+			// The probe-nudge (owner, 2026-11-19): scaffolding like the
+			// plan-retry — a quiet system line, never a user bubble.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-probe-nudge", id: `pn_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}
