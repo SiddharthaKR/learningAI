@@ -457,3 +457,18 @@ With `LLM_VISION=true` on .126, every picture "description" came back as *"Pleas
   - **The correct option was written first: 4 of 5.** The app shuffles options on screen, so this does not leak to the learner.
   - **Answer given away before the first question: 0 of 5.** The earlier give-away came later, after the learner answered: the model explained, then asked about what it had just explained. A first-question test cannot catch that; it needs multi-turn runs.
   - **No question at all: 1 of 6 runs** (black holes #1). The model only planned in its thinking and ended the turn without calling a tool, leaving the learner with nothing to answer.
+
+### Update 2026-11-19 (night): answer keys and the probing reminder
+**Done** (commits `a008a07d`, `7ed71e9e`; 2134/2134 tests pass):
+- **New quizzes must name their option values.** A one-character or all-digit value standing in for a longer label (`"a"`, `"2"`) is rejected at the authoring boundary (`quizAuthoringProblems`). Saved quizzes still display: the display parse uses `quizInputProblems`, which is unchanged.
+- **The tool description's example quiz now uses named values** (`"6cos2x"`…), owner-approved. The model had been copying the old `"a"/"b"/"c"`.
+- **Probing reminder:** when a probing turn ends with no tool call (not stopped or failed, before `probe_done`), the app sends one reminder per learner input, with owner-approved wording, through the plan-retry path. The chat shows the usual "Retrying…" line.
+
+**Measured on Gemma 4 26B after the change** (4 topics × 3 runs, rejections replayed as the app sends them):
+- **Named values:** 10 of 10 quizzes ended up with named values. Only 1 was rejected first and fixed itself on the next try.
+- **Answer keys:**
+  - 9 of 10 match their explanation.
+  - 1 is doubtful: a CPU-cache quiz keyed "latency-bandwidth trade-off" while its explanation talks about trading capacity for latency, and no option says that. This is a badly built question more than a wrong letter.
+  - Before the change: 2 wrong keys in 6 quizzes.
+- **No question at all: 2 of 12 runs.** The app now sends the reminder for this case. This test does not include the reminder, so it shows how often the reminder will fire, not the result after it.
+- **Not done:** the extra answer-key check call (about 1–2 s per quiz) is waiting for the owner's decision.
