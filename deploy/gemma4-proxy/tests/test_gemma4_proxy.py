@@ -219,6 +219,44 @@ class NamespacedToolNames(unittest.TestCase):
                 self.assertEqual(got["content"], "Next question.")
 
 
+class ThoughtWithoutOpener(unittest.TestCase):
+    """Owner report (2026-11-19, Gemma 4 26B on .126): replies began with the
+    literal 'thought' and '<channel|>' — the opening '<|channel>' marker never
+    reached the text, so the thinking leaked into the answer and the thinking
+    panel stayed empty."""
+
+    RAW = "thought\nThe learner picked Interference; correct is Entanglement.<channel|>That was a miss. The answer is Entanglement."
+
+    def test_old_proxy_leaked_it(self):
+        old = load("legacy_t", OLD)
+        msg = client_for(old, upstream_handler(self.RAW)).post("/v1/chat/completions", json=request_body(False)).json()["choices"][0]["message"]
+        self.assertIn("<channel|>", msg["content"])
+
+    def test_new_proxy_splits_thinking_from_the_answer(self):
+        new = load("new_t", NEW)
+        for stream in (False, True):
+            for piece in (1, 3, 64):
+                with self.subTest(stream=stream, piece=piece):
+                    r = client_for(new, upstream_handler(self.RAW, piece=piece)).post("/v1/chat/completions", json=request_body(stream))
+                    if stream:
+                        got = assemble(sse_events(r.text))
+                        content, reasoning = got["content"], got["reasoning"]
+                    else:
+                        m = r.json()["choices"][0]["message"]
+                        content, reasoning = m["content"], m.get("reasoning_content", "")
+                    self.assertEqual(content, "That was a miss. The answer is Entanglement.")
+                    self.assertEqual(reasoning, "The learner picked Interference; correct is Entanglement.")
+
+    def test_a_normal_answer_starting_with_the_word_thought_is_untouched(self):
+        new = load("new_t2", NEW)
+        raw = "thought experiments help here: imagine a train moving at near light speed."
+        for stream in (False, True):
+            with self.subTest(stream=stream):
+                r = client_for(new, upstream_handler(raw, piece=2)).post("/v1/chat/completions", json=request_body(stream))
+                content = assemble(sse_events(r.text))["content"] if stream else r.json()["choices"][0]["message"]["content"]
+                self.assertEqual(content, raw)
+
+
 class JsonToolCalls(unittest.TestCase):
     def test_off_by_default(self):
         new = load("new_h", NEW)

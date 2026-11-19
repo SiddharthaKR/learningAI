@@ -184,7 +184,18 @@ class _P:
 CALL_RE = re.compile(r"<\|tool_call>call:([\w\-.:]+?)\{(.*?)\}(?=<tool_call\|>|<turn\|>|<\|tool_response>|<\|tool_call>|\s*$)", re.S)
 THOUGHT_RE = re.compile(r"<\|channel>(?:thought)?\n?(.*?)<channel\|>", re.S)
 
+def restore_thought_opener(text):
+    """Gemma sometimes emits its thinking with the opening '<|channel>' marker
+    missing from the text: the reply starts 'thought\\n…' and the thinking ends
+    at '<channel|>' (seen on .126, 2026-11-19). Put the opener back so the
+    thinking is parsed as thinking instead of leaking into the answer."""
+    stripped = text.lstrip()
+    if stripped.startswith("thought\n") and "<channel|>" in stripped and "<|channel>" not in stripped.split("<channel|>", 1)[0]:
+        return "<|channel>" + stripped
+    return text
+
 def parse_output(text):
+    text = restore_thought_opener(text)
     reasoning = "\n".join(x.strip() for x in THOUGHT_RE.findall(text)).strip()
     text = THOUGHT_RE.sub("", text)
     calls = []
@@ -264,7 +275,17 @@ class StreamSplitter:
         self.hold_fences = hold_fences
 
     def _view(self):
-        raw, reasoning, content, i = self.raw, [], [], 0
+        raw = self.raw
+        stripped = raw.lstrip()
+        if "<|channel>" not in raw:
+            if "thought\n".startswith(stripped):
+                return "", ""  # could still become 'thought\n…' — wait for more
+            if stripped.startswith("thought\n"):
+                # Opener missing (see restore_thought_opener): stream it as
+                # thinking; if no '<channel|>' ever comes, finish() still
+                # sends the full text as the answer.
+                raw = "<|channel>" + stripped
+        reasoning, content, i = [], [], 0
         while True:
             hits = [p for p in (raw.find(o, i) for o in OPENERS) if p != -1]
             if not hits:
