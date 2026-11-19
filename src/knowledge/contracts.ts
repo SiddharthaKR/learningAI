@@ -38,6 +38,8 @@ export interface KnowledgeChunk {
 
 export interface KnowledgeResult extends KnowledgeChunk {
 	score: number;
+	/** Original passages when neighbor expansion spans distinct citation locations. */
+	passages?: KnowledgeChunk[];
 }
 
 export type ExtractedDocument = {

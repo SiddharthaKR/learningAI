@@ -212,6 +212,9 @@ export function expandNeighbors(hits: KnowledgeResult[], chunks: KnowledgeChunk[
 				if (chunk) parts.push(chunk);
 			}
 			const result: KnowledgeResult = { ...best, text: mergeChunkTexts(parts), score: best.score };
+			if (parts.some((part) => JSON.stringify(part.citation) !== JSON.stringify(best.citation))) {
+				result.passages = parts;
+			}
 			slots.push({ rank: ranks.get(group)!, result });
 		}
 	}
