@@ -39,6 +39,7 @@ import {
 import type { ExtraProps } from "streamdown";
 import { MERMAID_FONT_SIZE, renderMermaid } from "@/components/mermaid-render";
 import { MermaidError } from "@/components/mermaid-error";
+import { usePageDark } from "@/components/use-page-dark";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { chartSize, useSessionMermaid } from "@/components/session-overlay";
 import { Hint } from "@/components/ui/hint";
@@ -154,6 +155,7 @@ function MermaidInline({ chart }: { chart: string }) {
 	// live from the wrapper — --lh-prose-size today): a chart may shrink to
 	// fit the column, but never blow its text up past the chat's.
 	const holderRef = useRef<HTMLDivElement>(null);
+	const dark = usePageDark(); // redraw in the matching theme when the mode switches
 	const [capW, setCapW] = useState<number | null>(null);
 	useEffect(() => {
 		if (!svg || !holderRef.current) return;
@@ -168,7 +170,7 @@ function MermaidInline({ chart }: { chart: string }) {
 		let cancelled = false;
 		setSvg(null);
 		setError(null);
-		renderMermaid(chart)
+		renderMermaid(chart, dark)
 			.then((s) => {
 				if (!cancelled) setSvg(s);
 			})
@@ -178,7 +180,7 @@ function MermaidInline({ chart }: { chart: string }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [chart, attempt, incomplete]);
+	}, [chart, attempt, incomplete, dark]);
 
 	if (incomplete || (svg === null && error === null)) {
 		return (
@@ -362,7 +364,7 @@ export function MarkdownBlockquote(props: ComponentProps<"blockquote"> & ExtraPr
 		<div
 			data-testid="md-callout"
 			data-alert-kind={alert.kind}
-			className="my-4 w-fit max-w-full border border-white px-4 py-3 [&> :first-child]:mt-0 [&> :last-child]:mb-0"
+			className="my-4 w-fit max-w-full border border-foreground dark:border-white px-4 py-3 [&> :first-child]:mt-0 [&> :last-child]:mb-0"
 		>
 			{alert.children}
 		</div>

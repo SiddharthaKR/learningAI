@@ -377,6 +377,8 @@
     "mode": "モード",
     "comingSoon": "近日対応",
     "dark": "ダーク",
+    "light": "ライト",
+    "system": "システム",
     "background": "背景",
     "emptyValue": "空欄 = {value}",
     "readingFont": "本文フォント",

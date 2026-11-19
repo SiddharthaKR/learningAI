@@ -26,7 +26,7 @@ import { setupStage } from "../components/setup-dialog.tsx";
 describe("resolveAppearance — delta over factory", () => {
 	it("absent everything = the factory view", () => {
 		const a = resolveAppearance(undefined);
-		assert.equal(a.mode, "dark");
+		assert.equal(a.mode, "system"); // owner, 2026-11-19: System by default (follow the computer)
 		assert.equal(a.background, null);
 		assert.equal(a.fontFamily, null);
 		assert.equal(a.proseFontSize, 16);
