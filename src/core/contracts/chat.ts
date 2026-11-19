@@ -111,6 +111,26 @@ export interface SessionControlsChangedData {
 	>;
 }
 
+/** The model's line for each switch change (owner-approved wording,
+ *  2026-11-19): without it, a model that had said "I cannot search" kept
+ *  saying so after the learner turned web research on. */
+export function sessionControlsText(details: SessionControlsChangedData): string {
+	return details.changes
+		.map((change) => {
+			if (change.field === "knowledgeScope") {
+				const scope = change.to === "all" ? "shared and personal documents" : `${change.to} documents only`;
+				return `Session settings changed: knowledge search now covers ${scope}.`;
+			}
+			const [name, tool] = change.field === "webResearchEnabled"
+				? ["web research", "the research tool"]
+				: ["office knowledge", "the knowledge search tool"];
+			return change.to
+				? `Session settings changed: ${name} is now ON — ${tool} is available.`
+				: `Session settings changed: ${name} is now OFF — ${tool} is no longer available.`;
+		})
+		.join("\n");
+}
+
 
 // ─── Background-extraction usage (the money channel, extraction side) ────────
 

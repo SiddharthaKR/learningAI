@@ -41,6 +41,7 @@ import {
 	HANDOFF_TEXT,
 	planRetryText,
 	PROBE_QUESTION_NUDGE_TEXT,
+	sessionControlsText,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
@@ -155,13 +156,14 @@ export function newUserMessage(text: string, images?: { data: string; mimeType: 
 	};
 }
 
-/** Session controls are UI history only; never learner speech on the wire. */
+/** Session controls: shown to the learner, and (owner, 2026-11-19) one
+ *  line per change for the model — never learner speech on the wire. */
 export function newSessionControlsChangedMessage(details: SessionControlsChangedData): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "session-controls-changed",
-		content: "",
+		content: sessionControlsText(details),
 		display: true,
 		details,
 		timestamp: Date.parse(details.at),
@@ -674,14 +676,25 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 	const out: Message[] = [];
 	if (leading) out.push(leading);
 	if (head) out.push(head);
+	const heldNotes: Message[] = [];
 	for (let i = leading ? Math.max(start, 1) : start; i < messages.length; i++) {
 		const m = messages[i]!;
 		const role = (m as { role?: string }).role;
+		if (role !== "toolResult" && heldNotes.length > 0) out.push(...heldNotes.splice(0));
 		if (role === "custom") {
 			const marker = m as LhMarkerMessage;
 			// UI-only markers: plan blocks, controls audits, and problem
 			// dismissals (the synthesized conclude pair carries the model's face).
-			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed" || marker.customType === "session-controls-changed") continue;
+			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed") continue;
+			// Switch notes reach the model (owner, 2026-11-19); ones saved
+			// before that carry no text and stay UI-only. A note flipped while
+			// a question card was waiting would land between the tool call and
+			// its answer — providers reject that — so notes are HELD and sent
+			// right before the next non-toolResult message (or at the end).
+			if (marker.customType === "session-controls-changed") {
+				if (marker.content) heldNotes.push({ role: "user", content: [{ type: "text", text: marker.content }], timestamp: marker.timestamp });
+				continue;
+			}
 			// The ACTIVE compaction marker already rendered as the head —
 			// never twice. (Stale markers before the cut are unreachable; a
 			// marker whose cut could not resolve has no head and renders as
@@ -730,6 +743,7 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			}
 		}
 	}
+	out.push(...heldNotes);
 	return out;
 }
 
