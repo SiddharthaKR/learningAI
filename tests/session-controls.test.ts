@@ -5,6 +5,7 @@ import { syncBuiltinESMExports } from "node:module";
 import { it } from "node:test";
 import type { ChatStore } from "../src/core/ports.ts";
 import type { LhMarkerMessage, LhMessage } from "../src/core/native-messages.ts";
+import { sessionControlsText } from "../src/core/contracts/chat.ts";
 
 const { chatStore, TEST_USER_ROOT } = await import("./support/test-stores.ts");
 const { storesForUser, checkedStoresForUser } = await import("../src/server/stores.ts");
@@ -126,7 +127,8 @@ it("persists ON/OFF and both-at-once changes as one ordered neutral marker, with
       assert.equal(response.status, 200);
       const audit = markers(chatStore, chat.id).at(-1)!;
       assert.ok(audit, "a semantic settings change appends a native audit marker");
-      assert.equal(audit.content, "");
+      // Owner, 2026-11-19: the note now carries one line per change for the model.
+      assert.equal(audit.content, sessionControlsText({ at: (audit.details as { at: string }).at, changes: expected as never }));
       assert.equal(audit.display, true);
       const details = audit.details as { at: string; changes: unknown[] };
       assert.equal(new Date(details.at).toISOString(), details.at);
@@ -174,7 +176,11 @@ it("reloads the durable audit into a stable UI data part while keeping tool call
   assert.deepEqual(markers(chatStore, chat.id), [audit]);
   const view = projectView(loaded.messages).find((message) => message.id === audit.id);
   assert.deepEqual(view, { id: audit.id, role: "user", parts: [{ type: "data-session-controls-changed", id: `sc_${audit.id}`, data: audit.details }] });
-  assert.deepEqual(toLlmMessages(asAgentMessages(loaded.messages)).map((message) => message.role), ["assistant", "toolResult"]);
+  // The note reaches the model (owner, 2026-11-19) but is HELD until after the
+  // answer, so the tool call and its result stay adjacent on the wire.
+  const wire = toLlmMessages(asAgentMessages(loaded.messages));
+  assert.deepEqual(wire.map((message) => message.role), ["assistant", "toolResult", "user"]);
+  assert.match(JSON.stringify(wire[2]), /web research is now ON/);
 });
 
 it("authenticates controls/history access and keeps Alice outside Bob's owner root", async () => {

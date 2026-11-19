@@ -502,3 +502,53 @@ With `LLM_VISION=true` on .126, every picture "description" came back as *"Pleas
   - A filter picked by hand stays until you move to another session or draft.
   - Checked in the browser, all 6 steps as intended.
 - **Tests:** 2154/2154 pass.
+
+## Codex handoff — 2026-11-19
+
+### Branch workflow and committed work
+
+The owner confirmed that development belongs on `claude/pptx-image-reading` and that they will create the PR into `office`. Continue development in its existing worktree at `.claude/worktrees/admin-auth-knowledge-75b74a`. Keep fixes in separate verified commits.
+
+The following follow-up commits are pushed to `origin/claude/pptx-image-reading`.
+
+- `49a9d5af` updates four stale test expectations after the appearance change. The default is now System, and plan outlines/arrows use foreground-aware classes.
+- `42e7dbdc` ends a Chat turn after a successful research dispatch. The next model request waits for the research brief through the existing job-delivery flow. Chat's research description and acknowledgement describe this scheduling. A scripted regression test demonstrates that dispatch makes one model request, and a delivered brief permits the next request.
+- `a657014b` fixes citations when knowledge search expands a hit with passages from other slides/pages. Expanded results retain their original passages and `search_knowledge` labels each passage with its own location. Existing indexes work with this change.
+
+Local `office` was briefly fast-forwarded during this session. Its push was rejected because remote `office` contained newer commits. After the owner said they would create the PR, local `office` was restored to its starting commit `10f0c34c`. No push from this session changed remote `office`.
+
+### Verification completed
+
+The final code through `a657014b` passed all **2,162 tests**, TypeScript checking, repository lint, the Webpack production build, and the build-artifact check. The full suite required normal Windows filesystem and loopback-network access. Restricted-shell runs prevented the local HTTP vision stubs from receiving requests and produced misleading picture-reading failures.
+
+Browser checks used the existing root `.env`, which points to Ollama's OpenAI-compatible endpoint at `http://localhost:11434/v1` with model `gemma4-e4b-ctx65536`. The owner also showed the user-variable name `GEMINI_API_KEY`; Google's 26B endpoint was not exercised in this session.
+
+Temporary test servers ran the development worktree on port 3001 with Webpack and its production build on port 3002. Both used isolated data under `dist/verification/browser-data` and were stopped after testing. Test launchers, logs, and sample decks are ignored under `dist/verification`.
+
+Browser results covered the following flows.
+
+- Appearance offers System, Light, and Dark. Explicit Light and Dark settings applied, survived reload, and System was restored on the test account. Actual OS preference changes were not triggered.
+- The populated Knowledge page retained its light palette after reload, including a saved PowerPoint row. A model-generated Mermaid diagram visibly redrew with readable labels, edges, and arrows in both Light and Dark.
+- A new Chat answered a calculation, remembered a code word in a follow-up, and retained the conversation after reload. A new Chat also worked through the production server.
+- A PowerPoint saved to Personal Knowledge reached Ready. Teaching used its contents, accepted probe answers, progressed into a generated plan and lesson, and opened an interactive comprehension quiz.
+- Practice generated a question from the same deck, graded the submitted answer as solved, and generated another problem when explicitly asked to continue. The Next problem action first returned closing text after a request for one exercise; the current practice doctrine explicitly permits wrapping up a completed arc.
+- Live Knowledge retrieval reproduced a real citation error: the sentence on slide 2 was attributed to slide 1 because neighboring passages shared the best hit's label. After `a657014b`, a fresh Chat quoted the sentence and correctly cited slide 2. No JavaScript errors were captured during that retest.
+
+Cold development-route compilation caused visible delays. Warm Chat follow-ups were much faster. One model-generated teaching analogy about a short ruler was inaccurate. The older Chat containing the incorrect slide citation also repeated that old answer without making another search call when asked to search again; the fresh-chat retrieval check verified the corrected tool output.
+
+### Owner's latest report — investigate before changing behavior
+
+The owner subsequently supplied a screenshot from their **Gemma 26B server** showing a neural-networks lesson. They asked for an explanation before changes. No code changes were made in response to this report.
+
+The screenshot shows a previously graded MCQ, subsequent questions written as ordinary text, the literal word `thought` in the transcript, and dashes in the token/context and cost summary. The actual application URL, deployed revision, proxy configuration, and raw completion response still need to be confirmed. The owner identified the model as their Gemma 26B server, distinct from the local Ollama verification above.
+
+Relevant implementation points for the next investigation follow.
+
+- `probeNudgeOwed` in `src/core/native-messages.ts` deliberately accepts a non-empty plain-text response. Commit `1bb1c6d5` added this behavior to avoid repeating a question after the model wrote it as text. It does not require that a question be posed through the interactive tool. The model can therefore bypass the MCQ/free-text question card and its confidence/grading controls.
+- The owner remembers the earlier interactive MCQ flow. Confirm their desired behavior before enforcing interactive cards or changing the reminder. A free-response question posed through `ask_user_question` can still use the card; a plain-text question bypasses that mechanism.
+- The thinking panel depends on structured reasoning events. `src/agent/models.ts` declares reasoning support from `LLM_REASONING`. The bundled Gemma proxy defaults to thinking off unless `THINKING=1` and translates recognized thought markers into `reasoning_content`. The literal `thought` in the screenshot is a clue to inspect response parsing, not a confirmed diagnosis.
+- The first stats dash represents unavailable context/token information; the second represents unavailable cost. Check `components/stats-bar.tsx`, persisted `turns[].steps`, provider usage events, and the proxy's `stream_options.include_usage` handling. Token reporting has not been diagnosed on the owner's deployed endpoint.
+- The research-wait fix has deterministic regression coverage. End-to-end web research timing on the owner's Gemma 26B server still needs verification.
+- Whole-section retrieval through `open_section` still exposes a single leading citation with merged section text. If a multi-page section produces misleading page-level citations, investigate its location metadata as well as the already-fixed neighbor-search formatting.
+
+The owner requested this handoff and a commit of the completed work. They retain control of PR creation and main-branch integration.

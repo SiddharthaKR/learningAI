@@ -66,7 +66,7 @@ export interface KnowledgeToolContext {
 	openSection: (ownerId: string, fileName: string, section: string[]) => Promise<KnowledgeSectionResponse | { ambiguous: string[] } | null>;
 }
 
-export function formatCitation(result: KnowledgeResult): string {
+export function formatCitation(result: Pick<KnowledgeResult, "citation" | "section">): string {
 	const c = result.citation;
 	const path = result.section?.length ? result.section.join(" › ") : undefined;
 	switch (c.format) {
@@ -117,9 +117,11 @@ export function createKnowledgeTool(ctx: KnowledgeToolContext): Record<string, A
 					return "Knowledge retrieval succeeded but the session could not be updated. Please try again.";
 				}
 				// Format results with inline citations.
-				const formatted = results.map(
-					(r, i) => `${i + 1}. ${formatCitation(r)}\n${r.text}`,
-				);
+				const formatted = results.map((result, index) => {
+					const passages = result.passages ?? [result];
+					const text = passages.map((passage) => `${formatCitation(passage)}\n${passage.text}`).join("\n\n");
+					return `${index + 1}. ${text}`;
+				});
 				return formatted.join("\n\n---\n\n");
 			}),
 		},
