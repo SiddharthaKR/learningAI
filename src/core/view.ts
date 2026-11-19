@@ -394,6 +394,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "probe-nudge": {
+			// The probe-nudge (owner, 2026-11-19): scaffolding like the
+			// plan-retry — a quiet system line, never a user bubble.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-probe-nudge", id: `pn_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "subagent-steer": {
 			const meta = marker.details as SubagentResultMeta;
 			const artifact = marker.details as {

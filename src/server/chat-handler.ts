@@ -50,7 +50,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, planRetryOwed } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, planRetryOwed, probeNudgeOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
@@ -601,6 +601,14 @@ export async function handleChatInput(
 					if (owed !== false) {
 						void deliverJobResult(newPlanRetryMessage(chatId, owed)).catch((err: unknown) => {
 							console.error(`[chat ${chatId}] plan-retry nudge failed:`, err);
+						});
+					}
+					// THE PROBE-NUDGE (owner, 2026-11-19): a probing turn that
+					// ended with no tool call left the learner nothing to answer —
+					// remind the model once (per learner input) to ask.
+					if (settled && probeNudgeOwed(settled.messages)) {
+						void deliverJobResult(newProbeNudgeMessage(chatId, settled.messages.length)).catch((err: unknown) => {
+							console.error(`[chat ${chatId}] probe nudge failed:`, err);
 						});
 					}
 				}
