@@ -21,24 +21,35 @@ import { quoteMermaidLabels } from "@/components/mermaid-heal";
  *  never render larger than the session's own text). */
 export const MERMAID_FONT_SIZE = 16;
 
-// The app is dark-only (html.dark in the root layout) — diagrams render in
-// mermaid's dark theme. (Moved from ai-elements/message.tsx when the
-// renderer became app-owned; the old `mermaid` prop wiring is retired.)
-export const mermaidTheme: MermaidConfig = {
-	fontFamily: "ui-sans-serif, system-ui, sans-serif",
-	fontSize: MERMAID_FONT_SIZE,
-	securityLevel: "strict",
-	theme: "dark",
-};
+/** The diagram config for the page's mode (owner, 2026-11-19: light mode
+ *  exists now): mermaid's dark theme on a dark page, its default (light)
+ *  theme on a light one. */
+export function mermaidConfig(dark: boolean): MermaidConfig {
+	return {
+		fontFamily: "ui-sans-serif, system-ui, sans-serif",
+		fontSize: MERMAID_FONT_SIZE,
+		securityLevel: "strict",
+		theme: dark ? "dark" : "default",
+	};
+}
+
+/** The dark config — kept for callers that predate light mode. */
+export const mermaidTheme: MermaidConfig = mermaidConfig(true);
+
+/** Is the page dark right now? (<html class="dark">, set by the pre-paint
+ *  script and AppearanceProvider.) Dark when there is no document (SSR). */
+export function pageIsDark(): boolean {
+	return typeof document === "undefined" || document.documentElement.classList.contains("dark");
+}
 
 const plugin = createMermaidPlugin();
 
 /** Render one chart source to an svg string. The id is unique per call —
  *  mermaid caches rendered ids, and a repeated id across charts/renders
  *  returns the stale svg (the bug streamdown's own id minting avoids). */
-export async function renderMermaid(chart: string): Promise<string> {
+export async function renderMermaid(chart: string, dark: boolean = pageIsDark()): Promise<string> {
 	try {
-		return await renderOnce(chart);
+		return await renderOnce(chart, dark);
 	} catch (error) {
 		// One healing retry (owner, 2026-11-13): quote risky node labels. A
 		// chart that parsed is never touched; if healing changes nothing or
@@ -46,15 +57,15 @@ export async function renderMermaid(chart: string): Promise<string> {
 		const healed = quoteMermaidLabels(chart);
 		if (healed === chart) throw error;
 		try {
-			return await renderOnce(healed);
+			return await renderOnce(healed, dark);
 		} catch {
 			throw error;
 		}
 	}
 }
 
-async function renderOnce(chart: string): Promise<string> {
+async function renderOnce(chart: string, dark: boolean): Promise<string> {
 	const id = `lh-mermaid-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
-	const { svg } = await plugin.getMermaid(mermaidTheme).render(id, chart);
+	const { svg } = await plugin.getMermaid(mermaidConfig(dark)).render(id, chart);
 	return svg;
 }

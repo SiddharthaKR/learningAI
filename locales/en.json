@@ -377,6 +377,8 @@
     "mode": "Mode",
     "comingSoon": "Coming soon",
     "dark": "Dark",
+    "light": "Light",
+    "system": "System",
     "background": "Background",
     "emptyValue": "Empty = {value}",
     "readingFont": "Reading font",

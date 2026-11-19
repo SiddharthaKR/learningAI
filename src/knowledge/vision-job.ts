@@ -117,6 +117,25 @@ export async function describeImagesReport(
 	return { blocks, described: blocks.length, failed: [...failed.values()].sort((a, b) => a.number - b.number), skipped: unique.length - selected.length };
 }
 
+/**
+ * Describe ONE image attached in a chat (owner, 2026-11-19): the same call
+ * and prompt as document pictures. Null on failure or an empty answer — the
+ * caller tells the model the picture could not be read; never throws.
+ */
+export async function describeOneImage(
+	imageBase64: string,
+	mimeType: string,
+	config: VisionConfig,
+	callFn?: VisionCallFn,
+): Promise<string | null> {
+	try {
+		const text = (await (callFn ? callFn(imageBase64, mimeType, DESCRIBE_PROMPT) : defaultVisionCall(imageBase64, mimeType, DESCRIBE_PROMPT, config))).trim();
+		return text || null;
+	} catch {
+		return null;
+	}
+}
+
 const DESCRIBE_PROMPT = "Describe this image in detail for a text search index. Include all visible text, diagrams, charts, labels, and key visual elements. Be concise but thorough.";
 
 /** Per-picture timeout: the large server model on a busy GPU needs more than a laptop. */

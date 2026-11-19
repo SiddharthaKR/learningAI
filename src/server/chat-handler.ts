@@ -39,6 +39,7 @@ import { createAccountStore } from "./accounts.ts";
 import { PATHS } from "../../config.ts";
 import { fixedOfficeModelSpec } from "./office-config.ts";
 import { answerKeyCheck } from "./answer-key-check.ts";
+import { describeAttachedImages } from "./chat-image-vision.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
 	extractionEnabled,
@@ -61,7 +62,7 @@ import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./com
 import { catalogContextLimits } from "./model-catalog.ts";
 import { emit } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
-import { asAgentMessages } from "../core/native-messages.ts";
+import { asAgentMessages, type LhMessage } from "../core/native-messages.ts";
 import {
 	ChatInputError,
 	inputAppends,
@@ -326,6 +327,15 @@ export async function handleChatInput(
 	if (!beginTurn(chatId)) {
 		console.info(`[chat ${chatId}] turn already in flight — request rejected`);
 		return Response.json({ error: "A turn is already running for this session" }, { status: 409 });
+	}
+
+	// CHAT IMAGES THROUGH THE VISION ROUTE (owner, 2026-11-19): with
+	// LLM_VISION=false and VISION_* set, attached images are described once
+	// by the vision model (LM Studio directly — the Gemma proxy cannot carry
+	// images) and stored on the message; the chat model reads the
+	// descriptions. Never throws (an unreadable picture is recorded as such).
+	if (input.type === "text" && input.images?.length) {
+		appends = await describeAttachedImages(appends as LhMessage[]);
 	}
 
 	// Write-ahead persistence: the input's native appends go on disk BEFORE

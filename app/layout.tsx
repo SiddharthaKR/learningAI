@@ -27,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	return (
 		<html lang={language} className={inter.variable} suppressHydrationWarning>
 			<head>
-				<script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark')}catch(e){}}())` }} />
+				<script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.classList.add('dark');else if(t==='light')document.documentElement.classList.add('light')}catch(e){}}())` }} />
 			</head>
 			<body className="min-h-dvh antialiased">
 			<I18nProvider language={language}>
