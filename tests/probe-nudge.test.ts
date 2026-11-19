@@ -12,12 +12,20 @@ import { projectView } from "../src/core/view.ts";
 
 const CHAT = "chat_x";
 const user = { id: "u1", role: "user", content: "teach me black holes", timestamp: 1 };
-const textOnly = (id = "a1", stopReason = "stop") => ({ id, role: "assistant", content: [{ type: "text", text: "Let me plan the strands…" }], stopReason, timestamp: 2 });
+// A turn that showed the learner nothing: only thinking (the measured failure).
+const textOnly = (id = "a1", stopReason = "stop") => ({ id, role: "assistant", content: [{ type: "thinking", thinking: "Let me plan the strands…" }, { type: "text", text: "  " }], stopReason, timestamp: 2 });
 const withCall = (name: string) => ({ id: "a2", role: "assistant", content: [{ type: "toolCall", id: "c1", name, arguments: {} }], stopReason: "toolUse", timestamp: 2 });
 
 describe("probeNudgeOwed", () => {
 	it("is owed when a probing turn ended with only text", () => {
 		assert.equal(probeNudgeOwed([user, textOnly()] as never), true);
+	});
+
+	it("is not owed when the turn wrote its question as text (owner report, 2026-11-19)", () => {
+		// The 26B asked "Which of these sounds most like your goal?" as a numbered
+		// list; the reminder fired, and the model apologised and asked again.
+		const written = { id: "a1", role: "assistant", content: [{ type: "text", text: "Which of these sounds most like your goal?\n1. Overview\n2. Ethics" }], stopReason: "stop", timestamp: 2 };
+		assert.equal(probeNudgeOwed([user, written] as never), false);
 	});
 
 	it("is not owed when the turn asked something or called any tool (e.g. research)", () => {

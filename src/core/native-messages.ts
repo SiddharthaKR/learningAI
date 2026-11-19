@@ -280,6 +280,10 @@ export function probeNudgeOwed(messages: readonly LhMessage[]): boolean {
 	if (!last || (last as { role?: string }).role !== "assistant") return false;
 	if (last.stopReason === "error" || last.stopReason === "aborted") return false;
 	if (last.content.some((block) => block.type === "toolCall")) return false;
+	// Only a turn that showed the learner NOTHING (owner report, 2026-11-19):
+	// a question written as text can be answered by typing; nudging it made
+	// the model apologise and ask the same question again.
+	if (last.content.some((block) => block.type === "text" && block.text.trim().length > 0)) return false;
 	for (let i = messages.length - 2; i >= 0; i--) {
 		const m = messages[i] as { role?: string; customType?: string; toolName?: string };
 		if (m.role === "custom" && m.customType === "probe-nudge") return false;
