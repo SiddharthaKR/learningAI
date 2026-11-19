@@ -16,6 +16,7 @@ import type { JobStore } from "../../core/ports.ts";
 
 /** What the job tools need at execute time (injected by the composition root). */
 export interface JobToolContext {
+	waitForResearch?: boolean;
 	chatId: string;
 	/** Creates the job record (deduped by toolCallId). */
 	jobStore: JobStore;
@@ -139,10 +140,12 @@ export function jobTools(ctx: JobToolContext): Record<string, AgentTool<any>> {
 			research: {
 				name: "research",
 				label: "research",
-				description: RESEARCH_DESCRIPTION,
+				description: ctx.waitForResearch
+					? "Research current facts or uncertain specifics. Dispatching ends this turn. Answer from the returned research brief when it arrives."
+					: RESEARCH_DESCRIPTION,
 				parameters: researchInputSchema,
 				execute: serverExecute("research", researchInputSchema, (input, { toolCallId }) =>
-					dispatch(ctx, "research", toolCallId, RESEARCH_ACK, input),
+					dispatch(ctx, "research", toolCallId, ctx.waitForResearch ? "Research is running. This turn ends here and resumes when the brief arrives." : RESEARCH_ACK, input),
 				),
 			},
 		}),
