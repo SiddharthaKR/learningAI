@@ -17,7 +17,7 @@ npm ci && npm run build && npm run build:source
 cp .env.example .env && chmod 600 .env
 openssl rand -hex 32   # paste as SESSION_SECRET
 ```
-Fill the placeholders in `.env`: `LLM_MODEL`, `LLM_CONTEXT_WINDOW`, `LLM_MAX_TOKENS` (smaller than the window), `LLM_VISION`, `LLM_REASONING`, and `VISION_BASE_URL`/`VISION_MODEL` if used. Set `HTTPS_PROXY` (URL-encode special characters) only on the host. Optionally set `KNOWLEDGE_SHARED_DIR` (directory of shared documents) and `KNOWLEDGE_INDEX_FILE` (output index path), then run `npm run index:shared`. Left empty, shared knowledge is off and only personal uploads work.
+Fill the placeholders in `.env`: `LLM_MODEL`, `LLM_CONTEXT_WINDOW`, `LLM_MAX_TOKENS` (smaller than the window), `LLM_VISION`, `LLM_REASONING`, and `VISION_BASE_URL`/`VISION_MODEL` if used. `LLM_CONTEXT_WINDOW` must match the model's real context (for Ollama, its `num_ctx`) and should be at least 32768: compaction starts at the window minus a 16,384-token reserve, so a 16k window compacts before every turn. Set `HTTPS_PROXY` (URL-encode special characters) only on the host. Optionally set `KNOWLEDGE_SHARED_DIR` (directory of shared documents) and `KNOWLEDGE_INDEX_FILE` (output index path), then run `npm run index:shared`. Left empty, shared knowledge is off and only personal uploads work.
 
 ## 4. Data directory
 `data/` lives in the app folder and is created by the service user:
