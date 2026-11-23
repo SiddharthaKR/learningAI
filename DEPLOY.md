@@ -5,6 +5,7 @@ Host-specific values are placeholders (`<USER>`, model IDs, proxy URL). Never co
 ## 1. Prerequisites
 - Node.js 20+ and npm, git, Docker (for SearXNG).
 - The Gemma 4 proxy must already be running at `http://127.0.0.1:8088/v1` (managed separately on this host).
+  Run the copy in `deploy/gemma4-proxy/gemma4_proxy.py`: it honors each request's `chat_template_kwargs.enable_thinking`, which LearnHarness sends from each user's Reasoning preference (Preferences page, default on). The older proxy ignores it and uses only its `THINKING` variable (default off), so the switch has no effect until this copy replaces it. `THINKING` remains the default for requests that do not send the field. Start it the same way: `UPSTREAM=http://172.20.1.126:1234 TEMPLATE=./gemma4_chat_template.jinja uvicorn gemma4_proxy:app --host 127.0.0.1 --port 8088`.
 
 ## 2. Get the code
 ```bash
