@@ -6,7 +6,8 @@ import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCallback);
 export type Language = "en" | "ja";
-export interface Account { id: string; username: string; uiLanguage: Language; teachingLanguage: Language; background?: string; createdAt: string }
+/** reasoning: the tutor's model reasoning preference; absent means on (only false is stored). */
+export interface Account { id: string; username: string; uiLanguage: Language; teachingLanguage: Language; background?: string; reasoning?: boolean; createdAt: string }
 interface StoredAccount extends Account { passwordSalt: string; passwordHash: string }
 interface AccountFile { version: 1; accounts: StoredAccount[] }
 
@@ -88,13 +89,14 @@ export function createAccountStore(root: string) {
       const found = (await read()).accounts.find((item) => item.username === username.trim().toLowerCase());
       return found ? publicAccount(found) : null;
     },
-    async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string }): Promise<Account> {
+    async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string; reasoning?: boolean }): Promise<Account> {
       for (const language of [changes.uiLanguage, changes.teachingLanguage]) {
         if (language !== undefined && language !== "en" && language !== "ja") throw new Error("Unsupported language");
       }
       if (changes.background !== undefined && (typeof changes.background !== "string" || changes.background.length > 2000)) {
         throw new Error("Background must be at most 2000 characters");
       }
+      if (changes.reasoning !== undefined && typeof changes.reasoning !== "boolean") throw new Error("Reasoning must be on or off");
       return locked(async () => {
         const data = await read();
         const account = data.accounts.find((item) => item.id === id);
@@ -102,6 +104,8 @@ export function createAccountStore(root: string) {
         if (changes.uiLanguage !== undefined) account.uiLanguage = changes.uiLanguage;
         if (changes.teachingLanguage !== undefined) account.teachingLanguage = changes.teachingLanguage;
         if (changes.background !== undefined) account.background = changes.background.trim() || undefined;
+        if (changes.reasoning === true) delete account.reasoning;
+        else if (changes.reasoning === false) account.reasoning = false;
         await write(data);
         return publicAccount(account);
       });

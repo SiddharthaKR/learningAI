@@ -52,6 +52,27 @@ export interface PiEngine {
 
 export type { ThinkingLevel };
 
+/** The office reasoning switch on the wire (owner, 2026-11-23). pi-ai
+ * sends reasoning_effort "medium" when thinking is on and nothing when
+ * off; Gemma servers differ in what they obey, so both signals ride
+ * every request. Ollama obeys only reasoning_effort "none" to switch
+ * thinking off; the Gemma 4 proxy (deploy/gemma4-proxy) reads
+ * chat_template_kwargs.enable_thinking. Pure: returns a new payload. */
+export function withOfficeThinking(payload: unknown): unknown {
+	if (typeof payload !== "object" || payload === null) return payload;
+	const params = payload as Record<string, unknown>;
+	const effort = params.reasoning_effort;
+	const on = typeof effort === "string" && effort !== "none";
+	const kwargs = typeof params.chat_template_kwargs === "object" && params.chat_template_kwargs !== null
+		? params.chat_template_kwargs as Record<string, unknown>
+		: {};
+	return {
+		...params,
+		...(on ? {} : { reasoning_effort: "none" }),
+		chat_template_kwargs: { ...kwargs, enable_thinking: on },
+	};
+}
+
 let collection: ReturnType<typeof createModels> | undefined;
 let limitLlmStream: ReturnType<typeof createLlmLimiter> | undefined;
 
@@ -60,8 +81,16 @@ function officeStreams(): ProviderStreams {
 	const optionsFor = <T extends StreamOptions | SimpleStreamOptions>(options: T | undefined): T => {
 		const config = officeConfig();
 		const upstreamFetch = options?.fetch ?? globalThis.fetch;
+		const upstreamPayload = options?.onPayload;
 		return {
 			...options,
+			// Reasoning-capable office models carry both thinking signals.
+			...(config.llmReasoning ? {
+				onPayload: async (payload: unknown, model: Model<Api>) => {
+					const next = upstreamPayload ? await upstreamPayload(payload, model) : undefined;
+					return withOfficeThinking(next ?? payload);
+				},
+			} : {}),
 			apiKey: config.llmApiKey ?? "office-no-key-placeholder",
 			...(config.llmApiKey ? {} : {
 				fetch: (input: RequestInfo | URL, init?: RequestInit) => {
@@ -95,8 +124,11 @@ export function piModels() {
 			input: config.llmVision ? ["text", "image"] : ["text"],
 			reasoning: config.llmReasoning,
 			...(config.llmReasoning ? {
-				thinkingLevelMap: { off: null, medium: "medium" },
-				compat: { chatTemplateKwargs: { think: { $var: "thinking.enabled", omitWhenOff: true } } },
+				// Exactly two levels: off (the Preferences switch) and medium.
+				// null marks a level unsupported in pi-ai, so off stays unset —
+				// a null off clamped "off" up to "minimal" and thinking ran on.
+				// Off/on reach the wire through withOfficeThinking (onPayload).
+				thinkingLevelMap: { minimal: null, low: null, medium: "medium", high: null },
 			} : {}),
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: config.llmContextWindow,

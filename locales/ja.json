@@ -106,7 +106,9 @@
     "backgroundPlaceholder": "例：FPGA/DSP エンジニア。固定小数点とリアルタイム制御が得意。量子光学は初学者。",
     "save": "保存",
     "saved": "保存しました",
-    "saveError": "設定を保存できませんでした"
+    "saveError": "設定を保存できませんでした",
+    "reasoning": "推論",
+    "reasoningHint": "遅くなりますが、より丁寧に回答します。次の返答から講師の返答に適用されます。"
   },
   "newSession": {
     "title": "新しいセッション",

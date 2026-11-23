@@ -106,7 +106,9 @@
     "backgroundPlaceholder": "For example: FPGA/DSP engineer, strong in fixed-point and real-time control, new to quantum optics.",
     "save": "Save",
     "saved": "Saved",
-    "saveError": "Could not save preferences"
+    "saveError": "Could not save preferences",
+    "reasoning": "Reasoning",
+    "reasoningHint": "Slower, more careful answers. Applies to tutor replies from the next turn."
   },
   "newSession": {
     "title": "New session",

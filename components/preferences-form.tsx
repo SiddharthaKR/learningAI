@@ -5,17 +5,18 @@ import { SidebarToggle } from "@/components/sidebar";
 import { catalogFor, type UiLanguage } from "@/src/core";
 
 type Language = UiLanguage;
-export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; teachingLanguage: Language; background: string } }) {
+export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; teachingLanguage: Language; background: string; reasoning: boolean } }) {
   const [uiLanguage, setUiLanguage] = useState(initial.uiLanguage);
   const [teachingLanguage, setTeachingLanguage] = useState(initial.teachingLanguage);
   const [background, setBackground] = useState(initial.background);
+  const [reasoning, setReasoning] = useState(initial.reasoning);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const copy = catalogFor(uiLanguage);
   async function save() {
     setSaving(true); setMessage("");
     try {
-      const response = await fetch("/api/preferences", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ uiLanguage, teachingLanguage, background }) });
+      const response = await fetch("/api/preferences", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ uiLanguage, teachingLanguage, background, reasoning }) });
       if (!response.ok) throw new Error((await response.json()).error ?? copy.preferences.saveError);
       setMessage(copy.preferences.saved);
       document.documentElement.lang = uiLanguage;
@@ -39,6 +40,10 @@ export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; 
     </label>
     <label className="flex flex-col gap-1">{copy.preferences.background}
       <textarea value={background} onChange={(event) => setBackground(event.target.value)} maxLength={2000} rows={4} className="rounded border bg-background p-2" placeholder={copy.preferences.backgroundPlaceholder} />
+    </label>
+    <label className="flex items-start gap-2">
+      <input type="checkbox" checked={reasoning} onChange={(event) => setReasoning(event.target.checked)} className="mt-1" />
+      <span className="flex flex-col">{copy.preferences.reasoning}<span className="text-sm text-muted-foreground">{copy.preferences.reasoningHint}</span></span>
     </label>
     <button type="button" onClick={() => void save()} disabled={saving} className="self-start rounded bg-accent px-4 py-2 disabled:opacity-50">{copy.preferences.save}</button>
     {message && <p role="status">{message}</p>}

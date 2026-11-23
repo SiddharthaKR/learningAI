@@ -401,8 +401,14 @@ export async function handleChatInput(
 	// BYOK (owner, 2026-09-22): the conversation chain was resolved by the
 	// turn gate above (chat.model override → strong slot → refused) — the
 	// engine build is pure from here; thinking levels clamp natively.
-	// (Built once above the compaction gate; reused verbatim.)
-	const engine = conversationEngine;
+	// (Built once above the compaction gate; reused for compaction.)
+	// The learner's Reasoning preference (Preferences, default on) governs
+	// tutor turns only: off rebuilds this turn's engine at thinking "off".
+	// Compaction, extraction and job engines keep the configured default.
+	const account = await createAccountStore(PATHS.data).byId(currentUserId());
+	const engine = account?.reasoning === false
+		? piEngineForSpec({ ...conversation, thinkingLevel: "off" })
+		: conversationEngine;
 	// Provider-qualified stamp (model slots wave): matches the price table's
 	// provider:id keys.
 	const modelId = `${engine.model.provider}:${engine.model.id}`;
@@ -418,7 +424,7 @@ export async function handleChatInput(
 	const agentOpts: AgentBuildOptions = {
 		timeZone,
 		teachingLanguage: record.teachingLanguage ?? "en",
-		learnerBackground: (await createAccountStore(PATHS.data).byId(currentUserId()))?.background,
+		learnerBackground: account?.background,
 		engine,
 		messages: asAgentMessages(agentMessages),
 		onUsage: collectUsage,
