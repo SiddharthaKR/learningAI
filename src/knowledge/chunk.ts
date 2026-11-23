@@ -31,8 +31,23 @@ export function sectionPrefix(section: string[] | undefined): string {
 	return section?.length ? `§ ${section.join(" › ")}\n` : "";
 }
 
-/** Split a table at row boundaries only; a single over-long row is hard-split as a last resort. */
+/**
+ * Split a table at row boundaries, repeating the header row (and a Markdown
+ * separator row under it) at the top of every piece (owner, 2026-11-24), so
+ * each piece keeps its column meaning. A header longer than half the budget is
+ * not repeated.
+ */
 function splitTable(text: string, budget: number): string[] {
+	const rows = text.split("\n");
+	const headerRows = rows.length > 2 && /^\s*\|?\s*:?-{3,}/u.test(rows[1]!) ? 2 : 1;
+	const header = rows.slice(0, headerRows).join("\n");
+	const headerLength = Array.from(header).length;
+	if (rows.length <= headerRows || headerLength * 2 > budget) return splitRows(rows, budget);
+	return splitRows(rows.slice(headerRows), budget - headerLength - 1).map((piece) => `${header}\n${piece}`);
+}
+
+/** Split rows at row boundaries only; a single over-long row is hard-split as a last resort. */
+function splitRows(rows: string[], budget: number): string[] {
 	const pieces: string[] = [];
 	let current: string[] = [];
 	let currentLength = 0;
@@ -41,7 +56,7 @@ function splitTable(text: string, budget: number): string[] {
 		current = [];
 		currentLength = 0;
 	};
-	for (const row of text.split("\n")) {
+	for (const row of rows) {
 		const rowPoints = Array.from(row);
 		const rowLength = rowPoints.length;
 		if (rowLength > budget) {
