@@ -22,7 +22,7 @@ import { before, describe, it } from "node:test";
 process.env.LH_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "lh-pos-commit-"));
 process.env.LH_TEST_USER_ID ??= "test_commit_positions";
 
-let commitPositions: (input: unknown) => Record<string, { x: number; y: number }>;
+let commitPositions: (input: unknown) => Promise<Record<string, { x: number; y: number }>>;
 let readPositions: () => Record<string, { x: number; y: number }>;
 let appendNode: (node: unknown) => void;
 let appendChain: (assertion: unknown) => void;
@@ -58,8 +58,8 @@ before(async () => {
 });
 
 describe("commitPositions (the arg_ fix)", () => {
-	it("persists arg_ implication ids alongside propositions — the canvas's whole world", () => {
-		const persisted = commitPositions({
+	it("persists arg_ implication ids alongside propositions — the canvas's whole world", async () => {
+		const persisted = await commitPositions({
 			n_a: { x: 10, y: 20 },
 			n_b: { x: 30, y: 40 },
 			n_c: { x: 50, y: 60 },
@@ -71,8 +71,8 @@ describe("commitPositions (the arg_ fix)", () => {
 		assert.ok(!("garbage_id" in readPositions()), "unknown ids still discarded");
 	});
 
-	it("a payload covering the whole view runs NO settle — the file equals the payload exactly", () => {
-		commitPositions({
+	it("a payload covering the whole view runs NO settle — the file equals the payload exactly", async () => {
+		await commitPositions({
 			n_a: { x: 100, y: 200 },
 			n_b: { x: 300, y: 400 },
 			n_c: { x: 500, y: 600 },
@@ -86,9 +86,9 @@ describe("commitPositions (the arg_ fix)", () => {
 		}, "no settle recomputation — the client's rest state is the ledger");
 	});
 
-	it("a payload missing a view node (a merge landed mid-drag) triggers the absorbing settle", () => {
+	it("a payload missing a view node (a merge landed mid-drag) triggers the absorbing settle", async () => {
 		// The client never knew arg_chain1 (it merged after the drag began).
-		commitPositions({
+		await commitPositions({
 			n_a: { x: 1, y: 2 },
 			n_b: { x: 3, y: 4 },
 			n_c: { x: 5, y: 6 },
@@ -99,8 +99,8 @@ describe("commitPositions (the arg_ fix)", () => {
 		assert.ok(Math.abs(after.n_a!.x - 1) < 50, `anchor n_a near its committed rest (got ${after.n_a!.x})`);
 	});
 
-	it("garbage still sanitizes: non-finite drops, absurd clamps, nothing throws", () => {
-		const persisted = commitPositions({
+	it("garbage still sanitizes: non-finite drops, absurd clamps, nothing throws", async () => {
+		const persisted = await commitPositions({
 			n_a: { x: Number.NaN, y: 1 },
 			n_b: { x: 5, y: Number.POSITIVE_INFINITY },
 			n_c: { x: 1e9, y: 0 },

@@ -20,7 +20,7 @@
  */
 import type { Position } from "../core/contracts.ts";
 import { deriveView, getGraph } from "../core/graph.ts";
-import { settleGraphLayout } from "../core/layout-settle.ts";
+import { settleGraphLayoutHoldingLedger, withLayoutLedger } from "../core/layout-runner.ts";
 import { stores } from "./stores.ts";
 
 /** Max |x| or |y| accepted — NaN/Infinity clamp here, absurd too. */
@@ -31,7 +31,13 @@ const MAX_COORD = 1e6;
  * sanitized positions actually persisted (empty object = nothing written,
  * e.g. a body with no known ids — the caller reports but never fails).
  */
-export function commitPositions(input: unknown): Record<string, Position> {
+export function commitPositions(input: unknown): Promise<Record<string, Position>> {
+	// Serialized with every settle (owner, 2026-11-24): an off-thread settle in
+	// flight must never overwrite this drag, nor this write interleave with it.
+	return withLayoutLedger(() => commitPositionsHoldingLedger(input));
+}
+
+async function commitPositionsHoldingLedger(input: unknown): Promise<Record<string, Position>> {
 	if (typeof input !== "object" || input === null) return {};
 	const raw = input as Record<string, unknown>;
 
@@ -64,7 +70,7 @@ export function commitPositions(input: unknown): Record<string, Position> {
 	// comparison broke once args counted as persistable).
 	for (const id of known) {
 		if (!(id in positions)) {
-			settleGraphLayout(stores.graphStore);
+			await settleGraphLayoutHoldingLedger(stores.graphStore);
 			break;
 		}
 	}
