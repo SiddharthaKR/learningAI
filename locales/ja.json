@@ -150,7 +150,9 @@
     "askOrNext": "質問を入力するか、Enterキーで次の問題へ進みます。",
     "contextCompacted": "履歴を整理しました",
     "historyCompacted": "履歴を整理済み",
-    "compactionTokenCount": "約{count}千トークン"
+    "compactionTokenCount": "約{count}千トークン",
+    "somethingWentWrong": "エラーが発生しました: {message}",
+    "retry": "再試行"
   },
   "composer": {
     "nextProblem": "次の問題",

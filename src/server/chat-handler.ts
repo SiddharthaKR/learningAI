@@ -65,6 +65,7 @@ import {
 	ChatInputError,
 	inputAppends,
 	parseChatInput,
+	retryDrops,
 	type TurnInput,
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
@@ -223,6 +224,17 @@ export async function handleChatInput(
 		return Response.json({ error: "Unknown chat" }, { status: 404 });
 	}
 
+	// Refuse an ineligible Retry before compaction or any turn/write
+	// effects. Revalidated after the awaited compaction gate below.
+	if (input.type === "retry") {
+		try {
+			retryDrops(record.messages);
+		} catch (err) {
+			if (err instanceof ChatInputError) return Response.json({ error: err.message }, { status: 400 });
+			throw err;
+		}
+	}
+
 	// THE UNIVERSAL TURN GATE (BYOK, owner, 2026-09-22): a turn needs the
 	// CONVERSATION chain — the chat's own model override over the strong
 	// slot — and there is no factory floor; when both are empty the turn
@@ -281,6 +293,18 @@ export async function handleChatInput(
 	);
 	const compactedRecord = stores.chatStore.getChat(chatId);
 	if (compactedRecord) record = compactedRecord;
+	// Recompute Retry eligibility on current truth, still before beginTurn.
+	// A compaction marker or another writer may have landed during awaits.
+	// These omissions affect ONLY the agent context, never the saved record.
+	let retryOmissions = new Set<string>();
+	if (input.type === "retry") {
+		try {
+			retryOmissions = retryDrops(record.messages);
+		} catch (err) {
+			if (err instanceof ChatInputError) return Response.json({ error: err.message }, { status: 400 });
+			throw err;
+		}
+	}
 
 	// The input's native appends (pure; the honest 400 for an answer with no
 	// pending question call). Computed BEFORE beginTurn so a refused input
@@ -334,6 +358,11 @@ export async function handleChatInput(
 	// ride this same write-ahead - the pump de-queued them at fire, so this
 	// is the ONLY copy ever appended.)
 	const merged = [...record.messages, ...appends];
+	// Retry keeps every saved attempt. Pi needs a non-assistant tail to
+	// start continue(), so its temporary history omits the trailing
+	// failures only. Settlement counts that SAME prefix, or the retained
+	// failures would make persistTurn skip genuinely new output.
+	const agentMessages = input.type === "retry" ? merged.filter((m) => !retryOmissions.has(m.id)) : merged;
 	try {
 		stores.chatStore.saveMessages(chatId, merged);
 		// Dock fix (owner ruling 2026-09-26): persisted markers are visible
@@ -368,7 +397,7 @@ export async function handleChatInput(
 	// the session is still probing: build the PROBER (quiz/ask + probe_done).
 	// Both share this whole composition (write-ahead persist, liveness,
 	// steers, usage, extraction) — only the agent differs.
-	const teaching = hasProbeDone(merged);
+	const teaching = hasProbeDone(agentMessages);
 	// BYOK (owner, 2026-09-22): the conversation chain was resolved by the
 	// turn gate above (chat.model override → strong slot → refused) — the
 	// engine build is pure from here; thinking levels clamp natively.
@@ -391,7 +420,7 @@ export async function handleChatInput(
 		teachingLanguage: record.teachingLanguage ?? "en",
 		learnerBackground: (await createAccountStore(PATHS.data).byId(currentUserId()))?.background,
 		engine,
-		messages: asAgentMessages(merged),
+		messages: asAgentMessages(agentMessages),
 		onUsage: collectUsage,
 		toolToggles: effective.agent.tools,
 		// Debug (owner, 2026-10-04): teacher/prober raw provider events under
@@ -515,7 +544,7 @@ export async function handleChatInput(
 		// Debug recorder run marker (owner, 2026-10-04): correlates the
 		// JSONL event stream with the record's turns; no-op unless
 		// LH_PROVIDER_EVENTS=1.
-		providerEventNote(chatId, "turn", `run start (base: ${merged.length} messages)`);
+		providerEventNote(chatId, "turn", `run start (base: ${agentMessages.length} messages)`);
 		const handle = runPiTurn({
 			agent: constructed,
 			// The coalescing window seam (COMPACTION LAW, 2026-10-09): tests
@@ -538,8 +567,9 @@ export async function handleChatInput(
 			},
 			onFinish: (turnMessages, isAborted) => {
 				// Wave B: the record write is the agent's own final state —
-				// the new messages are the slice past the merged base.
-				const stamped = persistTurn(stores.chatStore, chatId, merged.length, turnMessages, isAborted);
+				// the new messages are the slice past the temporary agent prefix
+				// (Retry's saved record still holds its earlier failed attempts).
+				const stamped = persistTurn(stores.chatStore, chatId, agentMessages.length, turnMessages, isAborted);
 				// usage log append (idempotent per turn id) — the stats bar
 				// refolds this on the client after the turn settles. The
 				// provenance message is the turn's FIRST new assistant message.

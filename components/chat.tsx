@@ -68,10 +68,13 @@ import {
 } from "@/components/compaction-divider";
 import { CoverageRing } from "@/components/extraction-coverage";
 import { useI18n } from "@/components/i18n-provider";
+import { Button } from "@/components/ui/button";
 import {
 	activeProblemOf,
 	dismissedAnswer,
+	endsInFailedTurn,
 	findPendingToolCall,
+	formatMessage,
 	phaseAt3,
 	phaseTimeline,
 	teachStepIndex,
@@ -162,6 +165,23 @@ export function parseProviderKeyRefusal(message: string | undefined): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/** Retry sends no composer text. Its refusal must not resurrect the draft
+ * from an earlier, already-durable text send over today's unsent composer.
+ * Retire that fallback synchronously, never when the async Retry settles:
+ * a later ordinary send may own a new recovery draft by then.
+ * send() is ready-gated, and a dropped request leaves the session in
+ * "error": reset it to ready first (stop() — the consume is already dead)
+ * so the click always posts. */
+export function retryFailedResponse(
+	send: (input: ChatInput) => unknown,
+	submittedDraft: { current: string | null },
+	session: { status: string; stop: () => void },
+): void {
+	submittedDraft.current = null;
+	if (session.status === "error") session.stop();
+	void send({ type: "retry" });
 }
 
 /** useLayoutEffect that is silent during SSR (client components still render on the server in Next). */
@@ -666,6 +686,12 @@ export function Chat({
 	// server's registry mutex is the structural gate; this is the
 	// affordance).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
+	// A failed model response: Retry keeps the saved input and completed
+	// work, without another learner message. Offered from "error" too: a
+	// dropped stream leaves the model there, and send() recovers from it.
+	// Later compaction requires new input instead.
+	const retryable = (status === "ready" || status === "error") && !busy && !compacting && endsInFailedTurn(nativeMessages);
+	const retryFailedTurn = () => retryFailedResponse(send, draftRef, { status, stop });
 	const canSend =
 		(text.trim().length > 0 || dictation.active || composerImages.length > 0 || documents.length > 0) && !uploading && !pending && !activeProblem && !compacting;
 
@@ -1632,8 +1658,13 @@ export function Chat({
 								</span>
 							)}
 							{error && (
-								<div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
-									Something went wrong: {error.message}
+								<div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
+									<span className="whitespace-pre-wrap">{formatMessage(copy.chat.somethingWentWrong, { message: error.message })}</span>
+									{retryable && (
+										<Button variant="outline" size="xs" data-testid="retry-failed-turn" onClick={retryFailedTurn}>
+											{copy.chat.retry}
+										</Button>
+									)}
 								</div>
 							)}
 						</div>

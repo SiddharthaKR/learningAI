@@ -16,6 +16,7 @@
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import {
+	failedResponseAtEnd,
 	needsContinuation,
 	newAnswerResult,
 	newNextMessage,
@@ -223,7 +224,10 @@ export class SessionModel {
 	/** The in-flight assistant message's client id (see applyWireEvent). */
 	private streamingMessageId: string | null = null;
 	private statusValue: SessionStatus = "ready";
+	/** Request/loop failures are transient; provider failures derive from messages. */
 	private errorValue: { message: string } | null = null;
+	/** A completed failure from THIS consume, not the previous attempt's record. */
+	private liveFailureId: string | null = null;
 	// The single live consume (POST response or reattach stream): a newer
 	// consume cancels the older — one reader at a time.
 	private consumeAbort: AbortController | null = null;
@@ -254,11 +258,22 @@ export class SessionModel {
 			this.statusValue === "submitted" || this.statusValue === "streaming"
 				? { executions: this.executions, inFlight: true, streamingIds: this.streamingIds }
 				: undefined;
+		const messages = [...this.base, ...this.tail];
+		// One rule for live and restored failures: the failed response that
+		// ends the record owns the banner (plan/compaction markers do not
+		// resolve it). While trying again, hide the old failure from the
+		// first Thinking frame, but show a new failure from this consume.
+		const latest = failedResponseAtEnd(messages);
+		const providerError =
+			latest !== undefined && latest.id !== this.streamingMessageId &&
+			(!live || latest.id === this.liveFailureId)
+				? { message: latest.errorMessage ?? "An error occurred." }
+				: null;
 		return {
-			messages: projectView([...this.base, ...this.tail], live),
-			nativeMessages: [...this.base, ...this.tail],
+			messages: projectView(messages, live),
+			nativeMessages: messages,
 			status: this.statusValue,
-			error: this.errorValue,
+			error: this.errorValue ?? providerError,
 			steerQueue: this.steerQueueValue,
 		};
 	}
@@ -274,6 +289,7 @@ export class SessionModel {
 	}
 
 	private setStatus(status: SessionStatus): void {
+		if (status === "submitted") this.liveFailureId = null;
 		this.statusValue = status;
 		this.readyRef = status === "ready";
 		this.onChange?.();
@@ -364,6 +380,9 @@ export class SessionModel {
 				// the wire) still wins.
 				const id = message.id ?? this.streamingMessageId ?? localId();
 				const withId = { ...message, id } as LhMessage;
+				if (agent.type === "message_end" && message.role === "assistant" && (message as { stopReason?: string }).stopReason === "error") {
+					this.liveFailureId = id;
+				}
 				if (agent.type === "message_start") {
 					this.streamingMessageId = id;
 					this.streamingIds.add(id);
@@ -378,15 +397,9 @@ export class SessionModel {
 				}
 				if (agent.type === "message_end") {
 					this.streamingMessageId = null; // slot done — next start mints fresh
-					// (fallthrough: returns true below — the message landed)
-					const stop = (message as { stopReason?: string }).stopReason;
-					if (stop === "error") {
-						// Provider error, verbatim (owner ruling) — the record
-						// persists the same message; no masking anywhere.
-						this.setError(
-							String((message as { errorMessage?: string }).errorMessage ?? "An error occurred."),
-						);
-					}
+					// (fallthrough: returns true below — the message landed).
+					// A provider error, verbatim (owner ruling), reaches the
+					// banner through getState's record-derived providerError.
 				}
 				return true; // a message event is view work, even empty content
 			}
@@ -580,10 +593,17 @@ export class SessionModel {
 				return;
 			}
 			if (!res.ok) {
-				// Refusal envelopes (503 BYOK/key gates) and 400s: the RAW body
-				// text rides the error message — the banner shows it, and the
-				// page's refusal flow JSON-parses the envelope out of it.
-				throw new Error((await res.text()) || `The send failed (${res.status}).`);
+				// Keep model/key refusal envelopes verbatim: the page's refusal
+				// flow parses them. Retry's 400s are ordinary user-facing
+				// guidance, so show their error text without JSON syntax.
+				let message = (await res.text()) || `The send failed (${res.status}).`;
+				if (input.type === "retry" && res.status === 400) {
+					try {
+						const refusal = JSON.parse(message) as { error?: unknown } | null;
+						if (typeof refusal?.error === "string" && refusal.error.length > 0) message = refusal.error;
+					} catch { /* Non-envelope failures keep their original text. */ }
+				}
+				throw new Error(message);
 			}
 			// CONNECTION DIET B (owner, 2026-10-10 — parallel-session freeze
 			// postmortem): the POST acknowledges and closes; there is no stream

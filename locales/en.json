@@ -150,7 +150,9 @@
     "askOrNext": "Ask anything, or press Enter for the next one.",
     "contextCompacted": "Context compacted",
     "historyCompacted": "History compacted",
-    "compactionTokenCount": "{count}k tok"
+    "compactionTokenCount": "{count}k tok",
+    "somethingWentWrong": "Something went wrong: {message}",
+    "retry": "Retry"
   },
   "composer": {
     "nextProblem": "Next problem",
