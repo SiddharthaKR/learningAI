@@ -55,13 +55,23 @@ export interface PracticeToolContext {
  *  this closure — the intra-turn truth the record cannot hold yet. */
 export interface PracticeGate {
 	problemActive: boolean;
+	/** The learner sent a message of their own (not an answer commit) since the
+	 *  active problem was posed — the only input that can ask to end it. */
+	learnerSpokeSincePose: boolean;
+}
+
+/** Whether a plain learner message follows the active problem's pose. */
+function learnerSpokeSince(messages: readonly LhMessage[], poseCallId: string): boolean {
+	const poseIndex = messages.findIndex((m) => m.role === "assistant" && (m.content as Array<{ type: string; id?: string }>).some((b) => b.type === "toolCall" && b.id === poseCallId));
+	return poseIndex !== -1 && messages.slice(poseIndex + 1).some((m) => m.role === "user");
 }
 
 /** Seed the turn's gate from the record (result-aware activeProblemOf —
  *  only a cleanly-posed problem counts). */
 export function createPracticeGate(ctx: PracticeToolContext): PracticeGate {
 	const record = ctx.chatStore.getChat(ctx.chatId);
-	return { problemActive: record ? activeProblemOf(record.messages) !== null : false };
+	const active = record ? activeProblemOf(record.messages) : null;
+	return { problemActive: active !== null, learnerSpokeSincePose: active !== null && learnerSpokeSince(record!.messages, active.toolCallId) };
 }
 
 // ─── problem: the pose ───────────────────────────────────────────────────────
@@ -152,6 +162,7 @@ export function problemTool(
 				}
 			}
 			gate.problemActive = true;
+			gate.learnerSpokeSincePose = false;
 			return problemResult();
 		},
 	};
@@ -206,9 +217,17 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 		parameters: concludeInputObject,
 		prepareArguments: (args: unknown) => healEncodedArguments(args, concludeInputObject) as never,
 		executionMode: "sequential",
-		execute: async (_toolCallId, _input) => {
+		execute: async (_toolCallId, input) => {
 			if (!gate.problemActive) {
 				return invalidInputResult("conclude", ["no active problem to conclude — pose one first"]);
+			}
+			// THE END-CONDITION CONTRACT (owner, 2026-11-24; eval PRACTICE-01): a
+			// problem ends unsolved only when the learner asks. An answer commit
+			// is an attempt, never a request to stop.
+			if ((input.outcome === "movedOn" || input.outcome === "surrendered") && !gate.learnerSpokeSincePose) {
+				return invalidInputResult("conclude", [
+					`outcome ${input.outcome} needs the learner to ask to end the problem, and they have not — their latest input is an attempt. Give a minimal nudge (the next hint rung) and keep the problem active; conclude only when it is solved or the learner explicitly asks to end it`,
+				]);
 			}
 			gate.problemActive = false;
 			return concludeResult();
