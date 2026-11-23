@@ -18,7 +18,7 @@ npm ci && npm run build && npm run build:source
 cp .env.example .env && chmod 600 .env
 openssl rand -hex 32   # paste as SESSION_SECRET
 ```
-Fill the placeholders in `.env`: `LLM_MODEL`, `LLM_CONTEXT_WINDOW`, `LLM_MAX_TOKENS` (smaller than the window), `LLM_VISION`, `LLM_REASONING`, and `VISION_BASE_URL`/`VISION_MODEL` if used. `LLM_CONTEXT_WINDOW` must match the model's real context (for Ollama, its `num_ctx`) and should be at least 32768: compaction starts at the window minus a 16,384-token reserve, so a 16k window compacts before every turn. Set `HTTPS_PROXY` (URL-encode special characters) only on the host. Optionally set `KNOWLEDGE_SHARED_DIR` (directory of shared documents) and `KNOWLEDGE_INDEX_FILE` (output index path), then run `npm run index:shared`. Left empty, shared knowledge is off and only personal uploads work.
+Fill the placeholders in `.env`: `LLM_MODEL`, `LLM_CONTEXT_WINDOW`, `LLM_MAX_TOKENS` (smaller than the window), `LLM_VISION`, `LLM_REASONING`, and `VISION_BASE_URL`/`VISION_MODEL` if used. With `VISION_BASE_URL` and `VISION_MODEL` set, personal and shared uploads describe their images in the background after the text is indexed (up to 180 s and 1,536 tokens per image, thinking off), and `npm run index:shared` describes them inline; leave them empty to index text and OCR only. `LLM_CONTEXT_WINDOW` must match the model's real context (for Ollama, its `num_ctx`) and should be at least 32768: compaction starts at the window minus a 16,384-token reserve, so a 16k window compacts before every turn. Set `HTTPS_PROXY` (URL-encode special characters) only on the host. Optionally set `KNOWLEDGE_SHARED_DIR` (directory of shared documents) and `KNOWLEDGE_INDEX_FILE` (output index path), then run `npm run index:shared`. Left empty, shared knowledge is off and only personal uploads work.
 
 ## 4. Data directory
 `data/` lives in the app folder and is created by the service user:
@@ -66,6 +66,7 @@ They only touch the `learnharness` service and the `searxng` container, and ask 
 cd ~/app && git pull && npm ci && npm run build && npm run build:source
 sudo systemctl restart learnharness
 ```
+If `npm run build` fails in webpack hashing (`WasmHash._updateWithBuffer ... reading 'length'`), the persistent webpack cache is corrupt: move `.next/cache/webpack` aside and build again. On 2026-11-24 this fixed the failure reported in `docs/evaluations/2026-11-23-summary.md`.
 
 ## 8. Acceptance checks
 ```bash

@@ -1,5 +1,9 @@
 # Office v1 pilot progress
 
+2026-11-24 content/long-conversation follow-up: 20 live turns retained sampled preferences/corrections, but manual review found false explanations; real synthetic-history compaction lost a corrected label; the teacher repeated an invalid quiz call; wrong-answer practice ended prematurely; a Windows rename failure lost a streamed reply from durable history. Thinking and cited-answer UI were observed in the dedicated browser. Under concurrent development load, median first text was 14.845 s and p95 131.099 s; these are not production SLO measurements. Focused existing tests recorded 234 passes. User selected recording and proposed fixes only, for parallel Claude review: [evaluation](evaluations/2026-11-24-content-and-long-conversation.md), [timestamped bug register](evaluations/2026-11-24-bug-register.md). Runtime used commit `5fc583f`; current parallel app edits remain unverified by this run.
+
+2026-11-23 evaluation of commit `5fc583ffc8b1ebcf0d1e0956e9dc485946efc634`: **2,151/2,151 tests pass and typecheck passes, but lint fails with four restricted-import errors and production build fails in webpack hashing (reproduced outside the sandbox).** An isolated development instance passed 40 corrected HTTP workflow assertions and seven recovery/practice assertions. Sampled PDF answers were correct, while targeted diagnostics reproduced mixed-page OCR omission, invalid image-chunk source IDs, lost neighboring-page citations, missing split-table headers, visual-description output-budget exhaustion, and cross-user delay during synchronous graph layout. No product fixes or host acceptance were performed. See [current evaluation and limitations](evaluations/2026-11-23-summary.md). Earlier results below are historical.
+
 Plan: `docs/superpowers/plans/2026-11-02-office-v1-pilot.md`
 
 Last update: 2026-11-07. The implementation is in progress; no host acceptance has been performed.
@@ -340,3 +344,38 @@ Gate (2026-11-23): `npm test` 2,131/2,131 pass; `tsc --noEmit` clean; ESLint cle
 Gate (2026-11-23): `npm test` 2,151/2,151 pass; `tsc --noEmit` clean; ESLint clean on changed files.
 
 **Local Ollama tuning (laptop only, not in the repo).** `OLLAMA_KV_CACHE_TYPE=q8_0` and `OLLAMA_FLASH_ATTENTION=1` are set as user environment variables. On the 8 GB RTX 5060 the 12B model then fits 35 of 49 layers on the GPU instead of 33; generation is about 11.5 tok/s. A variant without the speculative draft model was slower (about 9.3 tok/s) and was removed.
+
+### Evaluation fixes (2026-11-24)
+
+Fixes for Codex's evaluations (`docs/evaluations/2026-11-23-summary.md`, `docs/evaluations/2026-11-24-bug-register.md`). Owner decisions were taken through questions on 2026-11-24; decisions Claude took alone while the owner was away are listed at the end.
+
+- **Build and lint (BUILD-01).** The webpack `WasmHash` crash came from a corrupt 1.1 GB persistent cache in `.next/cache/webpack`; with the cache moved aside, `npm run build` and the artifact check pass (documented in DEPLOY section 7). The four lint errors were knowledge map/section imports that skipped the barrels (`8d109337`).
+- **Mixed PDFs (RAG-01).** Pages without a text layer are OCRed even when other pages have text; native text is kept per page (`78676aad`).
+- **Tables (RAG-03).** Every split piece of a large table repeats the header row (`aec21e0c`, `ceb86d72`).
+- **Citations (RAG-04).** Search widens a hit only with neighbors from the same page, slide or heading (and the same OCR/image flags); MD/TXT results widen their line span (`0b6e504d`).
+- **OCR numbers (eval P2).** OCR citations reach the tutor as "(OCR, verify exact numbers)" (`c0f1e226`).
+- **Image descriptions (RAG-02, RAG-05).** Vision requests run with thinking off, 1,536 tokens, 180 s timeout. With `VISION_BASE_URL` and `VISION_MODEL` set, personal and shared uploads return after text indexing and describe images in the background; descriptions are chunked under the document's own id right after their page and replace the document's chunks through the same serialized queue. The upload route hands its index result to the store, so the file is indexed once (`9492f050`). Measured on the laptop: ZCU208 pages 6 and 19 described in 46–51 s, ~700 tokens; the manual has 28 images.
+- **Graph layout (GRAPH-01).** The settle computes in a worker thread (`src/core/layout-runner.ts`, `layout-worker.ts`); settles and drag commits are serialized. At 1,000 nodes the event-loop stall fell from 1,074 ms to 15 ms. The built worker chunk runs under `node` directly (`1b2f1d78`).
+- **Lost reply (CHAT-01).** All store renames retry EPERM/EBUSY/EACCES for up to ~0.8 s (`4ac845f5`).
+- **Compaction (MEMORY-01, MEMORY-02).** The kept tail is at most half of what the threshold leaves after the system prompt (about 3.2k tokens for the teacher on a 32k window, `2787e724`). The summary gains "Details to keep exactly", with only the latest value of a corrected detail (`0318aac3`); one live 12B check kept `MAPLE-7319 (replaced CEDAR-4826)`.
+- **Teach quiz (TEACH-01).** A teach quiz/explain call without `type` defaults to `check` (`2365db5b`).
+- **Practice (PRACTICE-01).** `conclude` refuses `movedOn`/`surrendered` unless the learner sent their own message since the pose (`c09d87b0`).
+- **Probe (FLOW-01).** A second `probe_done` in one turn is refused (`2e34b3a6`).
+
+Not changed (proposals only, in the bug register): CONTENT-01 (false worked steps), QUESTION-01 (equivalent-amount distractors), SPEED-01 (latency attribution), UI-01 (named search receipts). These touch the owner's teaching prompts, measurement plan, or UX.
+
+**Decisions Claude took without asking (owner away, 2026-11-24):**
+1. DOCX image descriptions go after all text (DOCX images carry no real position).
+2. Chat-attachment uploads (`destination: "chat"`) get no image descriptions; `npm run index:shared` describes inline.
+3. Vision requests always send the thinking-off fields, whatever `LLM_REASONING` says.
+4. The neighbor "place" key includes the OCR and image-description flags, so a description never merges into page text.
+5. A table header longer than half the split budget is not repeated.
+6. Layout settles and position commits share one process-wide queue; a settle reruns up to 3 times if nodes change mid-compute.
+7. The test suite settles inline (`NODE_ENV=test`); only `tests/layout-worker.test.ts` starts the worker (`LH_LAYOUT_WORKER=1`). An idle worker sometimes kept a test process alive.
+8. Rename retry: 6 retries, 10–400 ms backoff, applied to every store rename including accounts and knowledge snapshots.
+9. Kept tail = min(20k, (threshold − system prompt) / 2).
+10. Missing quiz `type` defaults to `check`, matching how the UI already shows typeless calls.
+11. The practice end-condition treats any plain learner message after the pose as a possible request to end; answer commits never count.
+12. Lint runs clean only when `tmp/` is excluded (Codex's running copy of the app lives there); the ESLint config was not changed.
+
+Gate (2026-11-24): `npm test` 2,178/2,178 pass; `tsc --noEmit` clean; `eslint . --ignore-pattern "tmp/**"` clean; `npm run build` and artifact check pass.
