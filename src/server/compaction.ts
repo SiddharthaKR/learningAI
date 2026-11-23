@@ -34,6 +34,7 @@ import {
 	buildCompactionPrompt,
 	compactionCutIndex,
 	COMPACTION_RESERVE_TOKENS,
+	KEEP_RECENT_TOKENS,
 	estimateContextTokens,
 	estimateTokens,
 	newCompactionMarker,
@@ -165,6 +166,18 @@ export function projectedContextTokens(messages: readonly LhMessage[], systemPro
 	return estimateTokens(toLlmMessages(messages as readonly AgentMessage[]) as unknown as readonly LhMessage[]) + systemPromptTokens;
 }
 
+/**
+ * The recent-history budget a compaction keeps verbatim (owner, 2026-11-24):
+ * KEEP_RECENT_TOKENS, but never more than half of what the threshold leaves
+ * after the system prompt. With a 32k window the threshold is 16,384, so a
+ * fixed 20k tail could never fit beneath it (eval MEMORY-02: the compacted
+ * projection stayed ~20.7k and later compactions were skipped). The other
+ * half leaves room for the summary and the next turns.
+ */
+export function keptTailBudget(thresholdTokens: number, systemPromptTokens: number): number {
+	return Math.max(1, Math.min(KEEP_RECENT_TOKENS, Math.floor((thresholdTokens - systemPromptTokens) / 2)));
+}
+
 // ─── the compaction run ─────────────────────────────────────────────────────
 
 /** Run one compaction for the chat (the registry mutex is HELD by the
@@ -178,7 +191,7 @@ async function compact(deps: CompactionDeps, chatId: string): Promise<void> {
 	const tokensBefore = projectedContextTokens(messages, deps.systemPromptTokens);
 	if (tokensBefore <= deps.thresholdTokens) return; // settled beneath while we waited
 
-	const cut = compactionCutIndex(messages);
+	const cut = compactionCutIndex(messages, keptTailBudget(deps.thresholdTokens, deps.systemPromptTokens));
 	if (cut <= 0 || cut >= messages.length) return; // no history can be dropped
 
 	// The previous compaction's kept boundary (chained compactions
