@@ -318,6 +318,7 @@ Cherry-picked unchanged (or with a test-only trim):
 
 Ported by hand:
 - Compaction cut walk (from `624c91a4`, compaction parts only; the pricing and usage-meter rework was not taken). The cut follows Pi coding-agent 1.4.0 `findCutPoint`: when the whole history fits in the 20k keep budget, nothing is summarized (the old walk summarized everything), and `compact()` returns early when the cut drops nothing. Failed responses no longer anchor the context estimate, and images count as a fixed 4,800 characters. Tests: `tests/compaction-native-parity.test.ts` (new) and updated cut tests.
+- Superseded compaction summaries (`b81f0a34`): when a newer summary is active, older summary markers are not sent to the model again, and the summarizer gets the prior summary once instead of also reading old markers in its span. A summary that stops at the output limit (`length`) is treated as a failed compaction, leaving history unchanged. The controls-audit marker stays filtered from the wire.
 
 Not taken because this branch already has its own version:
 - `ca0ac24c` (re-read the chat before saving the summary): done in Task 6A.
