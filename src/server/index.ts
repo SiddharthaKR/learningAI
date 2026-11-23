@@ -14,7 +14,7 @@ export * from "./jobs.ts";
 export * from "./stores.ts";
 export { getSessionSources } from "./session-sources.ts";
 export { runVerifierAgent, type VerifierClaim } from "../agent/subagents/verifier.ts";
-export { indexKnowledgeDocument } from "../knowledge/service.ts";
+export { indexKnowledgeDocument, knowledgeVisionConfig } from "../knowledge/service.ts";
 export { buildKnowledgeMap, sectionText } from "../knowledge/map.ts";
 export { readRenderSettings, writeRenderSettings } from "./stores.ts";
 // The settings record + prompt overrides (settings-storage wave, 2026-09-19).

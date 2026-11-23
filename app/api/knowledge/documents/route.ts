@@ -1,7 +1,7 @@
 import { withOfficeUser } from "@/src/server";
 import { currentUserId } from "@/src/server";
 import { checkedStoresForUser } from "@/src/server";
-import { appendSharedKnowledgeAudit, indexKnowledgeDocument, sharedKnowledgeStore, usernameForUserId } from "@/src/server";
+import { appendSharedKnowledgeAudit, indexKnowledgeDocument, knowledgeVisionConfig, sharedKnowledgeStore, usernameForUserId } from "@/src/server";
 import { MAX_KNOWLEDGE_MULTIPART_BYTES, validateKnowledgeUpload } from "@/src/core";
 import type { KnowledgeDocumentRecord } from "@/src/core";
 
@@ -52,7 +52,9 @@ export const POST = withOfficeUser(async (request: Request) => {
       const document = await checkedStoresForUser(currentUserId()).knowledgeStore.uploadDocument({ fileName: file.name, data, contentType: file.type });
       return Response.json({ document: publicDocument(document) });
     }
-    const indexed = await indexKnowledgeDocument({ fileName: file.name, data });
+    // Stored uploads describe images in the background; a chat attachment is text only.
+    const visionConfig = destination === "chat" ? undefined : knowledgeVisionConfig();
+    const indexed = await indexKnowledgeDocument({ fileName: file.name, data, ...(visionConfig ? { visionConfig, deferImages: true } : {}) });
     const text = indexed.chunks.map(({ citation, text }) => {
       if (citation.format === "pptx") return `Slide ${citation.slide}\n${text}`;
       if (citation.format === "pdf") return `Page ${citation.page}\n${text}`;
@@ -60,7 +62,7 @@ export const POST = withOfficeUser(async (request: Request) => {
     }).join("\n\n");
     if (!text.trim()) return Response.json({ error: "no_readable_text" }, { status: 422 });
     const store = destination === "shared" ? sharedKnowledgeStore : checkedStoresForUser(currentUserId()).knowledgeStore;
-    const document = destination === "chat" ? indexed.document : await store.uploadDocument({ fileName: file.name, data, contentType: file.type });
+    const document = destination === "chat" ? indexed.document : await store.uploadDocument({ fileName: file.name, data, contentType: file.type, indexed });
     if (destination === "shared") {
       const userId = currentUserId();
       await appendSharedKnowledgeAudit({ at: new Date().toISOString(), userId, username: await usernameForUserId(userId), action: "add", fileName: document.fileName, documentId: document.id });

@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { renameSync } from "node:fs";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { readKnowledgeSnapshot, writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot, type KnowledgeDocumentRecord } from "../knowledge/index-store.ts";
-import { indexKnowledgeDocument } from "../knowledge/service.ts";
+import { describePendingImages, indexKnowledgeDocument, knowledgeVisionConfig, type IndexedKnowledgeDocument, type PendingImageDescriptions } from "../knowledge/service.ts";
 import { validateKnowledgeUpload } from "../knowledge/upload.ts";
 import { writeKnowledgeVault } from "../knowledge/vault.ts";
 
@@ -17,6 +17,13 @@ function serialized<T>(root: string, operation: () => Promise<T>): Promise<T> {
   return current;
 }
 
+// Background image descriptions in flight (owner, 2026-11-24: text now, images later).
+const imageWork = new Set<Promise<void>>();
+/** Resolves once every in-flight background image description has published or failed. */
+export async function settleKnowledgeImageWork(): Promise<void> {
+	while (imageWork.size) await Promise.all([...imageWork]);
+}
+
 export function createKnowledgeStore(root: string, beforePublish: () => void) {
 	const indexFile = path.join(root, "knowledge", "index.json");
 	const sourceDirectory = path.join(root, "knowledge", "documents");
@@ -24,12 +31,32 @@ export function createKnowledgeStore(root: string, beforePublish: () => void) {
 		try { await writeKnowledgeVault(root, snapshot); }
 		catch (error) { console.error("knowledge vault rebuild failed", error); }
 	};
+	/** Describe a published document's images, then swap in its full chunk list
+	 *  under the same serialized queue. A document deleted meanwhile stays deleted. */
+	const describeLater = (pending: PendingImageDescriptions): void => {
+		const work = (async () => {
+			const chunks = await describePendingImages(pending);
+			if (!chunks) return;
+			await serialized(root, async () => {
+				beforePublish();
+				const snapshot = await readKnowledgeSnapshot(indexFile);
+				if (!snapshot.documents.some((document) => document.id === pending.documentId)) return;
+				const next = { ...snapshot, generatedAt: new Date().toISOString(), chunks: [...snapshot.chunks.filter((chunk) => chunk.sourceId !== pending.documentId), ...chunks] };
+				await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);
+				await refreshVault(next);
+			});
+		})().catch((error) => console.error("knowledge image descriptions failed", error instanceof Error ? error.message : error));
+		imageWork.add(work);
+		void work.finally(() => imageWork.delete(work));
+	};
 	return {
 		/** Index file path; a function so the checked-store proxy re-verifies the owner on every call. */
 		indexFile: () => indexFile,
 		readSnapshot: () => readKnowledgeSnapshot(indexFile),
 		writeSnapshot: (snapshot: KnowledgeSnapshot) => writeKnowledgeSnapshotAtomic(indexFile, snapshot, beforePublish),
-		uploadDocument: async ({ fileName, data, contentType }: { fileName: string; data: Uint8Array; contentType?: string }): Promise<KnowledgeDocumentRecord> => {
+		/** `indexed`: the caller's own indexKnowledgeDocument result for these exact
+		 *  bytes and file name, reused instead of indexing a second time. */
+		uploadDocument: async ({ fileName, data, contentType, indexed: preindexed }: { fileName: string; data: Uint8Array; contentType?: string; indexed?: IndexedKnowledgeDocument }): Promise<KnowledgeDocumentRecord> => {
 			validateKnowledgeUpload(fileName, data.byteLength, contentType);
 			return serialized(root, async () => {
 				beforePublish();
@@ -37,7 +64,7 @@ export function createKnowledgeStore(root: string, beforePublish: () => void) {
 				const contentHash = createHash("sha256").update(data).digest("hex");
 const existing = snapshot.documents.find((document) => document.contentHash === contentHash);
 				if (existing) return existing;
-				const indexed = await indexKnowledgeDocument({ fileName, data });
+				const indexed = preindexed ?? await indexKnowledgeDocument({ fileName, data, visionConfig: knowledgeVisionConfig(), deferImages: true });
 				const document = { ...indexed.document, contentHash };
 				const sourceFile = path.join(sourceDirectory, document.id);
 				const temporary = path.join(sourceDirectory, `.${randomUUID()}.tmp`);
@@ -52,6 +79,7 @@ const existing = snapshot.documents.find((document) => document.contentHash === 
 					const next = { ...snapshot, generatedAt: new Date().toISOString(), documents: [...snapshot.documents, document], chunks: [...snapshot.chunks, ...indexed.chunks] };
 						await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);
 						await refreshVault(next);
+					if (indexed.pendingImages) describeLater(indexed.pendingImages);
 					return document;
 				} catch (error) {
 					if (published) await unlink(sourceFile).catch((cleanup: NodeJS.ErrnoException) => { if (cleanup.code !== "ENOENT") throw cleanup; });

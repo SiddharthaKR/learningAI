@@ -8,6 +8,11 @@ export interface VisionConfig {
 
 export type VisionCallFn = (imageBase64: string, mimeType: string, prompt: string) => Promise<string>;
 
+/** Output and time budget per image (owner, 2026-11-24): dense manual pages
+ *  took ~700 tokens and 46-51 s with thinking off on the 12B dev model. */
+export const VISION_MAX_TOKENS = 1536;
+export const VISION_TIMEOUT_MS = 180_000;
+
 const DESCRIBE_PROMPT = "Describe this image in detail for a text search index. Include all visible text, diagrams, charts, labels, and key visual elements. Be concise but thorough.";
 
 async function defaultVisionCall(imageBase64: string, mimeType: string, prompt: string, config: VisionConfig): Promise<string> {
@@ -25,9 +30,14 @@ async function defaultVisionCall(imageBase64: string, mimeType: string, prompt: 
 					{ type: "text", text: prompt },
 				],
 			}],
-			max_tokens: 512,
+			max_tokens: VISION_MAX_TOKENS,
+			// Thinking off (owner, 2026-11-24): with thinking on, Gemma spent the whole
+			// budget reasoning and returned no description. Same wire signals as the
+			// Reasoning switch: reasoning_effort for Ollama, enable_thinking for the proxy.
+			reasoning_effort: "none",
+			chat_template_kwargs: { enable_thinking: false },
 		}),
-		signal: AbortSignal.timeout(30_000),
+		signal: AbortSignal.timeout(VISION_TIMEOUT_MS),
 	});
 	if (!response.ok) throw new Error(`Vision API ${response.status}: ${await response.text().catch(() => "")}`);
 	const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
