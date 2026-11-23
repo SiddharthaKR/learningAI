@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 const scrypt = promisify(scryptCallback);
 export type Language = "en" | "ja";
 /** reasoning: the tutor's model reasoning preference; absent means on (only false is stored). */
-export interface Account { id: string; username: string; uiLanguage: Language; teachingLanguage: Language; background?: string; reasoning?: boolean; createdAt: string }
+export interface Account { id: string; username: string; uiLanguage: Language; teachingLanguage: Language; background?: string; reasoning?: boolean; createdAt: string; /** Read pictures in uploaded documents by default (the user's last choice; off when absent). */ readPictures?: boolean }
 interface StoredAccount extends Account { passwordSalt: string; passwordHash: string }
 interface AccountFile { version: 1; accounts: StoredAccount[] }
 
@@ -18,6 +18,10 @@ export function accountExistsSync(root: string, userId: string): boolean {
     const data = JSON.parse(readFileSync(path.join(root, "accounts.json"), "utf8")) as AccountFile;
     return Array.isArray(data.accounts) && data.accounts.some((account) => account.id === userId);
   } catch { return false; }
+}
+
+function validatePassword(password: string): void {
+  if (password.length < 12) throw new Error("Password must contain at least 12 characters");
 }
 
 function publicAccount(account: StoredAccount): Account {
@@ -61,7 +65,7 @@ export function createAccountStore(root: string) {
     async create(username: string, password: string, language: Language): Promise<Account> {
       const normalized = username.trim().toLowerCase();
       if (!/^[a-z0-9][a-z0-9_-]{2,31}$/u.test(normalized)) throw new Error("Username must be 3–32 letters, numbers, underscores, or hyphens");
-      if (password.length < 12) throw new Error("Password must contain at least 12 characters");
+      validatePassword(password);
       if (language !== "en" && language !== "ja") throw new Error("Unsupported language");
       return locked(async () => {
         const data = await read();
@@ -90,7 +94,24 @@ export function createAccountStore(root: string) {
       const found = (await read()).accounts.find((item) => item.username === username.trim().toLowerCase());
       return found ? publicAccount(found) : null;
     },
-    async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string; reasoning?: boolean }): Promise<Account> {
+    async list(): Promise<Account[]> {
+      return (await read()).accounts.map(publicAccount);
+    },
+    async resetPassword(username: string, newPassword: string): Promise<Account> {
+      validatePassword(newPassword);
+      return locked(async () => {
+        const data = await read();
+        const found = data.accounts.find((item) => item.username === username.trim().toLowerCase());
+        if (!found) throw new Error("Account not found");
+        const salt = randomBytes(16);
+        found.passwordSalt = salt.toString("hex");
+        found.passwordHash = (await scrypt(newPassword, salt, 64) as Buffer).toString("hex");
+        await write(data);
+        return publicAccount(found);
+      });
+    },
+    async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string; reasoning?: boolean; readPictures?: boolean }): Promise<Account> {
+      if (changes.readPictures !== undefined && typeof changes.readPictures !== "boolean") throw new Error("readPictures must be true or false");
       for (const language of [changes.uiLanguage, changes.teachingLanguage]) {
         if (language !== undefined && language !== "en" && language !== "ja") throw new Error("Unsupported language");
       }
@@ -107,6 +128,7 @@ export function createAccountStore(root: string) {
         if (changes.background !== undefined) account.background = changes.background.trim() || undefined;
         if (changes.reasoning === true) delete account.reasoning;
         else if (changes.reasoning === false) account.reasoning = false;
+        if (changes.readPictures !== undefined) account.readPictures = changes.readPictures;
         await write(data);
         return publicAccount(account);
       });

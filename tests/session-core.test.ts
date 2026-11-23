@@ -490,14 +490,15 @@ describe("provider-error banner (live and saved)", () => {
 		return { ...assistantMsg(id, ""), content: [], stopReason: "error", errorMessage } as LhMessage;
 	}
 
-	it("restores an empty failed response on load and full sync without adding a transcript card", () => {
+	it("restores an empty failed response on load and full sync, shown as the inline error line", () => {
 		const record = [newUserMessage("topic"), failed()];
 		const m = model({ initialMessages: record });
 		assert.equal(m.getState().error?.message, "Google 500: fixture failure");
 		assert.equal(m.getState().status, "ready");
 		assert.equal(m.readyRef, true, "a restored provider failure does not block retry");
 		assert.deepEqual(m.getState().nativeMessages, record, "diagnostic history stays intact");
-		assert.equal(m.getState().messages.length, 1, "only the user bubble, no permanent error card");
+		// The saved failure renders as the inline turn-error line (2026-11-19), which carries Retry.
+		assert.equal(m.getState().messages.at(-1)?.parts.at(-1)?.type, "data-turn-error");
 		const synced = model();
 		synced.setMessages(record);
 		assert.equal(synced.getState().error?.message, m.getState().error?.message);

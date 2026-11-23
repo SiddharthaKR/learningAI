@@ -78,6 +78,7 @@ export * from "./session-markdown.ts";
 // Browser-safe helpers/types the shell needs (import-law cleanup).
 export * from "../i18n/catalog.ts";
 export * from "../knowledge/upload.ts";
+export * from "../knowledge/stats.ts";
 export * from "../knowledge/map-contracts.ts";
 export type { KnowledgeCitation } from "../knowledge/contracts.ts";
 export type { KnowledgeDocumentRecord } from "../knowledge/index-store.ts";

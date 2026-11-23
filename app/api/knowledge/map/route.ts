@@ -1,5 +1,5 @@
-import type { KnowledgeMapResponse } from "@/src/core";
 import { withOfficeUser, currentUserId, checkedStoresForUser, sharedKnowledgeStore, buildKnowledgeMap } from "@/src/server";
+import type { KnowledgeMapResponse } from "@/src/core";
 
 export const runtime = "nodejs";
 

@@ -21,6 +21,7 @@ import packageMetadata from "../../package.json" with { type: "json" };
 import { officeConfig } from "../core/office-config.ts";
 import { createLlmLimiter } from "./llm-concurrency.ts";
 import { promptToolStream } from "./prompt-tool-stream.ts";
+import { toolSalvageStream } from "./tool-salvage-stream.ts";
 
 /** App identity is immutable and shared by Models and every native Agent.
  * Agent's default Pi attribution otherwise overrides the Models identity. */
@@ -101,13 +102,16 @@ function officeStreams(): ProviderStreams {
 			}),
 		} as T;
 	};
+	// Native mode: the salvage wrapper turns a tool call the model TYPED into
+	// its reply (a ```json quiz, a ```mermaid plan) into the real call — see
+	// tool-salvage-stream.ts. Prompt mode has its own text-call parser.
 	return {
 		stream: (model, context, options) => officeConfig().llmToolMode === "prompt"
 			? promptToolStream((m, c, o) => upstream.stream(m, c, optionsFor(o)))(model, context, options)
-			: upstream.stream(model, context, optionsFor(options)),
+			: toolSalvageStream((m, c, o) => upstream.stream(m, c, optionsFor(o)))(model, context, options),
 		streamSimple: (model, context, options) => officeConfig().llmToolMode === "prompt"
 			? promptToolStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(o)))(model, context, options)
-			: upstream.streamSimple(model, context, optionsFor(options)),
+			: toolSalvageStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(o)))(model, context, options),
 	};
 }
 

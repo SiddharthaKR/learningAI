@@ -20,7 +20,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { FACTORY_SETTINGS, type AppearanceSettings } from "@/src/core";
+import { FACTORY_SETTINGS, type AppearanceMode, type AppearanceSettings } from "@/src/core";
 
 /** The resolved, fully-concrete appearance view (delta + factory merged). */
 export function resolveAppearance(delta: AppearanceSettings | undefined) {
@@ -71,12 +71,27 @@ export function derivedPalette(background: string): Record<string, string> {
 	};
 }
 
+/** THE MODE (owner, 2026-11-19): System follows the computer; Light and
+ *  Dark ignore it. Pure — exported for tests. */
+export function effectiveDark(mode: AppearanceMode, prefersDark: boolean): boolean {
+	return mode === "dark" || (mode === "system" && prefersDark);
+}
+
+/** What localStorage "theme" should hold so the pre-paint script in
+ *  app/layout.tsx starts the next load in the right mode (no flash):
+ *  light/dark as chosen; System clears it so the computer decides. */
+export function themeStorageValue(mode: AppearanceMode): "light" | "dark" | null {
+	return mode === "system" ? null : mode;
+}
+
 /** THE mapping: resolved appearance → the CSS variables to set on <html>.
  *  Absent entries = leave the factory stylesheet value in place. Pure —
- *  exported for tests. */
-export function appearanceVars(a: ReturnType<typeof resolveAppearance>): Record<string, string> {
+ *  exported for tests. `dark` = the effective mode: the custom background
+ *  is a DARK curve (raise()), so it applies in dark mode only — in light
+ *  mode the light palette stays. */
+export function appearanceVars(a: ReturnType<typeof resolveAppearance>, dark = true): Record<string, string> {
 	const vars: Record<string, string> = {};
-	if (a.background !== null) Object.assign(vars, derivedPalette(a.background));
+	if (a.background !== null && dark) Object.assign(vars, derivedPalette(a.background));
 	if (a.fontFamily !== null) {
 		vars["--font-prose"] = `"${a.fontFamily}", var(--font-sans3), ui-sans-serif, system-ui, sans-serif`;
 	}
@@ -126,9 +141,41 @@ export function useAppearance() {
 export function AppearanceProvider({ children }: { children: React.ReactNode }) {
 	const [delta, setDelta] = useState<AppearanceSettings | undefined>(undefined);
 	const appliedRef = useRef<string>("");
+	const mode = resolveAppearance(delta).mode;
+
+	// THE MODE (owner, 2026-11-19): track the computer's preference live
+	// (System follows it as it changes), then put the effective mode on
+	// <html> — .dark drives the dark palette and Tailwind's dark: variant;
+	// .light keeps the stylesheet's prefers-color-scheme block from turning
+	// a chosen Light dark. The choice is mirrored to localStorage "theme"
+	// for the pre-paint script, so the next load starts right. Until the
+	// settings arrive, the pre-paint script's result stands untouched.
+	const [prefersDark, setPrefersDark] = useState(() =>
+		typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches === true,
+	);
+	useEffect(() => {
+		const query = window.matchMedia?.("(prefers-color-scheme: dark)");
+		if (!query) return;
+		const onChange = () => setPrefersDark(query.matches);
+		query.addEventListener("change", onChange);
+		return () => query.removeEventListener("change", onChange);
+	}, []);
+	const dark = effectiveDark(mode, prefersDark);
+	const [settingsLoaded, setSettingsLoaded] = useState(false);
+	useEffect(() => {
+		if (!settingsLoaded) return;
+		const root = document.documentElement;
+		root.classList.toggle("dark", dark);
+		root.classList.toggle("light", !dark);
+		try {
+			const stored = themeStorageValue(mode);
+			if (stored) window.localStorage.setItem("theme", stored);
+			else window.localStorage.removeItem("theme");
+		} catch {/* storage blocked — the mode still applies this visit */}
+	}, [dark, mode, settingsLoaded]);
 
 	// The vars apply on every change — stringified as the change signal.
-	const vars = useMemo(() => appearanceVars(resolveAppearance(delta)), [delta]);
+	const vars = useMemo(() => appearanceVars(resolveAppearance(delta), dark), [delta, dark]);
 	const key = useMemo(() => JSON.stringify(vars), [vars]);
 	// REMOVAL is half the job (owner repro, fix wave): a later write that
 	// OMITS a var (empty field = factory, serif toggle back on) must clear
@@ -166,6 +213,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
 				setDelta(
 					appearance && typeof appearance === "object" ? (appearance as AppearanceSettings) : undefined,
 				);
+				setSettingsLoaded(true);
 			})
 			.catch(() => {/* settings stay factory — not worth a crash */});
 		return () => {
@@ -175,6 +223,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
 
 	const onAppearanceChange = useCallback((next: AppearanceSettings | undefined) => {
 		setDelta(next);
+		setSettingsLoaded(true);
 	}, []);
 
 	const value = useMemo(

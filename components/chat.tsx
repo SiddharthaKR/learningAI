@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
-import { pendingAttachmentTurns, prepareAttachmentText, type ChatDocument } from "@/components/chat-attachments";
+import { formatImageNotice, pendingAttachmentNotices, pendingAttachmentTurns, prepareAttachments, type AttachmentImageIssue, type ChatDocument } from "@/components/chat-attachments";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { Hint } from "@/components/ui/hint";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
@@ -611,6 +611,9 @@ export function Chat({
 	const [uploading, setUploading] = useState(false);
 	const uploadingRef = useRef(false);
 	const [uploadError, setUploadError] = useState<string>();
+	// Pictures in attachments that could not be read: a dismissible note, never a send failure.
+	const [imageIssues, setImageIssues] = useState<AttachmentImageIssue[]>(() => pendingAttachmentNotices.get(chatId) ?? []);
+	useEffect(() => { pendingAttachmentNotices.delete(chatId); }, [chatId]);
 	/* The composer's value MIRROR ("nothing gets lost" round, owner
 	 * 2026-10-01): a dictation flush lands via setState, which a closure
 	 * waiting through `await finish()` cannot observe in time. Kept
@@ -1160,7 +1163,9 @@ export function Chat({
 			setUploading(true);
 			setUploadError(undefined);
 			try {
-				message = await prepareAttachmentText(message, documents);
+				const prepared = await prepareAttachments(message, documents);
+				message = prepared.text;
+				setImageIssues(prepared.imageIssues);
 			} catch (error) {
 				setUploadError((error as Error).message);
 				return;
@@ -1412,10 +1417,12 @@ export function Chat({
 														{copy.chat.retryingPlan}
 													</SystemLine>
 												);
-											case "data-question-retry":
+											case "data-probe-nudge":
+												// The model ended a probing turn without a question and was
+												// reminded (owner, 2026-11-19): shown as the usual retry line.
 												return (
-													<SystemLine key={pi} testId="question-retry">
-														{copy.chat.retryingQuestion}
+													<SystemLine key={pi} testId="probe-nudge">
+														{copy.chat.retryingTool}
 													</SystemLine>
 												);
 											case "data-practice-thinking":
@@ -1532,7 +1539,7 @@ export function Chat({
 												) {
 													return (
 														<SystemLine key={`retry-${pi}`} testId="tool-retry">
-															Retrying…
+															{copy.chat.retryingTool}
 														</SystemLine>
 													);
 												}
@@ -1558,6 +1565,21 @@ export function Chat({
 														if (teachBoundary)
 															return <PhaseDivider key={`teach-step-${pi}`} phase="teach" />;
 														return pi > 0 ? <Separator key={pi} className="my-3" /> : null;
+													case "data-turn-error":
+														// A saved failed turn (owner report, 2026-11-19): same
+														// line as the live error, so a failure seen after a
+														// reload or reattach is never a blank chat.
+														return (
+															<div key={part.id || pi} data-testid="turn-error" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
+																<span className="whitespace-pre-wrap">{copy.chat.errorPrefix} {(part.data as { message?: string } | undefined)?.message}</span>
+																{/* Retry the failed turn (2026-11-23) when it is the chat's last part. */}
+																{retryable && part === messages.at(-1)?.parts.at(-1) && (
+																	<Button variant="outline" size="xs" data-testid="retry-failed-turn" onClick={retryFailedTurn}>
+																		{copy.chat.retry}
+																	</Button>
+																)}
+															</div>
+														);
 													case "data-plan-block":
 														// The plan in the chat (wave 4): a frozen snapshot
 														// block — rendered as carried, never re-derived.
@@ -1659,13 +1681,13 @@ export function Chat({
 								<span className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
 									<BrailleSpinner label={copy.chat.thinking} />
 									<Shimmer duration={1}>
-										THINKING…
+										{`${copy.chat.thinking}…`}
 									</Shimmer>
 								</span>
 							)}
-							{error && (
+							{error && messages.at(-1)?.parts.at(-1)?.type !== "data-turn-error" && (
 								<div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
-									<span className="whitespace-pre-wrap">{formatMessage(copy.chat.somethingWentWrong, { message: error.message })}</span>
+									<span className="whitespace-pre-wrap">{copy.chat.errorPrefix} {error.message}</span>
 									{retryable && (
 										<Button variant="outline" size="xs" data-testid="retry-failed-turn" onClick={retryFailedTurn}>
 											{copy.chat.retry}
@@ -1729,6 +1751,8 @@ export function Chat({
 							onDocumentsChange={setDocuments}
 							uploading={uploading}
 							uploadError={uploadError}
+							notice={formatImageNotice(imageIssues, copy)}
+							onDismissNotice={() => setImageIssues([])}
 							onImagesChange={setComposerImages}
 						/>
 					}

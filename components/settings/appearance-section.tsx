@@ -34,6 +34,7 @@ import { useEffect, useRef, useState } from "react";
 import {
 	EXTRACTION_CHUNK_TOKENS_FLOOR,
 	resolveSettings,
+	type AppearanceMode,
 	type AppearanceSettings,
 	type GraphSettings,
 } from "@/src/core";
@@ -189,8 +190,18 @@ export function AppearanceSection({
 
 	return (
 		<>
-			<SettingsRow label={copy.mode} hint={copy.comingSoon} testid="row-mode" dimmed>
-				<ThinSelect value="dark" ariaLabel={copy.mode} onChange={() => {}} testid="select-mode" disabled>
+			{/* MODE (owner, 2026-11-19): System follows the computer (the
+			    default, and what the app did before this setting); the choice
+			    is saved on the account and applied by AppearanceProvider. */}
+			<SettingsRow label={copy.mode} testid="row-mode">
+				<ThinSelect
+					value={resolved.mode}
+					ariaLabel={copy.mode}
+					onChange={(v) => onSectionChange({ ...appearance, mode: v as AppearanceMode })}
+					testid="select-mode"
+				>
+					<option value="system">{copy.system}</option>
+					<option value="light">{copy.light}</option>
 					<option value="dark">{copy.dark}</option>
 				</ThinSelect>
 			</SettingsRow>

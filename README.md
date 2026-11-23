@@ -42,7 +42,7 @@ Future teaching sessions can read the graph instead of starting from scratch. Pr
 
 ## Office deployment
 
-LearnHarness runs as a Node.js web application for an office. Copy `.env.example` to `.env` and set the internal OpenAI-compatible LLM URL, model, optional API key, session secret, and knowledge directory. The LLM URL must end in `/v1`. Set `NO_PROXY` to include the internal LLM host.
+LearnHarness runs as a Node.js web application for an office. Copy `.env.example` to `.env` and set the internal OpenAI-compatible LLM URL, model, optional API key, session secret, admin username (`LH_ADMIN_USERNAME`), and knowledge directory. The LLM URL must end in `/v1`. Set `NO_PROXY` to include the internal LLM host.
 
 `npm run smoke:llm` checks that the configured model answers a plain chat request and emits a tool call. Environment variables override values in `.env`, so you can test a local Ollama endpoint with `LLM_BASE_URL=http://localhost:11434/v1` and `LLM_MODEL=gemma4:e4b`.
 
@@ -55,7 +55,8 @@ The office v1 pilot (Tasks 1–8) is feature-complete for single-user local use.
 - **Web search**: the AI can fetch URLs but cannot search the web (`SEARCH_PROVIDER` not configured).
 - **`/source` route**: AGPL compliance archive download — not yet implemented.
 - **Concurrency**: `MAX_CONCURRENT_LLM=2` is set but untested with multiple simultaneous users.
-- **Shared knowledge**: only personal document uploads work; shared team-wide knowledge directory is not wired.
+- **Shared knowledge**: users upload to a Shared pool from the Knowledge page (stored in `data/shared/`, every add/delete logged). An admin-built folder index (`KNOWLEDGE_SHARED_DIR` + `KNOWLEDGE_INDEX_FILE`) is optional.
+- **Admin**: the account named by `LH_ADMIN_USERNAME` gets `/admin` (users, password reset, delete) and `/admin/knowledge` (library stats). Forgotten passwords are reset by the admin. See [DEPLOY.md](DEPLOY.md).
 
 ## Your keys, your data
 

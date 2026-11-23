@@ -10,6 +10,7 @@ import { DumbbellIcon, LogOutIcon, MessageCircleIcon, PanelLeftCloseIcon, PanelL
 import { ActivitySection } from "@/components/activity-dock";
 import { CoverageMenuBlock } from "@/components/extraction-coverage";
 import { LhMark } from "@/components/lh-mark";
+import { pageSessionKind } from "@/components/sidebar-kind";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { SettingsDialogProvider, useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
@@ -403,13 +404,29 @@ function SessionsSidebar() {
 	const router = useRouter();
 	const { open: openSettings } = useSettingsDialog();
 
+	/* FOLLOW THE SESSION (owner, 2026-11-19): opening a session or a new
+	   Teaching/Practice/Chat draft switches the filter to that type. It
+	   follows only when the page changes (followedKey), so a filter picked
+	   by hand stays until you move to another session or draft. Followed
+	   switches are not saved — only a hand-picked filter is remembered. */
+	const followedKey = useRef<string | null>(null);
+	const follow = useCallback((key: string, kind: SessionKindFilter) => {
+		followedKey.current = key;
+		setKindFilter(kind);
+	}, []);
+	useEffect(() => {
+		const page = pageSessionKind(pathname, window.location.search, chats);
+		if (page && page.key !== followedKey.current) follow(page.key, page.kind);
+	}, [pathname, chats, follow]);
+
 	/* New session (owner, 2026-09-13): NO POST — the button opens the
 	   sessionless draft view; the session is created only when the first
 	   message is sent (and that message becomes its title). Search: a
 	   client-side filter over the poll snapshot — no server round trip. */
 	const newSession = useCallback(() => {
+		follow("new:teach", "teach");
 		router.push("/chat/new");
-	}, [router]);
+	}, [router, follow]);
 
 	/* FUZZY (owner round 8, 2026-10-05): subsequence match ranked by
 	 * fuzzyScore — prefix beats word-boundary beats scattered. Empty query
@@ -707,7 +724,7 @@ function SessionsSidebar() {
 					<button
 						type="button"
 						data-testid="new-session-practice"
-						onClick={() => router.push("/chat/new?mode=practice")}
+						onClick={() => { follow("new:practice", "practice"); router.push("/chat/new?mode=practice"); }}
 						className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 					>
 						<DumbbellIcon className="size-3" />
@@ -717,7 +734,7 @@ function SessionsSidebar() {
 					<button
 						type="button"
 						data-testid="new-session-chat"
-						onClick={() => router.push("/chat/new?mode=chat")}
+						onClick={() => { follow("new:chat", "chat"); router.push("/chat/new?mode=chat"); }}
 						className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 					>
 						<MessageCircleIcon className="size-3" />

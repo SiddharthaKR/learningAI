@@ -38,6 +38,8 @@ import { validateRestrictedWebTarget } from "../agent/tools/restricted-web-fetch
 import { createAccountStore } from "./accounts.ts";
 import { PATHS } from "../../config.ts";
 import { fixedOfficeModelSpec } from "./office-config.ts";
+import { answerKeyCheck } from "./answer-key-check.ts";
+import { describeAttachedImages } from "./chat-image-vision.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
 	extractionEnabled,
@@ -50,7 +52,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newQuestionRetryMessage, planRetryOwed, questionRetryOwed, restatesQuestion } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, planRetryOwed, probeNudgeOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
@@ -60,7 +62,7 @@ import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./com
 import { catalogContextLimits } from "./model-catalog.ts";
 import { emit } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
-import { asAgentMessages } from "../core/native-messages.ts";
+import { asAgentMessages, type LhMessage } from "../core/native-messages.ts";
 import {
 	ChatInputError,
 	inputAppends,
@@ -351,6 +353,15 @@ export async function handleChatInput(
 		return Response.json({ error: "A turn is already running for this session" }, { status: 409 });
 	}
 
+	// CHAT IMAGES THROUGH THE VISION ROUTE (owner, 2026-11-19): with
+	// LLM_VISION=false and VISION_* set, attached images are described once
+	// by the vision model (LM Studio directly — the Gemma proxy cannot carry
+	// images) and stored on the message; the chat model reads the
+	// descriptions. Never throws (an unreadable picture is recorded as such).
+	if (input.type === "text" && input.images?.length) {
+		appends = await describeAttachedImages(appends as LhMessage[]);
+	}
+
 	// Write-ahead persistence: the input's native appends go on disk BEFORE
 	// the turn starts - the learner's answer is durable the instant the
 	// request arrives, and any remount, second tab, or server crash reads
@@ -406,9 +417,7 @@ export async function handleChatInput(
 	// tutor turns only: off rebuilds this turn's engine at thinking "off".
 	// Compaction, extraction and job engines keep the configured default.
 	const account = await createAccountStore(PATHS.data).byId(currentUserId());
-	// The probe tool guard's re-run only restates a question as a card:
-	// no thinking, so the card arrives in seconds (owner, 2026-11-24).
-	const engine = account?.reasoning === false || restatesQuestion(agentMessages)
+	const engine = account?.reasoning === false
 		? piEngineForSpec({ ...conversation, thinkingLevel: "off" })
 		: conversationEngine;
 	// Provider-qualified stamp (model slots wave): matches the price table's
@@ -508,6 +517,8 @@ export async function handleChatInput(
 						// = no research tool in the teacher's registry.
 						searchAvailable: () => researchAvailable(chatId),
 						knowledge: knowledgeCtx,
+						// The quiz answer-key check (QUIZ_ANSWER_CHECK, owner 2026-11-19).
+						checkAnswerKey: answerKeyCheck(),
 					},
 					agentOpts,
 				)
@@ -527,6 +538,7 @@ export async function handleChatInput(
 						// graph master switch AND the agent.graphTools toggle.
 						...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
 						knowledge: knowledgeCtx,
+						checkAnswerKey: answerKeyCheck(),
 					},
 					agentOpts,
 				);
@@ -641,13 +653,12 @@ export async function handleChatInput(
 							console.error(`[chat ${chatId}] plan-retry nudge failed:`, err);
 						});
 					}
-					// THE PROBE TOOL GUARD (owner, 2026-11-23): a prober reply
-					// that asked in prose re-runs once with the question-tool
-					// instruction (keyed by the learner input it answered).
-					const questionOwed = settled ? questionRetryOwed(settled.messages) : false;
-					if (questionOwed !== false) {
-						void deliverJobResult(newQuestionRetryMessage(chatId, questionOwed)).catch((err: unknown) => {
-							console.error(`[chat ${chatId}] question-retry nudge failed:`, err);
+					// THE PROBE-NUDGE (owner, 2026-11-19): a probing turn that
+					// ended with no tool call left the learner nothing to answer —
+					// remind the model once (per learner input) to ask.
+					if (settled && probeNudgeOwed(settled.messages)) {
+						void deliverJobResult(newProbeNudgeMessage(chatId, settled.messages.length)).catch((err: unknown) => {
+							console.error(`[chat ${chatId}] probe nudge failed:`, err);
 						});
 					}
 				}

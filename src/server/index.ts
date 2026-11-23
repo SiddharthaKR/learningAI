@@ -14,7 +14,7 @@ export * from "./jobs.ts";
 export * from "./stores.ts";
 export { getSessionSources } from "./session-sources.ts";
 export { runVerifierAgent, type VerifierClaim } from "../agent/subagents/verifier.ts";
-export { indexKnowledgeDocument, knowledgeVisionConfig } from "../knowledge/service.ts";
+export { indexKnowledgeDocument } from "../knowledge/service.ts";
 export { buildKnowledgeMap, sectionText } from "../knowledge/map.ts";
 export { readRenderSettings, writeRenderSettings } from "./stores.ts";
 // The settings record + prompt overrides (settings-storage wave, 2026-09-19).
@@ -58,3 +58,5 @@ export * from "./office-auth.ts";
 export * from "./session-auth.ts";
 export * from "./source-archive.ts";
 export * from "./knowledge-audit.ts";
+export * from "./knowledge-vision.ts";
+export * from "./admin.ts";

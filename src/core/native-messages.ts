@@ -40,7 +40,8 @@ import {
 	CONCLUDE_ACK_TEXT,
 	HANDOFF_TEXT,
 	planRetryText,
-	QUESTION_RETRY_TEXT,
+	PROBE_QUESTION_NUDGE_TEXT,
+	sessionControlsText,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
@@ -72,7 +73,7 @@ export interface LhMarkerMessage {
 		| "graph-context"
 		| "probe-handoff"
 		| "plan-retry"
-		| "question-retry"
+		| "probe-nudge"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
@@ -114,6 +115,22 @@ export function randomSuffix(): string {
 	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Chat images described by the vision model (owner, 2026-11-19): one entry
+ *  per image part, in order; null = the picture could not be read. Stored on
+ *  the user message; only the MODEL sees them (toLlmMessages swaps each image
+ *  for its description) — the learner's message still shows the image. */
+export type ImageDescriptions = (string | null)[];
+
+export function withImageDescriptions<M extends LhMessage>(message: M, descriptions: ImageDescriptions): M {
+	return { ...message, imageDescriptions: descriptions };
+}
+
+function describedImageText(index: number, description: string | null): string {
+	return description
+		? `[Image ${index + 1}, described by the vision model: ${description}]`
+		: `[Image ${index + 1} could not be read by the vision model.]`;
+}
+
 /** The app-wide message id shape (same as the UIMessage-era mint). */
 export function newMessageId(): string {
 	return `msg_${Date.now().toString(36)}_${randomSuffix()}`;
@@ -139,13 +156,14 @@ export function newUserMessage(text: string, images?: { data: string; mimeType: 
 	};
 }
 
-/** Session controls are UI history only; never learner speech on the wire. */
+/** Session controls: shown to the learner, and (owner, 2026-11-19) one
+ *  line per change for the model — never learner speech on the wire. */
 export function newSessionControlsChangedMessage(details: SessionControlsChangedData): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "session-controls-changed",
-		content: "",
+		content: sessionControlsText(details),
 		display: true,
 		details,
 		timestamp: Date.parse(details.at),
@@ -218,54 +236,6 @@ export function newPlanRetryMessage(chatId: string, lastError: string | null): L
 	};
 }
 
-/** The probe tool guard (owner, 2026-11-23): one nudge per learner input,
- *  keyed by that input's id, through the same wake pipeline as plan-retry. */
-export function questionRetryId(inputId: string): string {
-	return `steer_qretry_${inputId}`;
-}
-
-export function newQuestionRetryMessage(chatId: string, inputId: string): LhMarkerMessage {
-	return {
-		id: questionRetryId(inputId),
-		role: "custom",
-		customType: "question-retry",
-		content: QUESTION_RETRY_TEXT,
-		display: true,
-		details: { chatId },
-		timestamp: Date.now(),
-	};
-}
-
-/** Is the probe tool guard owed? While still probing (no probe_done), a
- *  prober reply that stopped normally with no tool call asked in prose —
- *  the learner has nothing to answer through. Walking back from the end:
- *  the trailing assistant replies, then the input they answered. Returns
- *  that input's id (the nudge's key), or false: not probing, the reply
- *  called a tool or did not stop normally, or the nudge already followed
- *  this input (a prose reply to the nudge itself never nudges again). */
-/** This run was started by the probe tool guard's nudge: it only restates a
- *  question as a card, so it runs without thinking (owner, 2026-11-24). */
-export function restatesQuestion(messages: readonly LhMessage[]): boolean {
-	const last = messages.at(-1) as LhMarkerMessage | undefined;
-	return last?.role === "custom" && last.customType === "question-retry";
-}
-
-export function questionRetryOwed(messages: readonly LhMessage[]): string | false {
-	if (hasProbeDone(messages)) return false;
-	const last = messages.at(-1);
-	if (!last || last.role !== "assistant") return false;
-	const reply = last as AssistantMessage;
-	if (reply.stopReason !== "stop" || reply.content.some((b) => b.type === "toolCall")) return false;
-	const ids = new Set(messages.map((m) => m.id));
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const m = messages[i]!;
-		if (m.role === "assistant") continue;
-		if (m.role === "custom" && (m as LhMarkerMessage).customType === "question-retry") return false;
-		return ids.has(questionRetryId(m.id)) ? false : m.id;
-	}
-	return false;
-}
-
 /** Should the plan-retry nudge fire now? Only after the handoff has been
  *  delivered (so the probe_done turn itself never triggers it), only while
  *  no plan exists (a plan block is written per successful plan_init), and
@@ -284,6 +254,45 @@ export function planRetryOwed(chatId: string, messages: readonly LhMessage[]): s
 		}
 	}
 	return lastError;
+}
+
+/** The probe-nudge (owner, 2026-11-19): one reminder when a probing turn
+ *  ends with no tool call. `position` (the record length when it fires)
+ *  makes the id deterministic per state, so a double settle cannot send two. */
+export function newProbeNudgeMessage(chatId: string, position: number): LhMarkerMessage {
+	return {
+		id: `steer_probenudge_${chatId}_${position}`,
+		role: "custom",
+		customType: "probe-nudge",
+		content: PROBE_QUESTION_NUDGE_TEXT,
+		display: true,
+		details: { chatId },
+		timestamp: Date.now(),
+	};
+}
+
+/** Should the probe-nudge fire now? Only while probing (no probe_done yet),
+ *  only when the last message is a finished assistant reply with NO tool call
+ *  (a dispatched research job is a legitimate wait), and at most once per
+ *  learner input: walking back to the last user message or question answer,
+ *  an earlier nudge means it already fired. */
+export function probeNudgeOwed(messages: readonly LhMessage[]): boolean {
+	if (hasProbeDone(messages)) return false;
+	const last = messages.at(-1) as AssistantMessage | undefined;
+	if (!last || (last as { role?: string }).role !== "assistant") return false;
+	if (last.stopReason === "error" || last.stopReason === "aborted") return false;
+	if (last.content.some((block) => block.type === "toolCall")) return false;
+	// Only a turn that showed the learner NOTHING (owner report, 2026-11-19):
+	// a question written as text can be answered by typing; nudging it made
+	// the model apologise and ask the same question again.
+	if (last.content.some((block) => block.type === "text" && block.text.trim().length > 0)) return false;
+	for (let i = messages.length - 2; i >= 0; i--) {
+		const m = messages[i] as { role?: string; customType?: string; toolName?: string };
+		if (m.role === "custom" && m.customType === "probe-nudge") return false;
+		if (m.role === "user") break;
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName ?? "")) break;
+	}
+	return true;
 }
 
 /** The plan presentation block: pure UI history (a frozen snapshot), no
@@ -669,17 +678,28 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 	const out: Message[] = [];
 	if (leading) out.push(leading);
 	if (head) out.push(head);
+	const heldNotes: Message[] = [];
 	for (let i = leading ? Math.max(start, 1) : start; i < messages.length; i++) {
 		const m = messages[i]!;
 		const role = (m as { role?: string }).role;
+		if (role !== "toolResult" && heldNotes.length > 0) out.push(...heldNotes.splice(0));
 		if (role === "custom") {
 			const marker = m as LhMarkerMessage;
 			// UI-only markers: plan blocks, controls audits, and problem
 			// dismissals (the synthesized conclude pair carries the model's face).
-			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed" || marker.customType === "session-controls-changed") continue;
+			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed") continue;
+			// Switch notes reach the model (owner, 2026-11-19); ones saved
+			// before that carry no text and stay UI-only. A note flipped while
+			// a question card was waiting would land between the tool call and
+			// its answer — providers reject that — so notes are HELD and sent
+			// right before the next non-toolResult message (or at the end).
+			if (marker.customType === "session-controls-changed") {
+				if (marker.content) heldNotes.push({ role: "user", content: [{ type: "text", text: marker.content }], timestamp: marker.timestamp });
+				continue;
+			}
 			// The head supersedes every compaction marker, not only its own
-			// stored position. Without a resolved head, preserve the existing
-			// full-history fallback, including the summary text.
+			// stored position (2026-11-23). Without a resolved head, preserve
+			// the full-history fallback, including the summary text.
 			if (marker.customType === "compaction" && head !== null) continue;
 			out.push({
 				role: "user",
@@ -689,7 +709,19 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			continue;
 		}
 		// Strip the record id: the wire carries the native shape only.
-		const { id: _id, ...native } = m as LhMessage;
+		const { id: _id, imageDescriptions, ...native } = m as LhMessage & { imageDescriptions?: ImageDescriptions };
+		if (role === "user" && imageDescriptions && Array.isArray((native as UserMessage).content)) {
+			// Described chat images (owner, 2026-11-19): the text model gets
+			// each picture's description in its place, never the bytes.
+			let imageIndex = 0;
+			const content = ((native as UserMessage).content as (TextContent | ImageContent)[]).map((part) =>
+				part.type === "image"
+					? ({ type: "text", text: describedImageText(imageIndex, imageDescriptions[imageIndex++] ?? null) } as TextContent)
+					: part,
+			);
+			out.push({ ...(native as UserMessage), content });
+			continue;
+		}
 		out.push(native as Message);
 		// Repair unanswered calls from completed generations, not calls in
 		// failed generations. Pi filters error/aborted assistants itself;
@@ -713,6 +745,7 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			}
 		}
 	}
+	out.push(...heldNotes);
 	return out;
 }
 

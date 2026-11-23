@@ -85,29 +85,21 @@ describe("probe_done: the probe→planning seam", () => {
 		assert.equal((delivered[0]!.details as { chatId: string }).chatId, chatId);
 	});
 
-	it("refuses a second probe_done in the same turn, before the record is saved (eval FLOW-01)", async () => {
-		const chatId = newChat("Probe: twice in one turn");
-		const delivered: SteerMessage[] = [];
-		const tools = probeDoneTool({ chatId, chatStore, deliver: (s) => delivered.push(s) });
-		assert.equal((await execute(tools, { assessment: ASSESSMENT })).ok, true);
-		const second = await execute(tools, { assessment: ASSESSMENT });
-		assert.equal(second.ok, false);
-		assert.match(second.error ?? "", /already concluded/);
-		assert.equal(delivered.length, 1, "the handoff is queued once");
-	});
+	it("a successful conclusion ENDS the prober's turn; a refusal does not (owner, 2026-11-19)", async () => {
+		// Gemma 4 26B kept teaching after probe_done (and wrote its own outline),
+		// competing with the teacher's plan. The handoff wakes the teacher the
+		// moment the prober's turn ends, so ending here also starts planning sooner.
+		const okChat = newChat("Probe: terminate");
+		const ok = await probeDoneTool({ chatId: okChat, chatStore, deliver: () => {} }).probe_done!.execute("t1", { assessment: ASSESSMENT });
+		assert.equal(ok.terminate, true);
 
-	it("hands off an evidence-based assessment without a known ceiling", async () => {
-		const chatId = newChat("Probe: enough to plan");
-		const delivered: SteerMessage[] = [];
-		const tool = probeDoneTool({ chatId, chatStore, deliver: (s) => delivered.push(s) });
-		assert.match(tool.probe_done!.description, /A topic request alone isn't that evidence/);
-		assert.match(tool.probe_done!.description, /Report bounds supported by the evidence/);
-		const assessment = {
-			strands: [{ strand: "Instantaneous rate", assessment: "Explains how the secant approaches the tangent. Build from that intuition; formal limits untested." }],
-			summary: "The goal is to connect the geometric intuition to the derivative definition.",
-		};
-		assert.equal((await execute(tool, { assessment })).ok, true);
-		assert.equal(delivered.length, 1);
+		const openChat = newChat("Probe: open question, no terminate");
+		chatStore.saveMessages(openChat, [
+			assistantWithCall("m1", "quiz", { question: "q?", options: [{ label: "a" }], correctAnswer: "a" }),
+		]);
+		const refused = await probeDoneTool({ chatId: openChat, chatStore, deliver: () => {} }).probe_done!.execute("t2", { assessment: ASSESSMENT });
+		assert.equal((refused.details as { ok: boolean }).ok, false);
+		assert.notEqual(refused.terminate, true, "a refused call lets the prober fix course in the same turn");
 	});
 
 	it("REFUSES while a question is still open — resolve it first", async () => {

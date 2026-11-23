@@ -18,7 +18,7 @@ import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
 import { jobTools, type JobToolContext } from "./tools/jobs.ts";
 import { createKnowledgeTool, type KnowledgeToolContext } from "./tools/knowledge.ts";
 import { healToolRecord } from "./tools/heal.ts";
-import { quizInputObject, quizInputProblems } from "../core/question-core.ts";
+import { quizInputObject, quizAuthoringProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
 import { toLlmMessages } from "../core/native-messages.ts";
 
@@ -227,7 +227,13 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		// exits BEFORE the steering poll — the parked-marker stranding our
 		// Wave C registerLiveAgent-before-runPiTurn design depends on.
 		// undefined preserves normal scheduling (the old boolean false).
-		finishTurn: (turn) => (stopper(turn) ? { action: "end" } : undefined),
+		finishTurn: (turn) => {
+			const researchDispatched = kind === "chat" && turn.toolResults.some((result) =>
+				result.toolName === "research" && !result.isError &&
+				result.content.some((part) => part.type === "text" && part.text.startsWith("Dispatched (job ")),
+			);
+			return stopper(turn) || researchDispatched ? { action: "end" } : undefined;
+		},
 		// Wave C (2026-09-26, owner correction same day): markers handed to a
 		// live run drain from pi's STEERING queue — the lesson loop is one
 		// continuous teach→quiz→teach run, so delivery must inject at turn
@@ -302,7 +308,7 @@ export function bareQuestionTools(): Record<string, AgentTool<any>> {
 		parameters: quizInputObject,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
-			const problems = quizInputProblems(input);
+			const problems = quizAuthoringProblems(input);
 			if (problems.length > 0) return invalidInputResult("quiz", problems);
 			return questionResult();
 		},
@@ -348,7 +354,7 @@ export interface ChatToolContext {
 export function createChatAgent(ctx: ChatToolContext, opts: AgentBuildOptions = {}) {
 	const tools: Record<string, AgentTool<any>> = healToolRecord({
 		...(ctx.jobs ? (() => {
-			const jobs = jobTools(ctx.jobs!);
+			const jobs = jobTools({ ...ctx.jobs!, waitForResearch: true });
 			return {
 				...(jobs.research ? { research: jobs.research } : {}),
 				pdf: jobs.pdf!,

@@ -117,7 +117,11 @@ describe("the compaction service", () => {
 		assert.equal(record.messages.at(-1)!.id, marker.id, "the summary marker follows all additions");
 		assert.equal(marker.details.firstKeptMessageId, original.messages[2]!.id, "the cut still names the original first kept message");
 		const wire = toLlmMessages(record.messages);
-		assert.deepEqual(wire.slice(1), toLlmMessages([original.messages[2]!, original.messages[3]!, lateMessage]), "the cut retains the original tail and later message, while audits remain UI-only");
+		// Owner, 2026-11-19: switch notes reach the model, so the kept tail
+		// (from the cut, without the summary marker) is what follows the head.
+		const kept = record.messages.slice(record.messages.findIndex((m) => m.id === marker.details.firstKeptMessageId)).filter((m) => m.id !== marker.id);
+		assert.deepEqual(wire.slice(1), toLlmMessages(kept), "the cut retains the original tail, later message and switch notes");
+		assert.ok(JSON.stringify(wire).includes("Session settings changed"), "switch notes after the cut reach the model");
 		assert.equal(record.knowledgeUsed, true);
 		assert.deepEqual(record.settings, { webResearchEnabled: false, officeKnowledgeEnabled: true });
 		assert.equal(record.turns?.filter((turn) => turn.messageId === marker.id).length, 1);

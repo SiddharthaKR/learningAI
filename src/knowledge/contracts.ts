@@ -21,6 +21,8 @@ export interface ExtractedImage {
 	width: number;
 	height: number;
 	citation: KnowledgeCitation;
+	/** Heading path where the picture sits, when the reader knows it (Word). */
+	section?: string[];
 }
 
 export interface KnowledgeChunk {
@@ -36,6 +38,8 @@ export interface KnowledgeChunk {
 
 export interface KnowledgeResult extends KnowledgeChunk {
 	score: number;
+	/** Original passages when neighbor expansion spans distinct citation locations. */
+	passages?: KnowledgeChunk[];
 }
 
 export type ExtractedDocument = {

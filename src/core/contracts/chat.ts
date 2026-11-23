@@ -111,6 +111,26 @@ export interface SessionControlsChangedData {
 	>;
 }
 
+/** The model's line for each switch change (owner-approved wording,
+ *  2026-11-19): without it, a model that had said "I cannot search" kept
+ *  saying so after the learner turned web research on. */
+export function sessionControlsText(details: SessionControlsChangedData): string {
+	return details.changes
+		.map((change) => {
+			if (change.field === "knowledgeScope") {
+				const scope = change.to === "all" ? "shared and personal documents" : `${change.to} documents only`;
+				return `Session settings changed: knowledge search now covers ${scope}.`;
+			}
+			const [name, tool] = change.field === "webResearchEnabled"
+				? ["web research", "the research tool"]
+				: ["office knowledge", "the knowledge search tool"];
+			return change.to
+				? `Session settings changed: ${name} is now ON — ${tool} is available.`
+				: `Session settings changed: ${name} is now OFF — ${tool} is no longer available.`;
+		})
+		.join("\n");
+}
+
 
 // ─── Background-extraction usage (the money channel, extraction side) ────────
 
@@ -219,6 +239,12 @@ export const HANDOFF_TEXT =
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and present the plan; I'll accept it or ask for changes.";
 
+/** The probe-nudge text (owner-approved wording, 2026-11-19): sent when a
+ *  probing turn ends with no tool call — Gemma 4 26B did that in 1 of 6 runs,
+ *  leaving the learner nothing to answer. */
+export const PROBE_QUESTION_NUDGE_TEXT =
+	"Your turn ended without a question. While probing, every turn ends with one question (the quiz tool or ask_user_question) or with probe_done. Ask your next question now.";
+
 /** The one plan-retry nudge (owner, 2026-11-13): fired once per session when
  *  a turn after the handoff settles with no successful plan_init. Carries
  *  the last rejection reason (null when plan_init was never called). */
@@ -232,14 +258,6 @@ export function planRetryText(lastError: string | null): string {
 		"no cycles; only `slug[title]` and `a --> b` lines, no subgraph/style."
 	);
 }
-
-/** The probe tool guard (owner, 2026-11-23): while probing, the learner can
- *  answer only through a question tool, so a prober reply that asks in
- *  prose re-runs once with this instruction. */
-export const QUESTION_RETRY_TEXT =
-	"Your last reply asked the learner in plain text, but while probing the learner can only answer through a question tool. " +
-	"Ask now with your quizzing tool (`probe` or `recall`) or `ask_user_question`, or call `probe_done` if you already have enough evidence. " +
-	"Do not repeat your explanation.";
 
 // ─── Practice sessions (owner, 2026-10-04) — marker + ack texts ──────────────
 // Single-sourced here per the marker law: the model-facing text of every

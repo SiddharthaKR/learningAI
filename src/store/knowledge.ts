@@ -1,9 +1,10 @@
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { renameSyncWithRetry } from "./atomic-rename.ts";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { readKnowledgeSnapshot, writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot, type KnowledgeDocumentRecord } from "../knowledge/index-store.ts";
-import { describePendingImages, indexKnowledgeDocument, knowledgeVisionConfig, type IndexedKnowledgeDocument, type PendingImageDescriptions } from "../knowledge/service.ts";
+import type { KnowledgeChunk } from "../knowledge/contracts.ts";
+import { indexKnowledgeDocument } from "../knowledge/service.ts";
 import { validateKnowledgeUpload } from "../knowledge/upload.ts";
 import { writeKnowledgeVault } from "../knowledge/vault.ts";
 
@@ -17,13 +18,6 @@ function serialized<T>(root: string, operation: () => Promise<T>): Promise<T> {
   return current;
 }
 
-// Background image descriptions in flight (owner, 2026-11-24: text now, images later).
-const imageWork = new Set<Promise<void>>();
-/** Resolves once every in-flight background image description has published or failed. */
-export async function settleKnowledgeImageWork(): Promise<void> {
-	while (imageWork.size) await Promise.all([...imageWork]);
-}
-
 export function createKnowledgeStore(root: string, beforePublish: () => void) {
 	const indexFile = path.join(root, "knowledge", "index.json");
 	const sourceDirectory = path.join(root, "knowledge", "documents");
@@ -31,32 +25,24 @@ export function createKnowledgeStore(root: string, beforePublish: () => void) {
 		try { await writeKnowledgeVault(root, snapshot); }
 		catch (error) { console.error("knowledge vault rebuild failed", error); }
 	};
-	/** Describe a published document's images, then swap in its full chunk list
-	 *  under the same serialized queue. A document deleted meanwhile stays deleted. */
-	const describeLater = (pending: PendingImageDescriptions): void => {
-		const work = (async () => {
-			const chunks = await describePendingImages(pending);
-			if (!chunks) return;
-			await serialized(root, async () => {
-				beforePublish();
-				const snapshot = await readKnowledgeSnapshot(indexFile);
-				if (!snapshot.documents.some((document) => document.id === pending.documentId)) return;
-				const next = { ...snapshot, generatedAt: new Date().toISOString(), chunks: [...snapshot.chunks.filter((chunk) => chunk.sourceId !== pending.documentId), ...chunks] };
-				await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);
-				await refreshVault(next);
-			});
-		})().catch((error) => console.error("knowledge image descriptions failed", error instanceof Error ? error.message : error));
-		imageWork.add(work);
-		void work.finally(() => imageWork.delete(work));
-	};
 	return {
 		/** Index file path; a function so the checked-store proxy re-verifies the owner on every call. */
 		indexFile: () => indexFile,
 		readSnapshot: () => readKnowledgeSnapshot(indexFile),
 		writeSnapshot: (snapshot: KnowledgeSnapshot) => writeKnowledgeSnapshotAtomic(indexFile, snapshot, beforePublish),
-		/** `indexed`: the caller's own indexKnowledgeDocument result for these exact
-		 *  bytes and file name, reused instead of indexing a second time. */
-		uploadDocument: async ({ fileName, data, contentType, indexed: preindexed }: { fileName: string; data: Uint8Array; contentType?: string; indexed?: IndexedKnowledgeDocument }): Promise<KnowledgeDocumentRecord> => {
+		/** The stored copy of these exact bytes, with its chunks, if this owner already has it. */
+		findByContent: async (data: Uint8Array): Promise<{ document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[] } | null> => {
+			const snapshot = await readKnowledgeSnapshot(indexFile);
+			const contentHash = createHash("sha256").update(data).digest("hex");
+			const document = snapshot.documents.find((item) => item.contentHash === contentHash);
+			return document ? { document, chunks: snapshot.chunks.filter((chunk) => chunk.sourceId === document.id) } : null;
+		},
+		/**
+		 * `index` (optional) replaces the default text-only indexing — the route passes its
+		 * memoized vision-aware indexer so one upload is extracted (and its pictures
+		 * described) once. It is not called when these bytes are already stored.
+		 */
+		uploadDocument: async ({ fileName, data, contentType, index }: { fileName: string; data: Uint8Array; contentType?: string; index?: () => Promise<{ document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[] }> }): Promise<KnowledgeDocumentRecord> => {
 			validateKnowledgeUpload(fileName, data.byteLength, contentType);
 			return serialized(root, async () => {
 				beforePublish();
@@ -64,7 +50,7 @@ export function createKnowledgeStore(root: string, beforePublish: () => void) {
 				const contentHash = createHash("sha256").update(data).digest("hex");
 const existing = snapshot.documents.find((document) => document.contentHash === contentHash);
 				if (existing) return existing;
-				const indexed = preindexed ?? await indexKnowledgeDocument({ fileName, data, visionConfig: knowledgeVisionConfig(), deferImages: true });
+				const indexed = index ? await index() : await indexKnowledgeDocument({ fileName, data });
 				const document = { ...indexed.document, contentHash };
 				const sourceFile = path.join(sourceDirectory, document.id);
 				const temporary = path.join(sourceDirectory, `.${randomUUID()}.tmp`);
@@ -79,7 +65,6 @@ const existing = snapshot.documents.find((document) => document.contentHash === 
 					const next = { ...snapshot, generatedAt: new Date().toISOString(), documents: [...snapshot.documents, document], chunks: [...snapshot.chunks, ...indexed.chunks] };
 						await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);
 						await refreshVault(next);
-					if (indexed.pendingImages) describeLater(indexed.pendingImages);
 					return document;
 				} catch (error) {
 					if (published) await unlink(sourceFile).catch((cleanup: NodeJS.ErrnoException) => { if (cleanup.code !== "ENOENT") throw cleanup; });
@@ -98,6 +83,33 @@ if (!snapshot.documents.some((document) => document.id === id)) return false;
 			await unlink(path.join(sourceDirectory, id)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
 			await refreshVault(next);
 			return true;
+		}),
+		/**
+		 * Re-index a saved document from its stored source with `index` (the vision-aware
+		 * indexer) and replace its record and chunks in place: same id, no duplicate.
+		 * Null when the document or its source file is gone.
+		 */
+		reindexDocument: <T extends { document: KnowledgeDocumentRecord; chunks: KnowledgeChunk[] }>(id: string, index: (fileName: string, data: Uint8Array) => Promise<T>): Promise<{ document: KnowledgeDocumentRecord; result: T } | null> => serialized(root, async () => {
+			beforePublish();
+			const snapshot = await readKnowledgeSnapshot(indexFile);
+			const current = snapshot.documents.find((document) => document.id === id);
+			if (!current) return null;
+			let data: Uint8Array;
+			try { data = new Uint8Array(await readFile(path.join(sourceDirectory, id))); }
+			catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+			const result = await index(current.fileName, data);
+			const document: KnowledgeDocumentRecord = { ...result.document, id, ...(current.contentHash ? { contentHash: current.contentHash } : {}) };
+			const chunks = result.chunks.map((chunk) => ({ ...chunk, sourceId: id }));
+			const next = {
+				...snapshot,
+				generatedAt: new Date().toISOString(),
+				documents: snapshot.documents.map((item) => item.id === id ? document : item),
+				chunks: [...snapshot.chunks.filter((chunk) => chunk.sourceId !== id), ...chunks],
+			};
+			beforePublish();
+			await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);
+			await refreshVault(next);
+			return { document, result };
 		}),
 	};
 }

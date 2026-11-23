@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { authenticatedAccount } from "./session-auth.ts";
 import { runAsUser } from "./user-scope.ts";
+import { isAdminUsername } from "./admin.ts";
 
 /** Server-component counterpart of withOfficeUser. */
 export async function withOfficePageUser<T>(work: () => T | Promise<T>): Promise<T> {
@@ -9,5 +10,14 @@ export async function withOfficePageUser<T>(work: () => T | Promise<T>): Promise
   const request = new Request("http://office.local/", { headers: incoming });
   const account = await authenticatedAccount(request);
   if (!account) redirect("/login");
+  return runAsUser(account.id, work);
+}
+
+/** Admin-only server-component scope: anonymous → /login, anyone but LH_ADMIN_USERNAME → /. */
+export async function withOfficeAdminPage<T>(work: () => T | Promise<T>): Promise<T> {
+  const incoming = await headers();
+  const account = await authenticatedAccount(new Request("http://office.local/", { headers: incoming }));
+  if (!account) redirect("/login");
+  if (!isAdminUsername(account.username)) redirect("/");
   return runAsUser(account.id, work);
 }

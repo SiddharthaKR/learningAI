@@ -7,8 +7,20 @@ const accounts = createAccountStore(PATHS.data);
 
 async function GETImpl() {
   const account = await accounts.byId(currentUserId());
-  return account ? Response.json({ preferences: { uiLanguage: account.uiLanguage, teachingLanguage: account.teachingLanguage, background: account.background ?? "", reasoning: account.reasoning !== false } })
+  return account ? Response.json({ preferences: { uiLanguage: account.uiLanguage, teachingLanguage: account.teachingLanguage, background: account.background ?? "", reasoning: account.reasoning !== false, readPictures: account.readPictures ?? false } })
     : Response.json({ error: "Account not found" }, { status: 404 });
+}
+
+/** PATCH { readPictures: boolean } — remember the user's "read pictures" choice; other preferences untouched. */
+async function PATCHImpl(request: Request) {
+  const body = await request.json().catch(() => null) as { readPictures?: unknown } | null;
+  if (!body || typeof body.readPictures !== "boolean") return Response.json({ error: "readPictures must be true or false" }, { status: 400 });
+  try {
+    const account = await accounts.updatePreferences(currentUserId(), { readPictures: body.readPictures });
+    return Response.json({ preferences: { readPictures: account.readPictures ?? false } });
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : "Invalid preferences" }, { status: 400 });
+  }
 }
 
 async function PUTImpl(request: Request) {
@@ -29,3 +41,4 @@ async function PUTImpl(request: Request) {
 
 export const GET = withOfficeUser(GETImpl);
 export const PUT = withOfficeUser(PUTImpl);
+export const PATCH = withOfficeUser(PATCHImpl);

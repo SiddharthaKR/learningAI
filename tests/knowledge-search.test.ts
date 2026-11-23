@@ -127,35 +127,11 @@ describe("KnowledgeSearch", () => {
 		const chunks = [0, 1, 2, 3, 4, 5].map((i) => chunkOf(`k${i}`, `block ${i} text`, i, { citation: i < 3 ? early : late }));
 		const ranker: Ranker = { rank: () => new Map([["k1", 2], ["k3", 7], ["k5", 1]]) };
 		const results = await new KnowledgeSearch(() => chunks, [ranker]).search(["q"], "u");
-		// SAME PAGE ONLY (owner, 2026-11-24): page 1 and page 2 stay separate results.
-		assert.equal(results.length, 2);
+		assert.equal(results.length, 1);
 		assert.equal(results[0]!.id, "k3");
 		assert.equal(results[0]!.score, 7);
-		assert.deepEqual(results[0]!.citation, late);
-		assert.equal(results[0]!.text, "block 3 text\nblock 4 text\nblock 5 text");
-		assert.equal(results[1]!.id, "k1");
-		assert.deepEqual(results[1]!.citation, early);
-		assert.equal(results[1]!.text, "block 0 text\nblock 1 text\nblock 2 text");
-	});
-	it("never merges a neighbor from another page under the hit's citation", async () => {
-		const page1: KnowledgeCitation = { format: "pdf", fileName: "guide.pdf", page: 1 };
-		const page2: KnowledgeCitation = { format: "pdf", fileName: "guide.pdf", page: 2 };
-		const chunks = [chunkOf("a", "intro text", 0, { citation: page1 }), chunkOf("b", "unique fact 73921", 1, { citation: page2 })];
-		const ranker: Ranker = { rank: () => new Map([["a", 3]]) };
-		const results = await new KnowledgeSearch(() => chunks, [ranker]).search(["q"], "u");
-		assert.equal(results.length, 1);
-		assert.deepEqual(results[0]!.citation, page1);
-		assert.ok(!results[0]!.text.includes("73921"), "page-2 text must not appear under the page-1 citation");
-	});
-	it("keeps an image description separate from the page text, and widens MD line spans", async () => {
-		const text: KnowledgeCitation = { format: "pdf", fileName: "guide.pdf", page: 4 };
-		const image: KnowledgeCitation = { format: "pdf", fileName: "guide.pdf", page: 4, imageDescription: true };
-		const pdf = [chunkOf("t", "page text", 0, { citation: text }), chunkOf("i", "diagram description", 1, { citation: image })];
-		const pdfResults = await new KnowledgeSearch(() => pdf, [{ rank: () => new Map([["t", 1]]) }]).search(["q"], "u");
-		assert.equal(pdfResults[0]!.text, "page text");
-		const md = [1, 2, 3].map((i) => chunkOf(`m${i}`, `line ${i}`, i - 1, { citation: { format: "md", fileName: "n.md", heading: "H", lineStart: i * 10, lineEnd: i * 10 + 5 } }));
-		const mdResults = await new KnowledgeSearch(() => md, [{ rank: () => new Map([["m2", 1]]) }]).search(["q"], "u");
-		assert.deepEqual(mdResults[0]!.citation, { format: "md", fileName: "n.md", heading: "H", lineStart: 10, lineEnd: 35 });
+		assert.deepEqual(results[0]!.citation, late); // k3 (best hit) is cited, not k0
+		assert.equal(results[0]!.text, "block 0 text\nblock 1 text\nblock 2 text\nblock 3 text\nblock 4 text\nblock 5 text");
 	});
 	it("returns hits without ordinals unchanged", async () => {
 		const results = await new KnowledgeSearch(() => [chunkOf("old", "legacy fire", undefined), chunkOf("n", "other", 1)], [bm25Ranker]).search(["fire"], "u");

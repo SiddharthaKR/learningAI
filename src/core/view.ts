@@ -152,16 +152,6 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 	// was summarized away. Everything before it stays visible to the
 	// user (full history is never hidden); only the MODEL's context jumps.
 	const compaction = activeCompactionOf(messages);
-	// THE PROBE TOOL GUARD (owner, 2026-11-24): the TEXT of a prose question
-	// that the guard re-asked as a card is hidden; its thinking stays visible,
-	// and the "Retrying question" line follows, so the learner reads the
-	// question once. The model still sees the prose (toLlmMessages untouched).
-	const restatedProse = new Set(
-		messages.flatMap((m, i) => {
-			const next = messages[i + 1] as LhMarkerMessage | undefined;
-			return m.role === "assistant" && next?.role === "custom" && next.customType === "question-retry" ? [m.id] : [];
-		}),
-	);
 
 	for (const m of messages) {
 		const role = (m as { role?: string }).role;
@@ -228,7 +218,6 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const block of assistant.content) {
 				if (block.type === "text") {
-					if (restatedProse.has(m.id)) continue; // the card re-asks it; thinking stays
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });
@@ -243,6 +232,14 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 					}
 					rest.push(part);
 				}
+			}
+			// A FAILED turn says so (owner report, 2026-11-19): a model call that
+			// failed (e.g. HTTP 400 on the first call) is saved as an empty
+			// assistant message with stopReason "error" — hidden as empty, the
+			// chat just stayed blank. Stops (aborted) stay silent as before.
+			if (assistant.stopReason === "error" && assistant.errorMessage) {
+				const reason = assistant.errorMessage.length > 300 ? `${assistant.errorMessage.slice(0, 300)}…` : assistant.errorMessage;
+				rest.push({ type: "data-turn-error", id: `${m.id}-err`, data: { message: reason } });
 			}
 			const parts: LhViewPart[] = [...reasoning, ...rest];
 			if (parts.length === 0) {
@@ -397,12 +394,13 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
-		case "question-retry": {
-			// The probe tool guard (owner, 2026-11-23): same quiet line.
+		case "probe-nudge": {
+			// The probe-nudge (owner, 2026-11-19): scaffolding like the
+			// plan-retry — a quiet system line, never a user bubble.
 			out.push({
 				id: marker.id,
 				role: "user",
-				parts: [{ type: "data-question-retry", id: `qr_${marker.id}`, data: marker.details }],
+				parts: [{ type: "data-probe-nudge", id: `pn_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}

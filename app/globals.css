@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
+/* Tailwind v4 wraps hover: in @media (hover: hover). Touch laptops and some
+   remote-desktop sessions report no hover, which silently removed every hover
+   effect; apply hover whenever the pointer is actually over the element. */
+@custom-variant hover (&:hover);
 
 /*
  * THE SKIN — wave 5. Design tokens, the single place to restyle the app.
@@ -79,7 +83,7 @@
 		--secondary-foreground: #e6e6e6;
 		--muted: #1c1c1c;
 		--muted-foreground: #8d8d8d;
-		--accent: #232340;
+		--accent: #2a2a4f;
 		--accent-foreground: #e6e6e6;
 		--destructive: oklch(0.704 0.191 22.216);
 		--border: #434343;
@@ -104,7 +108,7 @@
 	--secondary-foreground: #e6e6e6;
 	--muted: #1c1c1c;
 	--muted-foreground: #8d8d8d;
-	--accent: #232340;
+	--accent: #2a2a4f;
 	--accent-foreground: #e6e6e6;
 	--destructive: oklch(0.704 0.191 22.216);
 	--border: #434343;
