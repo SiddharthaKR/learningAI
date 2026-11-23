@@ -398,7 +398,10 @@ ${planSection}
 ## The current moment
 What is happening RIGHT NOW at the cut: any question or problem awaiting the learner's answer, any commitment the agent has made that a later turn must honor, and the immediate next step.
 
-Rules: no praise, no filler, no speculation beyond the transcript. Every claim about the learner must be traceable to what they actually said or answered. Keep every identifier (proposition ids, node ids, file paths) exact.
+## Details to keep exactly
+Every specific detail the learner gave or asked you to remember — names, labels, codes, numbers, dates, preferences, goals, constraints — copied character for character from the transcript, one per line. When the learner corrected or replaced a detail, write ONLY the latest value and mark it: "<detail>: <latest value> (replaced <old value>)". Write "None" if there are none.
+
+Rules: no praise, no filler, no speculation beyond the transcript. Every claim about the learner must be traceable to what they actually said or answered. Keep every identifier (proposition ids, node ids, file paths) exact. Never invent a detail that is not in the transcript.
 
 TRANSCRIPT TO SUMMARIZE:
 

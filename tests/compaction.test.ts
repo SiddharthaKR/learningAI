@@ -340,14 +340,21 @@ describe("serializeForSummary + buildCompactionPrompt", () => {
 		assert.ok(serializeForSummary([marker]).includes("LEGACY SUMMARY"));
 	});
 
-	it("the prompt demands the four sections in order and carries the plan tree verbatim", () => {
+	it("the prompt demands the five sections in order and carries the plan tree verbatim", () => {
 		const prompt = buildCompactionPrompt({ spanText: "TRANSCRIPT", planTreeText: "- [done] A (a1)\n- A → B", kind: "teach" });
-		const order = ["The learner's understanding", "The teaching arc", "The plan dependency tree", "The current moment"].map(
+		const order = ["The learner's understanding", "The teaching arc", "The plan dependency tree", "The current moment", "Details to keep exactly"].map(
 			(s) => prompt.indexOf(s),
 		);
 		assert.deepEqual(order, [...order].sort((a, b) => a - b), "sections appear in the ruled order");
 		assert.ok(prompt.includes("TRANSCRIPT"));
 		assert.ok(prompt.includes("- [done] A (a1)"));
+	});
+
+	it("keeps learner details exactly, latest correction only (eval MEMORY-01)", () => {
+		const prompt = buildCompactionPrompt({ spanText: "T", planTreeText: null, kind: "chat" });
+		assert.match(prompt, /## Details to keep exactly/);
+		assert.match(prompt, /ONLY the latest value/);
+		assert.match(prompt, /Never invent a detail/);
 	});
 
 	it("planTreeToText: statuses derive from the transcript; edges render; empty tree → null", () => {
