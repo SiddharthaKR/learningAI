@@ -15,7 +15,10 @@ Run:
 Env:
   UPSTREAM        LM Studio base URL           (default http://172.20.1.126:1234)
   TEMPLATE        .jinja file, or tokenizer_config.json containing "chat_template"
-  THINKING        1 = pass enable_thinking=True to the template (default 0)
+  THINKING        1 = pass enable_thinking=True to the template (default 0).
+                  A request's chat_template_kwargs.enable_thinking (true/false)
+                  overrides it per request; LearnHarness sends it on every call
+                  from the user's Reasoning preference.
   DEBUG           1 = print rendered prompt and raw model output
   STREAM          0 = old behaviour for stream=true requests: wait for the whole
                   reply, then send it as a few SSE chunks (default 1 = real
@@ -95,9 +98,15 @@ def normalize(messages):
         out.append(m)
     return out
 
+def thinking_for(body):
+    """The request's chat_template_kwargs.enable_thinking when it is a bool, else THINKING."""
+    kwargs = body.get("chat_template_kwargs")
+    value = kwargs.get("enable_thinking") if isinstance(kwargs, dict) else None
+    return value if isinstance(value, bool) else THINKING
+
 def render(body):
     kw = dict(messages=normalize(body["messages"]), add_generation_prompt=True,
-              bos_token="", eos_token="<eos>", enable_thinking=THINKING)
+              bos_token="", eos_token="<eos>", enable_thinking=thinking_for(body))
     if body.get("tools"):
         kw["tools"] = body["tools"]
     prompt = TEMPLATE.render(**kw)
