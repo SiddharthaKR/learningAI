@@ -1,4 +1,4 @@
-import type { KnowledgeChunk, KnowledgeResult } from "./contracts.ts";
+import type { KnowledgeChunk, KnowledgeCitation, KnowledgeResult } from "./contracts.ts";
 import type { Retriever } from "./retriever.ts";
 
 export const RESULT_LIMIT = 8;
@@ -164,7 +164,30 @@ export class KnowledgeSearch implements Retriever {
 	}
 }
 
-/** One result per hit (or per group of overlapping/adjacent hit windows) with prev+hit+next text. */
+/** The citable place a chunk comes from: PDF page, slide, or heading, plus its
+ *  OCR / image-description flags. Neighbors merge only within one place. */
+function citedPlace(citation: KnowledgeCitation): string {
+	const flags = [("imageDescription" in citation && citation.imageDescription) === true, ("ocr" in citation && citation.ocr) === true];
+	switch (citation.format) {
+		case "pdf": return JSON.stringify(["pdf", citation.page, ...flags]);
+		case "pptx": return JSON.stringify(["pptx", citation.slide, ...flags]);
+		default: return JSON.stringify([citation.format, citation.heading ?? null, ...flags]);
+	}
+}
+
+/** The merged result's citation: the best hit's, widened to the merged line span for MD/TXT. */
+function mergedCitation(best: KnowledgeCitation, parts: KnowledgeChunk[]): KnowledgeCitation {
+	if (best.format !== "md" && best.format !== "txt") return best;
+	const lines = parts.map((part) => part.citation).filter((citation) => citation.format === best.format) as Array<Extract<KnowledgeCitation, { lineStart: number }>>;
+	return { ...best, lineStart: Math.min(...lines.map((c) => c.lineStart)), lineEnd: Math.max(...lines.map((c) => c.lineEnd)) };
+}
+
+/**
+ * One result per hit (or per group of overlapping/adjacent hit windows) with
+ * prev+hit+next text. SAME PLACE ONLY (owner, 2026-11-24): a neighbor from
+ * another page/slide/heading is never merged in, so a fact is never shown
+ * under a neighbor's citation.
+ */
 export function expandNeighbors(hits: KnowledgeResult[], chunks: KnowledgeChunk[]): KnowledgeResult[] {
 	const bySource = new Map<string, Map<number, KnowledgeChunk>>();
 	for (const chunk of chunks) {
@@ -182,8 +205,10 @@ export function expandNeighbors(hits: KnowledgeResult[], chunks: KnowledgeChunk[
 			return;
 		}
 		const ordinals = bySource.get(hit.sourceId)!;
-		const lo = ordinals.has(hit.ordinal - 1) ? hit.ordinal - 1 : hit.ordinal;
-		const hi = ordinals.has(hit.ordinal + 1) ? hit.ordinal + 1 : hit.ordinal;
+		const place = citedPlace(hit.citation);
+		const samePlace = (ordinal: number) => { const chunk = ordinals.get(ordinal); return chunk !== undefined && citedPlace(chunk.citation) === place; };
+		const lo = samePlace(hit.ordinal - 1) ? hit.ordinal - 1 : hit.ordinal;
+		const hi = samePlace(hit.ordinal + 1) ? hit.ordinal + 1 : hit.ordinal;
 		let entry = windowsBySource.get(hit.sourceId);
 		if (!entry) windowsBySource.set(hit.sourceId, (entry = { windows: [], ranks: new Map() }));
 		const window: Window = { lo, hi, hits: [hit] };
@@ -196,7 +221,7 @@ export function expandNeighbors(hits: KnowledgeResult[], chunks: KnowledgeChunk[
 		const groups: Window[] = [];
 		for (const window of windows) {
 			const last = groups.at(-1);
-			if (last && window.lo <= last.hi + 1) {
+			if (last && window.lo <= last.hi + 1 && citedPlace(last.hits[0]!.citation) === citedPlace(window.hits[0]!.citation)) {
 				last.hi = Math.max(last.hi, window.hi);
 				last.hits.push(...window.hits);
 				ranks.set(last, Math.min(ranks.get(last)!, ranks.get(window)!));
@@ -211,7 +236,7 @@ export function expandNeighbors(hits: KnowledgeResult[], chunks: KnowledgeChunk[
 				const chunk = ordinals.get(ordinal);
 				if (chunk) parts.push(chunk);
 			}
-			const result: KnowledgeResult = { ...best, text: mergeChunkTexts(parts), score: best.score };
+			const result: KnowledgeResult = { ...best, citation: mergedCitation(best.citation, parts), text: mergeChunkTexts(parts), score: best.score };
 			slots.push({ rank: ranks.get(group)!, result });
 		}
 	}
