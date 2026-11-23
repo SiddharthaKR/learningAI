@@ -71,7 +71,7 @@ export function formatCitation(result: KnowledgeResult): string {
 	const path = result.section?.length ? result.section.join(" › ") : undefined;
 	switch (c.format) {
 		case "pdf":
-			return `[${c.fileName}, page ${c.page}${path ? `, §${path}` : ""}]${c.ocr ? " (OCR)" : ""}`;
+			return `[${c.fileName}, page ${c.page}${path ? `, §${path}` : ""}]${c.ocr ? " (OCR, verify exact numbers)" : ""}`;
 		case "pptx":
 			return `[${c.fileName}, slide ${c.slide}${c.title ? `: ${c.title}` : ""}${path ? `, §${path}` : ""}]`;
 		case "docx": {

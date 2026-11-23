@@ -168,7 +168,7 @@ describe("tool citation display and upload cap", () => {
 	const result = (c: KnowledgeCitation, section?: string[]) => ({ ...chunkOf("x", "t", 0, section ? { section } : {}), citation: c, score: 1 });
 	it("shows the section path and marks OCR", () => {
 		assert.equal(formatCitation(result({ format: "pdf", fileName: "file.pdf", page: 12 }, ["Chapter 5", "AXI Interface"])), "[file.pdf, page 12, §Chapter 5 › AXI Interface]");
-		assert.equal(formatCitation(result({ format: "pdf", fileName: "file.pdf", page: 3, ocr: true })), "[file.pdf, page 3] (OCR)");
+		assert.equal(formatCitation(result({ format: "pdf", fileName: "file.pdf", page: 3, ocr: true })), "[file.pdf, page 3] (OCR, verify exact numbers)");
 		assert.equal(formatCitation(result({ format: "pdf", fileName: "file.pdf", page: 1 })), "[file.pdf, page 1]");
 	});
 	it("allows exactly 100 MiB", () => {
