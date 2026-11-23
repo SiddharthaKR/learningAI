@@ -630,3 +630,19 @@ Not changed (proposals only, in the bug register): CONTENT-01 (false worked step
 Gate (2026-11-24): `npm test` 2,178/2,178 pass; `tsc --noEmit` clean; `eslint . --ignore-pattern "tmp/**"` clean; `npm run build` and artifact check pass.
 
 **Cleanup (2026-11-24).** Three test processes left hanging by the stopped run that first exposed the layout-worker exit hang (decision 7 above) were stopped, and the 1.1 GB corrupt webpack cache copy was deleted. No other process or file was touched.
+
+### Merge with origin/office (2026-11-24)
+
+The local `office` branch had diverged from `origin/office` (33 local commits, 37 remote commits from 2026-11-16 to 19). Branch `eval-fixes-2026-11-24` merges both (`160819bf`); the owner chose how to resolve the features that existed twice:
+
+| Area | Kept | Removed |
+|---|---|---|
+| Probe question written as text | Probe-nudge from 2026-11-19: remind only when a probing turn showed nothing; a text question can be answered by typing ("whatever works and keep UI smooth") | The question-retry guard (`5fc583ff`) and its hide/no-thinking follow-up (`ecf12ef6`) |
+| Pictures in uploads | Opt-in "Read pictures (slower)" pipeline (reasoning off, Word placement, 30-picture cap, per-upload report, single indexing, in-place upgrade), with the 1,536-token / 180 s budget on top (`44662724`) | Automatic background descriptions (`9492f050`). Not re-added: the upload reply carries the picture report the UI shows and chat attachments need descriptions at once; the box already says "slower" |
+| Neighbor passages | Passages list with each passage's own page (`a657014b`) | Same-page-only merging (`0b6e504d`) |
+| Gemma 4 proxy | New streaming proxy, plus per-request `enable_thinking` (`bbcb3403`) | The older vault copy (`eeb0ca01`) |
+| Typeless quiz = check; lint barrels; second `probe_done` | origin/office versions (`probe_done` success now ends the turn) | Duplicates `2365db5b`, `8d109337` parts, `2e34b3a6` |
+| Failed turns | origin/office inline error line, now with the Retry button; banner keeps Retry otherwise | — |
+| Accounts | Both `reasoning` and `readPictures` preferences | — |
+
+Kept from 2026-11-24 unchanged: mixed-PDF OCR, table headers, OCR "verify exact numbers" label, worker-thread graph layout, Windows rename retry (also applied to the merged knowledge store), compaction tail budget and "Details to keep exactly", practice end-condition.

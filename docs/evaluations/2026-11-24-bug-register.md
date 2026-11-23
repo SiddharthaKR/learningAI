@@ -64,3 +64,7 @@ Appended by Claude per the review protocol; original observations above are unch
 | PRACTICE-01 | `c09d87b0` | `conclude` refuses movedOn/surrendered without a learner message since the pose. | Gate tests. |
 | FLOW-01 | `2e34b3a6` | Second `probe_done` in one turn refused. | Tool test. |
 | CONTENT-01, QUESTION-01, SPEED-01, UI-01 | none | Left as proposals: teaching-prompt, measurement and UX decisions for the owner. | — |
+
+### Claude fixes after merging origin/office (2026-11-24)
+
+Branch `eval-fixes-2026-11-24` merges the Nov 16–19 work from `origin/office`. Changes to the table above: **RAG-02/RAG-05** are now covered by origin's opt-in picture pipeline (reasoning off, valid ids, placement) plus a 1,536-token / 180 s budget (`44662724`); background description was dropped. **RAG-04** is covered by origin's passages list (`a657014b`); the same-page rule was dropped. **TEACH-01** and **FLOW-01** use origin's equivalent fixes (typeless quiz = check; `probe_done` success ends the turn). All remain **retest needed**.
