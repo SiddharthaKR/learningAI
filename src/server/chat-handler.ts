@@ -50,7 +50,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newQuestionRetryMessage, planRetryOwed, questionRetryOwed } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newQuestionRetryMessage, planRetryOwed, questionRetryOwed, restatesQuestion } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
@@ -406,7 +406,9 @@ export async function handleChatInput(
 	// tutor turns only: off rebuilds this turn's engine at thinking "off".
 	// Compaction, extraction and job engines keep the configured default.
 	const account = await createAccountStore(PATHS.data).byId(currentUserId());
-	const engine = account?.reasoning === false
+	// The probe tool guard's re-run only restates a question as a card:
+	// no thinking, so the card arrives in seconds (owner, 2026-11-24).
+	const engine = account?.reasoning === false || restatesQuestion(agentMessages)
 		? piEngineForSpec({ ...conversation, thinkingLevel: "off" })
 		: conversationEngine;
 	// Provider-qualified stamp (model slots wave): matches the price table's

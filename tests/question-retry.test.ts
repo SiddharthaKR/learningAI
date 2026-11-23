@@ -10,6 +10,7 @@ import {
 	newQuestionRetryMessage,
 	questionRetryId,
 	questionRetryOwed,
+	restatesQuestion,
 	toLlmMessages,
 } from "../src/core/native-messages.ts";
 import { QUESTION_RETRY_TEXT } from "../src/core/contracts/chat.ts";
@@ -82,6 +83,24 @@ describe("the question-retry marker", () => {
 		const last = wire.at(-1) as { role: string; content: Array<{ text: string }> };
 		assert.equal(last.role, "user");
 		assert.equal(last.content[0]!.text, QUESTION_RETRY_TEXT);
+	});
+
+	it("hides the re-asked prose text but keeps its thinking; other replies are untouched", () => {
+		const thoughtful = { ...prose("a1"), content: [{ type: "thinking", thinking: "Plan the question" }, { type: "text", text: "Which optics area?" }] };
+		const nudge = newQuestionRetryMessage("chat_q", "u1");
+		const view = projectView([learner("u1"), thoughtful, nudge] as never);
+		const reply = view.find((m) => m.id === "a1")!;
+		const kinds = (m: { parts: Array<{ type: string }> }) => m.parts.map((p) => p.type).filter((t) => t !== "step-start");
+		assert.deepEqual(kinds(reply), ["reasoning"], "thinking stays, the prose question goes");
+		const plain = projectView([learner("u1"), thoughtful] as never).find((m) => m.id === "a1")!;
+		assert.deepEqual(kinds(plain), ["reasoning", "text"], "without the nudge nothing is hidden");
+	});
+
+	it("only the nudged re-run restates the question (and so skips thinking)", () => {
+		const nudge = newQuestionRetryMessage("chat_q", "u1");
+		assert.equal(restatesQuestion([learner("u1"), prose("a1"), nudge] as never), true);
+		assert.equal(restatesQuestion([learner("u1")] as never), false);
+		assert.equal(restatesQuestion([learner("u1"), prose("a1"), nudge, withCall("a2", "ask_user_question"), learner("u2")] as never), false);
 	});
 
 	it("renders as a quiet system line, never the instruction text", () => {

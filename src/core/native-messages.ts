@@ -243,6 +243,13 @@ export function newQuestionRetryMessage(chatId: string, inputId: string): LhMark
  *  that input's id (the nudge's key), or false: not probing, the reply
  *  called a tool or did not stop normally, or the nudge already followed
  *  this input (a prose reply to the nudge itself never nudges again). */
+/** This run was started by the probe tool guard's nudge: it only restates a
+ *  question as a card, so it runs without thinking (owner, 2026-11-24). */
+export function restatesQuestion(messages: readonly LhMessage[]): boolean {
+	const last = messages.at(-1) as LhMarkerMessage | undefined;
+	return last?.role === "custom" && last.customType === "question-retry";
+}
+
 export function questionRetryOwed(messages: readonly LhMessage[]): string | false {
 	if (hasProbeDone(messages)) return false;
 	const last = messages.at(-1);

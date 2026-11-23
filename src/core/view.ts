@@ -152,6 +152,16 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 	// was summarized away. Everything before it stays visible to the
 	// user (full history is never hidden); only the MODEL's context jumps.
 	const compaction = activeCompactionOf(messages);
+	// THE PROBE TOOL GUARD (owner, 2026-11-24): the TEXT of a prose question
+	// that the guard re-asked as a card is hidden; its thinking stays visible,
+	// and the "Retrying question" line follows, so the learner reads the
+	// question once. The model still sees the prose (toLlmMessages untouched).
+	const restatedProse = new Set(
+		messages.flatMap((m, i) => {
+			const next = messages[i + 1] as LhMarkerMessage | undefined;
+			return m.role === "assistant" && next?.role === "custom" && next.customType === "question-retry" ? [m.id] : [];
+		}),
+	);
 
 	for (const m of messages) {
 		const role = (m as { role?: string }).role;
@@ -218,6 +228,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const block of assistant.content) {
 				if (block.type === "text") {
+					if (restatedProse.has(m.id)) continue; // the card re-asks it; thinking stays
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });
