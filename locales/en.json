@@ -154,7 +154,8 @@
     "historyCompacted": "History compacted",
     "compactionTokenCount": "{count}k tok",
     "somethingWentWrong": "Something went wrong: {message}",
-    "retry": "Retry"
+    "retry": "Retry",
+    "retryingQuestion": "Retrying question"
   },
   "composer": {
     "nextProblem": "Next problem",

@@ -40,6 +40,7 @@ import {
 	CONCLUDE_ACK_TEXT,
 	HANDOFF_TEXT,
 	planRetryText,
+	QUESTION_RETRY_TEXT,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
@@ -71,6 +72,7 @@ export interface LhMarkerMessage {
 		| "graph-context"
 		| "probe-handoff"
 		| "plan-retry"
+		| "question-retry"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
@@ -214,6 +216,47 @@ export function newPlanRetryMessage(chatId: string, lastError: string | null): L
 		details: { chatId },
 		timestamp: Date.now(),
 	};
+}
+
+/** The probe tool guard (owner, 2026-11-23): one nudge per learner input,
+ *  keyed by that input's id, through the same wake pipeline as plan-retry. */
+export function questionRetryId(inputId: string): string {
+	return `steer_qretry_${inputId}`;
+}
+
+export function newQuestionRetryMessage(chatId: string, inputId: string): LhMarkerMessage {
+	return {
+		id: questionRetryId(inputId),
+		role: "custom",
+		customType: "question-retry",
+		content: QUESTION_RETRY_TEXT,
+		display: true,
+		details: { chatId },
+		timestamp: Date.now(),
+	};
+}
+
+/** Is the probe tool guard owed? While still probing (no probe_done), a
+ *  prober reply that stopped normally with no tool call asked in prose —
+ *  the learner has nothing to answer through. Walking back from the end:
+ *  the trailing assistant replies, then the input they answered. Returns
+ *  that input's id (the nudge's key), or false: not probing, the reply
+ *  called a tool or did not stop normally, or the nudge already followed
+ *  this input (a prose reply to the nudge itself never nudges again). */
+export function questionRetryOwed(messages: readonly LhMessage[]): string | false {
+	if (hasProbeDone(messages)) return false;
+	const last = messages.at(-1);
+	if (!last || last.role !== "assistant") return false;
+	const reply = last as AssistantMessage;
+	if (reply.stopReason !== "stop" || reply.content.some((b) => b.type === "toolCall")) return false;
+	const ids = new Set(messages.map((m) => m.id));
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "assistant") continue;
+		if (m.role === "custom" && (m as LhMarkerMessage).customType === "question-retry") return false;
+		return ids.has(questionRetryId(m.id)) ? false : m.id;
+	}
+	return false;
 }
 
 /** Should the plan-retry nudge fire now? Only after the handoff has been

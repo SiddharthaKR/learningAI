@@ -154,7 +154,8 @@
     "historyCompacted": "履歴を整理済み",
     "compactionTokenCount": "約{count}千トークン",
     "somethingWentWrong": "エラーが発生しました: {message}",
-    "retry": "再試行"
+    "retry": "再試行",
+    "retryingQuestion": "質問を再試行中"
   },
   "composer": {
     "nextProblem": "次の問題",

@@ -50,7 +50,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, planRetryOwed } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newQuestionRetryMessage, planRetryOwed, questionRetryOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
@@ -637,6 +637,15 @@ export async function handleChatInput(
 					if (owed !== false) {
 						void deliverJobResult(newPlanRetryMessage(chatId, owed)).catch((err: unknown) => {
 							console.error(`[chat ${chatId}] plan-retry nudge failed:`, err);
+						});
+					}
+					// THE PROBE TOOL GUARD (owner, 2026-11-23): a prober reply
+					// that asked in prose re-runs once with the question-tool
+					// instruction (keyed by the learner input it answered).
+					const questionOwed = settled ? questionRetryOwed(settled.messages) : false;
+					if (questionOwed !== false) {
+						void deliverJobResult(newQuestionRetryMessage(chatId, questionOwed)).catch((err: unknown) => {
+							console.error(`[chat ${chatId}] question-retry nudge failed:`, err);
 						});
 					}
 				}

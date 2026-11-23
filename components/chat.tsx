@@ -1412,6 +1412,12 @@ export function Chat({
 														{copy.chat.retryingPlan}
 													</SystemLine>
 												);
+											case "data-question-retry":
+												return (
+													<SystemLine key={pi} testId="question-retry">
+														{copy.chat.retryingQuestion}
+													</SystemLine>
+												);
 											case "data-practice-thinking":
 												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-next":

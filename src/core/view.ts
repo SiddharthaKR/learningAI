@@ -386,6 +386,15 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "question-retry": {
+			// The probe tool guard (owner, 2026-11-23): same quiet line.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-question-retry", id: `qr_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "subagent-steer": {
 			const meta = marker.details as SubagentResultMeta;
 			const artifact = marker.details as {

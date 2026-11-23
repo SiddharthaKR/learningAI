@@ -233,6 +233,14 @@ export function planRetryText(lastError: string | null): string {
 	);
 }
 
+/** The probe tool guard (owner, 2026-11-23): while probing, the learner can
+ *  answer only through a question tool, so a prober reply that asks in
+ *  prose re-runs once with this instruction. */
+export const QUESTION_RETRY_TEXT =
+	"Your last reply asked the learner in plain text, but while probing the learner can only answer through a question tool. " +
+	"Ask now with your quizzing tool (`probe` or `recall`) or `ask_user_question`, or call `probe_done` if you already have enough evidence. " +
+	"Do not repeat your explanation.";
+
 // ─── Practice sessions (owner, 2026-10-04) — marker + ack texts ──────────────
 // Single-sourced here per the marker law: the model-facing text of every
 // custom marker lives in core/contracts, never in the flattening seam.
