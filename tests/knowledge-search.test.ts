@@ -37,17 +37,17 @@ describe("chunker sections, tables and ordinals", () => {
 		assert.equal(chunks.length, 1);
 		assert.equal(chunks[0]!.text, `§ T\n${table}`);
 	});
-	it("splits an oversized table only at row boundaries and repeats the prefix", () => {
+	it("splits an oversized table only at row boundaries and repeats the prefix and header row", () => {
 		const rows = Array.from({ length: 200 }, (_, i) => `row${String(i).padStart(3, "0")} | ${"c".repeat(40)}`);
 		const chunks = chunkDocument(doc([{ text: rows.join("\n"), citation, kind: "table", section: ["T"] }]), "s");
 		assert.ok(chunks.length > 1);
 		const seen: string[] = [];
 		for (const chunk of chunks) {
-			assert.ok(chunk.text.startsWith("§ T\n"));
+			assert.ok(chunk.text.startsWith(`§ T\n${rows[0]}\n`), "every piece starts with the section prefix and header row");
 			assert.ok(Array.from(chunk.text).length <= 4000);
-			seen.push(...chunk.text.slice(4).split("\n"));
+			seen.push(...chunk.text.slice(4).split("\n").slice(1));
 		}
-		assert.deepEqual(seen, rows);
+		assert.deepEqual(seen, rows.slice(1), "every data row appears exactly once, in order");
 	});
 	it("numbers chunks with a running 0-based ordinal across blocks", () => {
 		const chunks = chunkDocument(doc([{ text: "a".repeat(2000), citation }, { text: "b", citation: { ...citation, page: 2 } }]), "s");
