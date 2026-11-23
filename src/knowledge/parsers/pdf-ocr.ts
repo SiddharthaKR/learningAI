@@ -31,15 +31,17 @@ async function prepareLangPath(): Promise<string> {
 	return dir;
 }
 
-/** OCR every embedded page image; returns one entry per page that yielded text.
+/** OCR the embedded page images (only those on `pages` when given); returns one
+ *  entry per page that yielded text.
  *  Never throws: any failure to load or run tesseract is logged and yields []. */
-export async function ocrPdfPages(fileName: string, data: Uint8Array): Promise<OcrPage[]> {
+export async function ocrPdfPages(fileName: string, data: Uint8Array, pages?: ReadonlySet<number>): Promise<OcrPage[]> {
 	let images;
 	try {
 		images = await extractPdfImages(fileName, data);
 	} catch {
 		return [];
 	}
+	if (pages) images = images.filter((image) => image.citation.format === "pdf" && pages.has(image.citation.page));
 	if (!images.length) return [];
 	let worker: import("tesseract.js").Worker | undefined;
 	try {
