@@ -85,6 +85,17 @@ describe("probe_done: the probe→planning seam", () => {
 		assert.equal((delivered[0]!.details as { chatId: string }).chatId, chatId);
 	});
 
+	it("refuses a second probe_done in the same turn, before the record is saved (eval FLOW-01)", async () => {
+		const chatId = newChat("Probe: twice in one turn");
+		const delivered: SteerMessage[] = [];
+		const tools = probeDoneTool({ chatId, chatStore, deliver: (s) => delivered.push(s) });
+		assert.equal((await execute(tools, { assessment: ASSESSMENT })).ok, true);
+		const second = await execute(tools, { assessment: ASSESSMENT });
+		assert.equal(second.ok, false);
+		assert.match(second.error ?? "", /already concluded/);
+		assert.equal(delivered.length, 1, "the handoff is queued once");
+	});
+
 	it("hands off an evidence-based assessment without a known ceiling", async () => {
 		const chatId = newChat("Probe: enough to plan");
 		const delivered: SteerMessage[] = [];

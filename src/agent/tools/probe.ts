@@ -46,6 +46,10 @@ function probeConcluded(messages: readonly LhMessage[]): boolean {
  * from that message on, every request builds the TEACHER agent.
  */
 export function probeDoneTool(ctx: ProbeDoneContext): Record<string, AgentTool<any>> {
+	// TURN-SCOPED (owner, 2026-11-24; eval FLOW-01): the stored record freezes
+	// at the turn's write-ahead, so a second probe_done in the same turn passed
+	// the probeConcluded check. This flag sees the first success at once.
+	let concludedThisTurn = false;
 	return {
 		probe_done: {
 			name: "probe_done",
@@ -74,9 +78,10 @@ export function probeDoneTool(ctx: ProbeDoneContext): Record<string, AgentTool<a
 							"probe_done only fires with no question outstanding.",
 					};
 				}
-				if (probeConcluded(record.messages)) {
+				if (concludedThisTurn || probeConcluded(record.messages)) {
 					return { ok: false, error: "The probe is already concluded — probe_done fires exactly once." };
 				}
+				concludedThisTurn = true;
 				try {
 					ctx.deliver(buildProbeHandoffSteer(ctx.chatId));
 				} catch (err) {
