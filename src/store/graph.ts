@@ -33,6 +33,7 @@
  */
 
 import * as fs from "node:fs";
+import { renameSyncWithRetry } from "./atomic-rename.ts";
 import * as path from "node:path";
 import { assertGraphFormat as assertGraphFormatAt, ensureGraphFormat as ensureGraphFormatAt } from "./graph-format.ts";
 import type {
@@ -240,7 +241,7 @@ const graphStore: GraphStore = {
 				// must see exactly what appendLine would have written.
 				const body = records.map((record) => JSON.stringify(record)).join("\n") + (records.length > 0 ? "\n" : "");
 				fs.writeFileSync(tmp, body, "utf-8");
-				fs.renameSync(tmp, file);
+				renameSyncWithRetry(tmp, file);
 			} catch (err) {
 				try {
 					fs.unlinkSync(tmp);
@@ -286,7 +287,7 @@ function writePositionMap(positions: Record<string, Position>): void {
 	const tmp = `${POSITIONS_FILE}.tmp-${crypto.randomUUID().slice(0, 8)}`;
 	try {
 		fs.writeFileSync(tmp, JSON.stringify({ positions, updatedAt: new Date().toISOString() }, null, "\t"), "utf-8");
-		fs.renameSync(tmp, POSITIONS_FILE);
+		renameSyncWithRetry(tmp, POSITIONS_FILE);
 	} catch (err) {
 		try {
 			fs.unlinkSync(tmp);

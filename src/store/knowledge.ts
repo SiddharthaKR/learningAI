@@ -1,6 +1,6 @@
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { renameSync } from "node:fs";
+import { renameSyncWithRetry } from "./atomic-rename.ts";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { readKnowledgeSnapshot, writeKnowledgeSnapshotAtomic, type KnowledgeSnapshot, type KnowledgeDocumentRecord } from "../knowledge/index-store.ts";
 import { describePendingImages, indexKnowledgeDocument, knowledgeVisionConfig, type IndexedKnowledgeDocument, type PendingImageDescriptions } from "../knowledge/service.ts";
@@ -74,7 +74,7 @@ const existing = snapshot.documents.find((document) => document.contentHash === 
 				try {
 					await writeFile(temporary, data, { mode: 0o600, flag: "wx" });
 					beforePublish();
-					renameSync(temporary, sourceFile);
+					renameSyncWithRetry(temporary, sourceFile);
 					published = true;
 					const next = { ...snapshot, generatedAt: new Date().toISOString(), documents: [...snapshot.documents, document], chunks: [...snapshot.chunks, ...indexed.chunks] };
 						await writeKnowledgeSnapshotAtomic(indexFile, next, beforePublish);

@@ -10,6 +10,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { emit } from "../core/events.ts";
+import { renameSyncWithRetry } from "./atomic-rename.ts";
 import type { ChatStore } from "../core/ports.ts";
 import type { ChatRecord, ChatSettings, ChatSummary, ExtractionRunUsage, PlanTree, SessionControls, SessionControlsChangedData, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
@@ -68,7 +69,7 @@ function writeChat(record: ChatRecord): void {
 		fs.fsyncSync(fd);
 		fs.closeSync(fd);
 		fd = undefined;
-		fs.renameSync(temporary, destination);
+		renameSyncWithRetry(temporary, destination);
 	} finally {
 		if (fd !== undefined) {
 			try { fs.closeSync(fd); } catch { /* Preserve the publication failure. */ }

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } fr
 import { promises as fs } from "node:fs";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { renameSyncWithRetry } from "../store/atomic-rename.ts";
 import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCallback);
@@ -40,7 +41,7 @@ export function createAccountStore(root: string) {
   async function write(value: AccountFile): Promise<void> {
     const temp = path.join(root, `.accounts-${randomUUID()}.tmp`);
     await fs.writeFile(temp, `${JSON.stringify(value)}\n`, { mode: 0o600 });
-    try { await fs.rename(temp, file); } finally { await fs.rm(temp, { force: true }); }
+    try { renameSyncWithRetry(temp, file); } finally { await fs.rm(temp, { force: true }); }
   }
   async function locked<T>(operation: () => Promise<T>): Promise<T> {
     await fs.mkdir(root, { recursive: true });

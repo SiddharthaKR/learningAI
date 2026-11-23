@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { renameSync } from "node:fs";
+import { renameSyncWithRetry } from "../store/atomic-rename.ts";
 import { mkdir, open, unlink } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -99,7 +99,7 @@ export async function writeKnowledgeSnapshotAtomic(filePath: string, snapshot: K
 		// Keep authorization and replacement in one event-loop turn. A queued
 		// account deletion must not run between this final check and publication.
 		beforePublish?.();
-		renameSync(temporary, filePath);
+		renameSyncWithRetry(temporary, filePath);
 	} finally {
 		try { if (handle) await handle.close(); }
 		finally { await unlink(temporary).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; }); }
