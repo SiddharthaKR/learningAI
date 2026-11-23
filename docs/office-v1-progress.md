@@ -349,7 +349,7 @@ Gate (2026-11-23): `npm test` 2,151/2,151 pass; `tsc --noEmit` clean; ESLint cle
 
 Fixes for Codex's evaluations (`docs/evaluations/2026-11-23-summary.md`, `docs/evaluations/2026-11-24-bug-register.md`). Owner decisions were taken through questions on 2026-11-24; decisions Claude took alone while the owner was away are listed at the end.
 
-- **Build and lint (BUILD-01).** The webpack `WasmHash` crash came from a corrupt 1.1 GB persistent cache in `.next/cache/webpack`; with the cache moved aside, `npm run build` and the artifact check pass (documented in DEPLOY section 7). The four lint errors were knowledge map/section imports that skipped the barrels (`8d109337`).
+- **Build and lint (BUILD-01).** The webpack `WasmHash` crash came from a corrupt 1.1 GB persistent cache in `.next/cache/webpack`; with that cache removed, `npm run build` and the artifact check pass (documented in DEPLOY section 7). The old cache copy was deleted after the fix was confirmed. The four lint errors were knowledge map/section imports that skipped the barrels (`8d109337`).
 - **Mixed PDFs (RAG-01).** Pages without a text layer are OCRed even when other pages have text; native text is kept per page (`78676aad`).
 - **Tables (RAG-03).** Every split piece of a large table repeats the header row (`aec21e0c`, `ceb86d72`).
 - **Citations (RAG-04).** Search widens a hit only with neighbors from the same page, slide or heading (and the same OCR/image flags); MD/TXT results widen their line span (`0b6e504d`).
@@ -379,3 +379,5 @@ Not changed (proposals only, in the bug register): CONTENT-01 (false worked step
 12. Lint runs clean only when `tmp/` is excluded (Codex's running copy of the app lives there); the ESLint config was not changed.
 
 Gate (2026-11-24): `npm test` 2,178/2,178 pass; `tsc --noEmit` clean; `eslint . --ignore-pattern "tmp/**"` clean; `npm run build` and artifact check pass.
+
+**Cleanup (2026-11-24).** Three test processes left hanging by the stopped run that first exposed the layout-worker exit hang (decision 7 above) were stopped, and the 1.1 GB corrupt webpack cache copy was deleted. No other process or file was touched.

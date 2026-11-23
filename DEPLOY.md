@@ -66,7 +66,7 @@ They only touch the `learnharness` service and the `searxng` container, and ask 
 cd ~/app && git pull && npm ci && npm run build && npm run build:source
 sudo systemctl restart learnharness
 ```
-If `npm run build` fails in webpack hashing (`WasmHash._updateWithBuffer ... reading 'length'`), the persistent webpack cache is corrupt: move `.next/cache/webpack` aside and build again. On 2026-11-24 this fixed the failure reported in `docs/evaluations/2026-11-23-summary.md`.
+If `npm run build` fails in webpack hashing (`WasmHash._updateWithBuffer ... reading 'length'`), the persistent webpack cache is corrupt: delete `.next/cache/webpack` (`rm -rf .next/cache/webpack`) and build again; the next build recreates it. On 2026-11-24 this fixed the failure reported in `docs/evaluations/2026-11-23-summary.md`.
 
 ## 8. Acceptance checks
 ```bash
