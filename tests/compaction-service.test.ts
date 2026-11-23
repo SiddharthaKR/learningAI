@@ -260,6 +260,16 @@ describe("the compaction service", () => {
 		kickCompaction(() => null, chatId);
 	});
 
+	it("a usage-heavy zero cut does not spend or append a marker", async () => {
+		const chat = chatStore.createChat("no-progress fixture");
+		const assistant = { id: "measured", role: "assistant", content: [{ type: "text", text: "ok" }], stopReason: "stop", usage: { input: 120_000, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 120_001 }, timestamp: 1 } as LhMessage;
+		chatStore.saveMessages(chat.id, [newUserMessage("tiny visible history"), assistant]);
+		const before = summarizeCalls;
+		await ensureCompacted(depsOf(chat.id, 40_000), chat.id);
+		assert.equal(summarizeCalls, before);
+		assert.equal(activeCompactionOf(chatStore.getChat(chat.id)!.messages), null);
+	});
+
 	it("a summarizer failure leaves the record untouched and the gate re-arms", async () => {
 		const chatId = overThresholdChat("compact: fail");
 		const before = summarizeCalls;

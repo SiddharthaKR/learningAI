@@ -305,3 +305,20 @@ These are UI polish changes. All acceptance items remain at their prior status; 
 | Deployment on .126 | Pending | `DEPLOY.md` and `deploy/learnharness.service` are written; the host run and acceptance checks have not been done. |
 | Concurrency limits | Untested | `MAX_CONCURRENT_LLM=2` is set but not host-tested with multiple users. |
 | Shared knowledge index | Operator-configured | Paths are set in the host `.env` by the operator (decided 2026-11-11); empty means off. Currently not wired: `KNOWLEDGE_SHARED_DIR` and `KNOWLEDGE_INDEX_FILE` are not pointed at real directories; only personal uploads work. |
+
+### Upstream fixes taken from amosblomqvist/learnharness (2026-11-23)
+
+The fork point is v0.3.4 (`6cba9c8`); upstream `main` was at v0.7.0 with 607 commits. Upstream work that only applies to the desktop app, subscription logins, Claude Code, plugins, flashcards, drawing pad, themes, or pricing was not taken. Each commit message names its upstream source commit.
+
+Cherry-picked unchanged (or with a test-only trim):
+- `3c769309`: math such as `$a<b$` is no longer cut off while a reply streams. The test drops the tool-content renderer case, which this branch does not have.
+- `485c51f0`: the chat list sets `pendingProblem`, so the sidebar "Problem waiting" marker shows.
+- `ef0075fc`: rendered Markdown does not load remote images.
+- `c4f5a09f`, `ca196470`, `6842bd02`, `d2214b4c`, `0a8c0445`: evidence-led probing and confidence calibration in the prober prompts.
+
+Ported by hand:
+- Compaction cut walk (from `624c91a4`, compaction parts only; the pricing and usage-meter rework was not taken). The cut follows Pi coding-agent 1.4.0 `findCutPoint`: when the whole history fits in the 20k keep budget, nothing is summarized (the old walk summarized everything), and `compact()` returns early when the cut drops nothing. Failed responses no longer anchor the context estimate, and images count as a fixed 4,800 characters. Tests: `tests/compaction-native-parity.test.ts` (new) and updated cut tests.
+
+Not taken because this branch already has its own version:
+- `ca0ac24c` (re-read the chat before saving the summary): done in Task 6A.
+- `e3618cbb` (marker placed before messages saved during the summary): the owner kept the Task 6A behavior, which appends the marker at the end.
