@@ -138,8 +138,9 @@ export async function describeOneImage(
 
 const DESCRIBE_PROMPT = "Describe this image in detail for a text search index. Include all visible text, diagrams, charts, labels, and key visual elements. Be concise but thorough.";
 
-/** Per-picture timeout: the large server model on a busy GPU needs more than a laptop. */
-const VISION_TIMEOUT_MS = 60_000;
+/** Per-picture timeout and no-reasoning budget (owner, 2026-11-24): dense manual
+ *  pages took ~700 tokens and 46-51 s on the 12B laptop model. */
+const VISION_TIMEOUT_MS = 180_000;
 
 /**
  * One OpenAI-compatible vision call. Reasoning models (Gemma 4 with thinking on) can
@@ -163,7 +164,7 @@ async function defaultVisionCall(imageBase64: string, mimeType: string, prompt: 
 					{ type: "text", text: prompt },
 				],
 			}],
-			...(noReasoning ? { max_tokens: 1024, reasoning_effort: "none" } : { max_tokens: 2048 }),
+			...(noReasoning ? { max_tokens: 1536, reasoning_effort: "none" } : { max_tokens: 2048 }),
 		}),
 		signal,
 	});
