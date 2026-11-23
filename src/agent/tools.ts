@@ -73,6 +73,19 @@ function prepareQuestionArguments<T extends object>(args: unknown): T {
 	return args as T;
 }
 
+/** Teach quiz/explain: a call with NO `type` defaults to "check" (owner,
+ *  2026-11-24). Gemma writes arguments in alphabetical order, so `type`
+ *  comes last and was dropped twice in a row, losing the question card (eval
+ *  TEACH-01). "check" is the role the display already gives a call without a
+ *  type (questionNeedsReveal); a present but invalid value is still rejected. */
+export function prepareTeachQuestionArguments<T extends object>(args: unknown): T {
+	const prepared = prepareQuestionArguments<T>(args);
+	if (prepared && typeof prepared === "object" && !Array.isArray(prepared) && !("type" in prepared)) {
+		return { ...prepared, type: "check" } as T;
+	}
+	return prepared;
+}
+
 export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 	name: "ask_user_question",
 	label: "ask_user_question",
@@ -218,7 +231,7 @@ export function teachExplainToolFor(
 		label: "explain",
 		description: explainDescription("explain", true),
 		parameters: explainInputObject,
-		prepareArguments: prepareQuestionArguments,
+		prepareArguments: prepareTeachQuestionArguments,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
 			const problems = [...explainInputProblems(input)];
@@ -369,7 +382,7 @@ export function teachQuizToolFor(ctx: Pick<PlanToolContext, "chatId" | "chatStor
 		label: "quiz",
 		description: quizDescription({ name: "quiz", nodeId: true, types: true }),
 		parameters: quizInputObject,
-		prepareArguments: prepareQuestionArguments,
+		prepareArguments: prepareTeachQuestionArguments,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
 			const problems = [...quizInputProblems(input)];
