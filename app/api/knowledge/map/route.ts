@@ -1,6 +1,5 @@
-import { withOfficeUser, currentUserId, checkedStoresForUser, sharedKnowledgeStore } from "@/src/server";
-import { buildKnowledgeMap } from "@/src/knowledge/map";
-import type { KnowledgeMapResponse } from "@/src/knowledge/map-contracts";
+import type { KnowledgeMapResponse } from "@/src/core";
+import { withOfficeUser, currentUserId, checkedStoresForUser, sharedKnowledgeStore, buildKnowledgeMap } from "@/src/server";
 
 export const runtime = "nodejs";
 
