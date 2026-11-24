@@ -45,6 +45,43 @@ export function healStringifiedArrays(raw: unknown): unknown {
 	return out;
 }
 
+/** A chain endpoint written as `{ "id": "p2" }` instead of `"p2"`. */
+function unwrapIdObject(value: unknown): unknown {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+	const keys = Object.keys(value);
+	const id = (value as { id?: unknown }).id;
+	return keys.length === 1 && typeof id === "string" ? id : value;
+}
+
+/** The chain-endpoint heal (owner, 2026-11-24): Gemma 12B wrote a chain's
+ *  premises as `[{"id": "p2"}]` instead of `["p2"]` in 4 of 7 extraction
+ *  runs, and four slips in a row ended the run ("never submitted
+ *  findings"). An object holding only a string `id` — in premises or as the
+ *  conclusion — becomes that id; anything else is left for validation. */
+export function healChainEndpoints(raw: unknown): unknown {
+	if (typeof raw !== "object" || raw === null) return raw;
+	const chains = (raw as { chains?: unknown }).chains;
+	if (!Array.isArray(chains)) return raw;
+	return {
+		...(raw as Record<string, unknown>),
+		chains: chains.map((chain) => {
+			if (typeof chain !== "object" || chain === null) return chain;
+			const c = chain as { premises?: unknown; conclusion?: unknown };
+			return {
+				...c,
+				...(Array.isArray(c.premises) ? { premises: c.premises.map(unwrapIdObject) } : {}),
+				...("conclusion" in c ? { conclusion: unwrapIdObject(c.conclusion) } : {}),
+			};
+		}),
+	};
+}
+
+/** Every extractor heal, in order: stringified arrays first, then the
+ *  chain endpoints inside them. */
+export function healExtractorArguments(raw: unknown): unknown {
+	return healChainEndpoints(healStringifiedArrays(raw));
+}
+
 export async function runSubmitAgent<T>(opts: {
 	role: ModelRole;
 	toolName: string;

@@ -50,3 +50,12 @@ describe("office thinking levels", () => {
 		assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
 	});
 });
+
+describe("office output cap (2026-11-24)", () => {
+	it("sends LLM_MAX_TOKENS as max_tokens (Ollama ignores max_completion_tokens)", async () => {
+		const body = await sentBody();
+		assert.equal(typeof body.max_tokens, "number");
+		assert.ok((body.max_tokens as number) > 0);
+		assert.equal(body.max_completion_tokens, undefined);
+	});
+});

@@ -141,19 +141,28 @@ export function quizInputProblems(input: {
 	return problems;
 }
 
+/** Does the label contain this number as a separate number — not part of a
+ *  longer number or a decimal ("1" is not in "10" or "2.5")? */
+function numberInLabel(digits: string, label: string): boolean {
+	return new RegExp(`(?<![\\d.,])${digits}(?![\\d]|[.,]\\d)`, "u").test(label);
+}
+
 /** A NEW quiz from the model: the gradeability contract above plus the
  *  placeholder-value rule (owner, 2026-11-19). Gemma 4 26B named every option
  *  "a"/"b"/"c" and keyed the wrong letter in 2 of 6 quizzes (its own
  *  explanation backed another option); a value that names the option makes
  *  that slip visible while the key is written. A one-character or all-digit
- *  value is rejected only when it stands in for a longer label. Authoring
- *  boundary ONLY — saved quizzes display through quizInputProblems, so old
- *  records with "a"/"b"/"c" values keep rendering. */
+ *  value is rejected only when it stands in for a longer label — except an
+ *  all-digit value that appears as a separate number in its own label
+ *  ("4" for "4 times more", owner 2026-11-24: Gemma 12B's real answers were
+ *  refused). Authoring boundary ONLY — saved quizzes display through
+ *  quizInputProblems, so old records with "a"/"b"/"c" values keep rendering. */
 export function quizAuthoringProblems(input: Parameters<typeof quizInputProblems>[0]): string[] {
 	const problems = quizInputProblems(input);
 	const placeholders = input.options
 		.map((option, i) => ({ i, value: option.value?.trim() ?? "", label: option.label.trim() }))
-		.filter(({ value, label }) => value && (/^[\p{L}\p{N}]$/u.test(value) || /^\d+$/u.test(value)) && value.toLowerCase() !== label.toLowerCase());
+		.filter(({ value, label }) => value && (/^[\p{L}\p{N}]$/u.test(value) || /^\d+$/u.test(value)) && value.toLowerCase() !== label.toLowerCase())
+		.filter(({ value, label }) => !(/^\d+$/u.test(value) && numberInLabel(value, label)));
 	if (placeholders.length > 0) {
 		problems.push(
 			`${placeholders.map(({ i, value }) => `options[${i}].value "${value}"`).join(", ")} ${placeholders.length === 1 ? "is a placeholder" : "are placeholders"}. ` +
@@ -680,6 +689,12 @@ export function shuffleOptions(options: QuizOption[], rand: () => number = Math.
 
 // ─── quiz grading ───────────────────────────────────────────────────────────
 
+/** An option key compared without `$` math delimiters, whitespace, or a
+ *  final full stop (`.` or `。`). */
+function mathInsensitiveKey(value: string): string {
+	return value.replace(/\$/g, "").replace(/\s+/g, "").replace(/[.。]$/, "");
+}
+
 /** Preserve an exact option key before trying copy-syntax cleanup: a
  *  label's final period, quotes, or backticks can be CONTENT (calculus
  *  incident, 2026-10-12), not model debris. The actual option values are
@@ -693,7 +708,18 @@ export function coerceCorrectAnswer(
 ): string[] {
 	const clean = (value: string): string => {
 		const trimmed = value.trim();
-		return optionValues.includes(trimmed) ? trimmed : stripModelValueDebris(value);
+		if (optionValues.includes(trimmed)) return trimmed;
+		const stripped = stripModelValueDebris(value);
+		if (optionValues.includes(stripped)) return stripped;
+		// Math-delimiter slip (2026-11-24, Gemma E4B): the key written as
+		// "Close to $1/10$" for the option "Close to 1/10" (or the reverse).
+		// Resolve only when exactly one option matches ignoring `$` and
+		// spacing — anything ambiguous stays a hard error. A missing or extra
+		// final full stop resolves the same way (2026-11-24, Gemma 12B: the
+		// key "The energy doubles" for the option "The energy doubles.").
+		const key = mathInsensitiveKey(stripped);
+		const hits = optionValues.filter((option) => mathInsensitiveKey(option) === key);
+		return hits.length === 1 ? hits[0]! : stripped;
 	};
 	if (Array.isArray(correctAnswer)) return correctAnswer.map(clean);
 	const trimmed = correctAnswer.trim();

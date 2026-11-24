@@ -451,3 +451,39 @@ describe("derivePlanStatuses: tagged explain calls move the map like quiz calls"
 		assert.deepEqual([...st.visited], ["a"]);
 	});
 });
+
+describe("plan_init — presenting ends the teacher's turn (owner, 2026-11-24)", () => {
+	const MAP = "graph TD\n  a[First] --> b[Second]\n";
+	const msg = (m: Record<string, unknown>) => m as never;
+	const probeDone = [
+		msg({ id: "p1", role: "assistant", content: [{ type: "toolCall", id: "pd", name: "probe_done", arguments: {} }], stopReason: "toolUse", timestamp: 0 }),
+		msg({ id: "p2", role: "toolResult", toolCallId: "pd", toolName: "probe_done", content: [{ type: "text", text: "ok" }], isError: false, timestamp: 0 }),
+	];
+
+	it("ends the turn while the plan is being presented (probe concluded, teaching not begun)", async () => {
+		const chatId = newChat("Plan: presenting");
+		chatStore.saveMessages(chatId, probeDone);
+		const result = await planTools({ chatId, chatStore }).plan_init!.execute("t1", { mermaid: MAP });
+		assert.equal((result.details as PlanToolResult).ok, true);
+		assert.equal(result.terminate, true);
+	});
+
+	it("a refused map keeps the turn open so the teacher can fix it", async () => {
+		const chatId = newChat("Plan: refused");
+		chatStore.saveMessages(chatId, probeDone);
+		const result = await planTools({ chatId, chatStore }).plan_init!.execute("t2", { mermaid: "graph TD\n  a[A] --> a\n" });
+		assert.equal((result.details as PlanToolResult).ok, false);
+		assert.notEqual(result.terminate, true);
+	});
+
+	it("a mid-lesson rewrite (teaching begun) carries on", async () => {
+		const chatId = newChat("Plan: mid-lesson");
+		chatStore.saveMessages(chatId, [
+			...probeDone,
+			msg({ id: "q1", role: "assistant", content: [{ type: "toolCall", id: "qz", name: "quiz", arguments: { nodeId: "a" } }], stopReason: "toolUse", timestamp: 0 }),
+		]);
+		const result = await planTools({ chatId, chatStore }).plan_init!.execute("t3", { mermaid: MAP });
+		assert.equal((result.details as PlanToolResult).ok, true);
+		assert.notEqual(result.terminate, true);
+	});
+});

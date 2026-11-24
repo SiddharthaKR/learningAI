@@ -123,6 +123,22 @@ describe("quizInputSchema / quizInputProblems (the authoring contract)", () => {
 		assert.deepEqual(quizInputProblems(lettered), []);
 	});
 
+	it("accepts an all-digit value that appears as a separate number in its own label (owner, 2026-11-24)", () => {
+		// Gemma 12B keyed "2 times more" … "10 times more" as "2", "4", "8", "10"
+		// and the rule rejected them — the values named their options.
+		const times = {
+			...valid,
+			options: ["2", "4", "8", "10"].map((n) => ({ label: `${n} times more`, value: n })),
+			correctAnswer: "4",
+		};
+		assert.deepEqual(quizAuthoringProblems(times), []);
+		// "1" is not a separate number in "10 times more"; positional digits for word labels stay rejected.
+		const embedded = { ...valid, options: [{ label: "10 times more", value: "1" }, { label: "20 times more", value: "2" }], correctAnswer: "1" };
+		assert.equal(quizAuthoringProblems(embedded).length, 1);
+		const decimal = { ...valid, options: [{ label: "2.5 volts", value: "2" }, { label: "5 volts", value: "5" }], correctAnswer: "5" };
+		assert.match(quizAuthoringProblems(decimal)[0] ?? "", /options\[0\]\.value "2" is a placeholder/u);
+	});
+
 	it("accepts explicit values and multi-select arrays (incl. JSON-stringified)", () => {
 		const multi = {
 			...valid,
@@ -295,6 +311,31 @@ describe("coerceCorrectAnswer", () => {
 
 	it("parses a JSON-stringified multi-select array", () => {
 		assert.deepEqual(coerceCorrectAnswer('["a", "b"]', values), ["a", "b"]);
+	});
+
+	it("resolves a key that differs from one option only by $ math markers (Gemma E4B slip)", () => {
+		const plain = ["Close to 1/2", "Close to 1/10", "Close to 1/9"];
+		assert.deepEqual(coerceCorrectAnswer("Close to $1/10$", plain), ["Close to 1/10"]);
+		const math = ["$V_1 = 2$ V", "$V_1 = 4$ V"];
+		assert.deepEqual(coerceCorrectAnswer("V_1 = 4 V", math), ["$V_1 = 4$ V"]);
+		assert.deepEqual(quizInputProblems({ options: plain.map((label) => ({ label })), correctAnswer: "Close to $1/10$" }), []);
+	});
+
+	it("resolves a key that differs from one option only by a final full stop (Gemma 12B slip, 2026-11-24)", () => {
+		const sentences = ["The energy doubles.", "The energy halves.", "The energy stays the same."];
+		assert.deepEqual(coerceCorrectAnswer("The energy doubles", sentences), ["The energy doubles."]);
+		assert.deepEqual(coerceCorrectAnswer("電圧は同じ", ["電圧は同じ。", "電圧は二倍。"]), ["電圧は同じ。"]);
+		assert.deepEqual(coerceCorrectAnswer("Ohm's law.", ["Ohm's law", "Kirchhoff's law"]), ["Ohm's law"]);
+		assert.deepEqual(quizInputProblems({ options: sentences.map((label) => ({ label })), correctAnswer: "The energy halves" }), []);
+	});
+
+	it("never guesses when the full-stop-insensitive match is ambiguous", () => {
+		assert.deepEqual(coerceCorrectAnswer("x = 1", ["x = 1.", "x = 1。"]), ["x = 1"]);
+	});
+
+	it("never guesses when the math-insensitive match is ambiguous", () => {
+		const twins = ["$x$ + 1", "x + 1"];
+		assert.deepEqual(coerceCorrectAnswer("$x + 1$", twins), ["$x + 1$"]);
 	});
 
 	it("leaves a non-JSON bracketed string alone", () => {

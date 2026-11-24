@@ -137,6 +137,12 @@ export function piModels() {
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: config.llmContextWindow,
 			maxTokens: config.llmMaxTokens,
+			// LLM_MAX_TOKENS goes out as `max_tokens` (2026-11-24): pi-ai's
+			// default for a custom endpoint is `max_completion_tokens`, which
+			// Ollama ignores — a local 12B turn thought for 19k tokens (13 min)
+			// past the 4,096 cap. Ollama, LM Studio and the Gemma 4 proxy all
+			// read `max_tokens`.
+			compat: { maxTokensField: "max_tokens" },
 		};
 		collection = createModels({ identity: APP_IDENTITY });
 		collection.setProvider(createProvider({

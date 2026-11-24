@@ -75,6 +75,34 @@ function outcomeLabel(outcome: string): string {
 	return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** The answer key of a graded record: the correct option label(s) of a
+ *  quiz or probe, or the committed answer of a recall check. Undefined
+ *  when the record carries none (a dismissal, an old record). */
+function answerKeyText(out: unknown): string | undefined {
+	const record = out as Partial<{
+		options: { index: number; label: string }[];
+		correctIndices: number[];
+		committed: string;
+	}> | undefined;
+	if (typeof record?.committed === "string" && record.committed.trim()) return record.committed.trim();
+	if (!Array.isArray(record?.options) || !Array.isArray(record?.correctIndices)) return undefined;
+	const labels = record.correctIndices
+		.map((index) => record.options!.find((o) => o.index === index)?.label)
+		.filter((label): label is string => typeof label === "string" && label.trim().length > 0);
+	return labels.length > 0 ? labels.join(", ") : undefined;
+}
+
+/** The labels of the learner's selected options. Real records carry
+ *  `{ label, value, index }` objects (buildAnswer); plain strings are
+ *  accepted too, so a bare array never renders as "[object Object]". */
+function answerLabels(answers: unknown): string[] {
+	if (!Array.isArray(answers)) return [];
+	return answers
+		.map((a) => (typeof a === "string" ? a : (a as { label?: unknown } | null)?.label))
+		.filter((label): label is string => typeof label === "string" && label.trim().length > 0)
+		.map((label) => label.trim());
+}
+
 /** One tool result's learner-visible outcome, rendered as body lines. */
 function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { heading: string; body: string[] } {
 	const out = result.details as
@@ -84,7 +112,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 				dontKnow: boolean;
 				note: string;
 				text: string;
-				answers: string[];
+				answers: unknown[];
 				other: string;
 				dismissed: boolean;
 		  }>
@@ -106,10 +134,19 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 						: "Recall check"; // explain — the teach free-recall name
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];
+		// The answer key (owner, 2026-11-24): without it the extractor saw
+		// only "answered correctly" and had to guess the fact — 12B saved a
+		// wrong one. Wrong options are never listed as statements.
+		const correctAnswer = answerKeyText(out);
+		if (correctAnswer !== undefined) body.push(`Correct answer: ${correctAnswer}`);
 		if (out?.dismissed === true) body.push("The learner skipped this check.");
 		else if (out?.dontKnow === true) body.push("The learner did not know.");
 		else if (out?.correct === true) body.push("The learner answered correctly.");
-		else if (out?.correct === false) body.push("The learner answered incorrectly.");
+		else if (out?.correct === false) {
+			body.push("The learner answered incorrectly.");
+			const chosen = answerLabels(out.answers);
+			if (chosen.length > 0) body.push(`The learner chose: ${chosen.join(", ")}`);
+		}
 		else if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered in his own words: ${out.text.trim()}`);
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
 		return { heading, body };
@@ -142,7 +179,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];
 		const chosen = [
-			...(Array.isArray(out?.answers) ? out!.answers! : []),
+			...answerLabels(out?.answers),
 			...(typeof out?.other === "string" && out.other.trim() ? [out.other.trim()] : []),
 		];
 		if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered: ${out.text.trim()}`);

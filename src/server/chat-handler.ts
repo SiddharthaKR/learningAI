@@ -37,7 +37,7 @@ import { requestWebApproval } from "./web-approvals.ts";
 import { validateRestrictedWebTarget } from "../agent/tools/restricted-web-fetch.ts";
 import { createAccountStore } from "./accounts.ts";
 import { PATHS } from "../../config.ts";
-import { fixedOfficeModelSpec } from "./office-config.ts";
+import { fixedOfficeModelSpec, officeConfig } from "./office-config.ts";
 import { answerKeyCheck } from "./answer-key-check.ts";
 import { describeAttachedImages } from "./chat-image-vision.ts";
 import { providerKeyPresent } from "./keys.ts";
@@ -52,7 +52,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, planRetryOwed, probeNudgeOwed } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, newTeachNudgeMessage, nudgeAfterEmptyCapHit, planRetryOwed, probeNudgeOwed, teachNudgeOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
@@ -105,8 +105,11 @@ export function extractionForOwner(ownerId: string): ReturnType<typeof createExt
 	// role override → slot → NOTHING — read FRESH per stage call; an empty
 	// chain flows through as undefined and the pipeline refuses the run
 	// with the typed ModelsNotConfiguredError. Direct test values still win.
-	engineFor: (role) =>
-		resolveEngine(role),
+	// THINKING OFF (owner, 2026-11-24): with LLM_MAX_TOKENS enforced, Gemma
+	// spent the whole 4,096-token cap thinking and never submitted its
+	// findings (every batch failed, ~200 s each). Extraction runs like the
+	// picture-reading jobs: no thinking, done sooner, model freed for turns.
+	engineFor: extractionEngine,
 	// Key-presence gate (provider-key interlude, 2026-09-25): same check
 	// the job runner gets — a stage engine whose provider key is gone
 	// refuses BEFORE any batch runs (the typed throw), never mid-run.
@@ -140,9 +143,24 @@ setTurnRunner(async (chatId, input) => {
  *  the chain (role override → slot → NOTHING) may end empty, and undefined
  *  flows through to the per-need refusal gates (runner/extraction), read
  *  FRESH so a settings PUT between dispatch and spawn lands. */
-function resolveEngine(_role: ModelRole): PiEngine | undefined {
+/** The extraction stages' engine: the office model with thinking off. */
+export function extractionEngine(role: ModelRole): PiEngine | undefined {
+	return resolveEngine(role, { thinking: false });
+}
+
+/** The compaction summary's engine (owner, 2026-11-24): the office model
+ *  with thinking off. The summary is a text job; thinking under the
+ *  output cap made it slow and could use the whole cap before any
+ *  summary was written. */
+export function compactionEngine(): PiEngine | undefined {
 	const spec = fixedOfficeModelSpec();
-	return spec ? piEngineForSpec(spec) : undefined;
+	return spec ? piEngineForSpec({ ...spec, thinkingLevel: "off" }) : undefined;
+}
+
+function resolveEngine(_role: ModelRole, opts: { thinking?: boolean } = {}): PiEngine | undefined {
+	const spec = fixedOfficeModelSpec();
+	if (!spec) return undefined;
+	return piEngineForSpec(opts.thinking === false ? { ...spec, thinkingLevel: "off" } : spec);
 }
 
 function spawnOfficeJob(jobId: string, ownerId: string | undefined, input?: unknown): void {
@@ -282,12 +300,13 @@ export async function handleChatInput(
 	await ensureCompacted(
 		{
 			chatStore: stores.chatStore,
-			engine: conversationEngine,
+			engine: compactionEngine() ?? conversationEngine,
 			modelId: modelIdForCompaction,
 			kind: record.kind === "practice" ? "practice" : record.kind === "chat" ? "chat" : hasProbeDone(record.messages) ? "teach" : "probe",
 			thresholdTokens: effectiveThresholdTokens(
 				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
+				officeConfig().llmMaxTokens,
 			),
 			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : record.kind === "chat" ? "chat" : "teacher").length / 4),
 		},
@@ -415,9 +434,12 @@ export async function handleChatInput(
 	// (Built once above the compaction gate; reused for compaction.)
 	// The learner's Reasoning preference (Preferences, default on) governs
 	// tutor turns only: off rebuilds this turn's engine at thinking "off".
-	// Compaction, extraction and job engines keep the configured default.
+	// Compaction and extraction run with thinking off; job engines keep
+	// the configured default.
+	// A nudge answering a turn that thought until the output cap and showed
+	// nothing also runs with thinking off (owner, 2026-11-24).
 	const account = await createAccountStore(PATHS.data).byId(currentUserId());
-	const engine = account?.reasoning === false
+	const engine = account?.reasoning === false || nudgeAfterEmptyCapHit(agentMessages)
 		? piEngineForSpec({ ...conversation, thinkingLevel: "off" })
 		: conversationEngine;
 	// Provider-qualified stamp (model slots wave): matches the price table's
@@ -661,6 +683,14 @@ export async function handleChatInput(
 							console.error(`[chat ${chatId}] probe nudge failed:`, err);
 						});
 					}
+					// THE TEACH-NUDGE (owner, 2026-11-24): a teaching turn that ended
+					// with no question tool left the learner no answer box — remind
+					// the model once (per learner input) to ask with a tool.
+					if (settled && teachNudgeOwed(settled.messages)) {
+						void deliverJobResult(newTeachNudgeMessage(chatId, settled.messages.length)).catch((err: unknown) => {
+							console.error(`[chat ${chatId}] teach nudge failed:`, err);
+						});
+					}
 				}
 				// THE SETTLE KICK (owner round 14): the turn settled — if the
 				// projection is now over threshold, the summary starts in the
@@ -674,9 +704,8 @@ export async function handleChatInput(
 				if (process.env.NODE_ENV !== "test")
 					kickCompaction(() => {
 						const fresh = effectiveSettings();
-						const spec = fixedOfficeModelSpec();
-						if (!spec) return null;
-						const kickEngine = piEngineForSpec(spec);
+						const kickEngine = compactionEngine();
+						if (!kickEngine) return null;
 						const kickModelId = `${kickEngine.model.provider}:${kickEngine.model.id}`;
 						const freshRecord = stores.chatStore.getChat(chatId);
 						if (!freshRecord) return null;
@@ -688,6 +717,7 @@ export async function handleChatInput(
 							thresholdTokens: effectiveThresholdTokens(
 								fresh.compaction?.thresholdTokens,
 								catalogContextLimits().get(kickModelId),
+								officeConfig().llmMaxTokens,
 							),
 							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher").length / 4),
 						};

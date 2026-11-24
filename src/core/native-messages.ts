@@ -42,6 +42,7 @@ import {
 	planRetryText,
 	PROBE_QUESTION_NUDGE_TEXT,
 	sessionControlsText,
+	TEACH_QUESTION_NUDGE_TEXT,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
@@ -74,6 +75,7 @@ export interface LhMarkerMessage {
 		| "probe-handoff"
 		| "plan-retry"
 		| "probe-nudge"
+		| "teach-nudge"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
@@ -289,6 +291,77 @@ export function probeNudgeOwed(messages: readonly LhMessage[]): boolean {
 	for (let i = messages.length - 2; i >= 0; i--) {
 		const m = messages[i] as { role?: string; customType?: string; toolName?: string };
 		if (m.role === "custom" && m.customType === "probe-nudge") return false;
+		if (m.role === "user") break;
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName ?? "")) break;
+	}
+	return true;
+}
+
+/** Is this run a probe- or teach-nudge answering a turn that hit the output
+ *  cap while showing nothing? (owner, 2026-11-24): the model thought until
+ *  the cap; a second run with thinking on would likely do the same, so the
+ *  nudge's run goes with thinking off. True when the record ends on a nudge
+ *  marker (other markers may follow it) and the message before the trailing
+ *  markers is an assistant reply that stopped on "length" with no visible
+ *  text and no tool call. */
+export function nudgeAfterEmptyCapHit(messages: readonly LhMessage[]): boolean {
+	let i = messages.length - 1;
+	let nudged = false;
+	for (; i >= 0; i--) {
+		const m = messages[i] as { role?: string; customType?: string };
+		if (m.role !== "custom") break;
+		if (m.customType === "probe-nudge" || m.customType === "teach-nudge") nudged = true;
+	}
+	if (!nudged || i < 0) return false;
+	const reply = messages[i] as AssistantMessage | { role?: string };
+	if (reply.role !== "assistant") return false;
+	const assistant = reply as AssistantMessage;
+	if (assistant.stopReason !== "length") return false;
+	return !assistant.content.some((block) =>
+		block.type === "toolCall" || (block.type === "text" && block.text.trim().length > 0));
+}
+
+/** The teach-nudge (owner, 2026-11-24): one reminder when a TEACHING turn
+ *  ends with no tool call, so the learner always gets an answer box. Same
+ *  deterministic-id scheme as the probe-nudge. */
+export function newTeachNudgeMessage(chatId: string, position: number): LhMarkerMessage {
+	return {
+		id: `steer_teachnudge_${chatId}_${position}`,
+		role: "custom",
+		customType: "teach-nudge",
+		content: TEACH_QUESTION_NUDGE_TEXT,
+		display: true,
+		details: { chatId },
+		timestamp: Date.now(),
+	};
+}
+
+/** Should the teach-nudge fire now? Only once a plan exists (probe concluded
+ *  and a plan block written — the presenting turn ends on plan_init, a tool
+ *  call), only when the last message is a finished assistant reply with NO
+ *  tool call, and at most once per learner input. Unlike the probe-nudge it
+ *  also fires when the turn wrote text: a question in prose has no answer
+ *  box (Gemma 12B asked every teaching question that way, 2026-11-24). */
+export function teachNudgeOwed(messages: readonly LhMessage[]): boolean {
+	if (!hasProbeDone(messages)) return false;
+	if (!messages.some((m) => (m as { role?: string }).role === "custom" && (m as LhMarkerMessage).customType === "plan-block")) return false;
+	const last = messages.at(-1) as AssistantMessage | undefined;
+	if (!last || (last as { role?: string }).role !== "assistant") return false;
+	if (last.stopReason === "error" || last.stopReason === "aborted") return false;
+	if (last.content.some((block) => block.type === "toolCall")) return false;
+	// Only an empty turn or one that wrote a question (owner, 2026-11-24): a
+	// closing goodbye or a plain explanation is left alone — nudging the
+	// goodbye made 12B re-ask "what next?" after the learner said they were
+	// done (~4 min). Full-width "？" covers Japanese lessons.
+	const visible = last.content
+		.filter((block): block is TextContent => block.type === "text")
+		.map((block) => block.text)
+		.join("")
+		.trim();
+	if (visible.length > 0 && !/[?？]/.test(visible)) return false;
+	for (let i = messages.length - 2; i >= 0; i--) {
+		const m = messages[i] as { role?: string; customType?: string; toolName?: string };
+		if (m.role === "custom" && m.customType === "teach-nudge") return false;
 		if (m.role === "user") break;
 		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName ?? "")) break;
 	}
@@ -867,6 +940,14 @@ export function needsContinuation(messages: readonly LhMessage[]): boolean {
 		(m) => m.toolName === PRACTICE_PROBLEM_TOOL && !m.isError && m.details == null,
 	);
 	if (posedProblem) return false;
+	// A SUCCESSFUL probe_done ends the prober's turn on purpose (terminate:
+	// true) and queues the probe-handoff, whose server wake starts the
+	// teacher's run. A client continuation here would race that wake and
+	// start a teacher turn without the handoff (seen 2026-11-24: two
+	// teacher turns, the second replacing the plan). A refusal (isError)
+	// still owes the prober its reaction.
+	const concludedProbe = results.some((m) => m.toolName === "probe_done" && !m.isError);
+	if (concludedProbe) return false;
 	const answered = new Set(results.map((m) => m.toolCallId));
 	const calls = (content as Array<{ type?: string; id?: string }>).filter(
 		(b) => b.type === "toolCall" && typeof b.id === "string",

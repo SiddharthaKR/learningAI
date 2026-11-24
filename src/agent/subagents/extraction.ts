@@ -30,7 +30,7 @@ import { settleGraphLayoutInBackground } from "../../core/layout-runner.ts";
 import { batchRuns, coverageOf, messageViewLines } from "../../core/coverage.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { auditorGraphTools } from "../tools/graph.ts";
-import { runSubmitAgent, healStringifiedArrays } from "./submit-agent.ts";
+import { runSubmitAgent, healExtractorArguments, healStringifiedArrays } from "./submit-agent.ts";
 
 /**
  * The extraction pipeline (vision §1 construction, 2026-09-02 redesign;
@@ -501,7 +501,7 @@ function runExtractor(
 		signal,
 		onStep,
 		neverSubmitted: "the extractor never submitted findings",
-		prepareArguments: healStringifiedArrays,
+		prepareArguments: healExtractorArguments,
 	}).then(asSessionFindings);
 }
 
@@ -532,7 +532,7 @@ function runNotesExtractor(
 		signal,
 		onStep,
 		neverSubmitted: "the extractor never submitted findings",
-		prepareArguments: healStringifiedArrays,
+		prepareArguments: healExtractorArguments,
 	}).then(asSessionFindings);
 }
 

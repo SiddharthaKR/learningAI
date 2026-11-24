@@ -91,6 +91,52 @@ describe("messageMarkdown", () => {
 		assert.match(md, /\*\(his thinking: mixed up signs\)\*/);
 	});
 
+	it("graded blocks carry the answer key and, when wrong, the learner's choice (owner, 2026-11-24)", () => {
+		const options = [
+			{ index: 1, label: "The energy stays the same." },
+			{ index: 2, label: "The energy doubles." },
+			{ index: 3, label: "The energy halves." },
+		];
+		const wrong = messageMarkdown(
+			result("r1", "q1", "quiz", {
+				questionText: "You double the plate gap. What happens to the stored energy?",
+				options,
+				correctIndices: [2],
+				correct: false,
+				dontKnow: false,
+				answers: [{ label: "The energy stays the same.", value: "same", index: 1 }],
+			}),
+			"r1",
+		)!;
+		assert.match(wrong, /\*\*Q:\*\* You double[^\n]*\n\nCorrect answer: The energy doubles\.\n\nThe learner answered incorrectly\.\n\nThe learner chose: The energy stays the same\./);
+		assert.doesNotMatch(wrong, /halves/, "wrong options are never listed");
+
+		const right = messageMarkdown(
+			result("r2", "p1", "probe", { questionText: "Q?", options, correctIndices: [2], correct: true, dontKnow: false, answers: [{ label: "The energy doubles.", value: "d", index: 2 }] }),
+			"r2",
+		)!;
+		assert.match(right, /Correct answer: The energy doubles\./);
+		assert.doesNotMatch(right, /The learner chose/);
+
+		const recall = messageMarkdown(
+			result("r3", "e1", "explain", { questionText: "Why?", committed: "Because the field stays fixed.", text: "no idea" }),
+			"r3",
+		)!;
+		assert.match(recall, /Correct answer: Because the field stays fixed\./);
+
+		const skipped = messageMarkdown(result("r4", "q2", "quiz", { questionText: "Q?", dismissed: true, answers: [] }), "r4")!;
+		assert.doesNotMatch(skipped, /Correct answer/);
+	});
+
+	it("ask blocks render real option records by label, never [object Object]", () => {
+		const md = messageMarkdown(
+			result("r1", "a1", "ask_user_question", { questionText: "Next?", answers: [{ label: "Practice problems", value: "practice", index: 2 }] }),
+			"r1",
+		)!;
+		assert.match(md, /The learner chose: Practice problems/);
+		assert.doesNotMatch(md, /object Object/);
+	});
+
 	it("explain results: the learner's own words are shown", () => {
 		const md = messageMarkdown(
 			result("r1", "e1", "explain", { questionText: "Why does Mercury stay near the Sun?", text: "it never strays far" }),
