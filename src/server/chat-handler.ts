@@ -105,8 +105,11 @@ export function extractionForOwner(ownerId: string): ReturnType<typeof createExt
 	// role override → slot → NOTHING — read FRESH per stage call; an empty
 	// chain flows through as undefined and the pipeline refuses the run
 	// with the typed ModelsNotConfiguredError. Direct test values still win.
-	engineFor: (role) =>
-		resolveEngine(role),
+	// THINKING OFF (owner, 2026-11-24): with LLM_MAX_TOKENS enforced, Gemma
+	// spent the whole 4,096-token cap thinking and never submitted its
+	// findings (every batch failed, ~200 s each). Extraction runs like the
+	// picture-reading jobs: no thinking, done sooner, model freed for turns.
+	engineFor: extractionEngine,
 	// Key-presence gate (provider-key interlude, 2026-09-25): same check
 	// the job runner gets — a stage engine whose provider key is gone
 	// refuses BEFORE any batch runs (the typed throw), never mid-run.
@@ -140,9 +143,15 @@ setTurnRunner(async (chatId, input) => {
  *  the chain (role override → slot → NOTHING) may end empty, and undefined
  *  flows through to the per-need refusal gates (runner/extraction), read
  *  FRESH so a settings PUT between dispatch and spawn lands. */
-function resolveEngine(_role: ModelRole): PiEngine | undefined {
+/** The extraction stages' engine: the office model with thinking off. */
+export function extractionEngine(role: ModelRole): PiEngine | undefined {
+	return resolveEngine(role, { thinking: false });
+}
+
+function resolveEngine(_role: ModelRole, opts: { thinking?: boolean } = {}): PiEngine | undefined {
 	const spec = fixedOfficeModelSpec();
-	return spec ? piEngineForSpec(spec) : undefined;
+	if (!spec) return undefined;
+	return piEngineForSpec(opts.thinking === false ? { ...spec, thinkingLevel: "off" } : spec);
 }
 
 function spawnOfficeJob(jobId: string, ownerId: string | undefined, input?: unknown): void {
