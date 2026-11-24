@@ -29,6 +29,20 @@ describe("teachNudgeOwed", () => {
 		assert.equal(teachNudgeOwed([...planned, user(), prose()] as never), true);
 	});
 
+	it("is owed when the turn showed nothing (thinking only)", () => {
+		assert.equal(teachNudgeOwed([...planned, user(), prose("a9", "stop", "  ")] as never), true);
+	});
+
+	it("is not owed for a goodbye or explanation with no question (owner, 2026-11-24)", () => {
+		// 12B said goodbye after "That's all for now"; the nudge made it re-ask "what next?".
+		const bye = prose("a9", "stop", "You're very welcome. Have a great rest of your day!");
+		assert.equal(teachNudgeOwed([...planned, user("u2", "That's all for now, thanks."), bye] as never), false);
+	});
+
+	it("counts a Japanese full-width question mark", () => {
+		assert.equal(teachNudgeOwed([...planned, user(), prose("a9", "stop", "電圧はどうなりますか？")] as never), true);
+	});
+
 	it("is not owed when the turn ended on a question tool", () => {
 		assert.equal(teachNudgeOwed([...planned, user(), call("q1", "quiz", { nodeId: "a" })] as never), false);
 		assert.equal(teachNudgeOwed([...planned, user(), call("q2", "ask_user_question")] as never), false);

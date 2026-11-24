@@ -325,6 +325,16 @@ export function teachNudgeOwed(messages: readonly LhMessage[]): boolean {
 	if (!last || (last as { role?: string }).role !== "assistant") return false;
 	if (last.stopReason === "error" || last.stopReason === "aborted") return false;
 	if (last.content.some((block) => block.type === "toolCall")) return false;
+	// Only an empty turn or one that wrote a question (owner, 2026-11-24): a
+	// closing goodbye or a plain explanation is left alone — nudging the
+	// goodbye made 12B re-ask "what next?" after the learner said they were
+	// done (~4 min). Full-width "？" covers Japanese lessons.
+	const visible = last.content
+		.filter((block): block is TextContent => block.type === "text")
+		.map((block) => block.text)
+		.join("")
+		.trim();
+	if (visible.length > 0 && !/[?？]/.test(visible)) return false;
 	for (let i = messages.length - 2; i >= 0; i--) {
 		const m = messages[i] as { role?: string; customType?: string; toolName?: string };
 		if (m.role === "custom" && m.customType === "teach-nudge") return false;
