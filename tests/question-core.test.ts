@@ -305,6 +305,18 @@ describe("coerceCorrectAnswer", () => {
 		assert.deepEqual(quizInputProblems({ options: plain.map((label) => ({ label })), correctAnswer: "Close to $1/10$" }), []);
 	});
 
+	it("resolves a key that differs from one option only by a final full stop (Gemma 12B slip, 2026-11-24)", () => {
+		const sentences = ["The energy doubles.", "The energy halves.", "The energy stays the same."];
+		assert.deepEqual(coerceCorrectAnswer("The energy doubles", sentences), ["The energy doubles."]);
+		assert.deepEqual(coerceCorrectAnswer("電圧は同じ", ["電圧は同じ。", "電圧は二倍。"]), ["電圧は同じ。"]);
+		assert.deepEqual(coerceCorrectAnswer("Ohm's law.", ["Ohm's law", "Kirchhoff's law"]), ["Ohm's law"]);
+		assert.deepEqual(quizInputProblems({ options: sentences.map((label) => ({ label })), correctAnswer: "The energy halves" }), []);
+	});
+
+	it("never guesses when the full-stop-insensitive match is ambiguous", () => {
+		assert.deepEqual(coerceCorrectAnswer("x = 1", ["x = 1.", "x = 1。"]), ["x = 1"]);
+	});
+
 	it("never guesses when the math-insensitive match is ambiguous", () => {
 		const twins = ["$x$ + 1", "x + 1"];
 		assert.deepEqual(coerceCorrectAnswer("$x + 1$", twins), ["$x + 1$"]);
