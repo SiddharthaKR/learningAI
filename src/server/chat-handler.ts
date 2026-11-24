@@ -157,6 +157,13 @@ export function compactionEngine(): PiEngine | undefined {
 	return spec ? piEngineForSpec({ ...spec, thinkingLevel: "off" }) : undefined;
 }
 
+/** A background job's engine: the researcher runs with thinking off (owner,
+ *  2026-11-25 — it thought on each of up to 12 search/fetch steps and
+ *  research took minutes); the other jobs keep the configured default. */
+export function jobEngine(role: ModelRole): PiEngine | undefined {
+	return resolveEngine(role, role === "researcher" ? { thinking: false } : {});
+}
+
 function resolveEngine(_role: ModelRole, opts: { thinking?: boolean } = {}): PiEngine | undefined {
 	const spec = fixedOfficeModelSpec();
 	if (!spec) return undefined;
@@ -172,7 +179,7 @@ function spawnOfficeJob(jobId: string, ownerId: string | undefined, input?: unkn
 			chatStore: owned.chatStore,
 			jobStore: owned.jobStore,
 			deliver: deliverJobResult,
-			engineFor: resolveEngine,
+			engineFor: jobEngine,
 			searchProvider,
 			webEnabled: researchAvailable,
 			webAllowedUrl: (chatId, url) => userMessageUrls(owned.chatStore.getChat(chatId)?.messages ?? []).has(url),
@@ -434,7 +441,7 @@ export async function handleChatInput(
 	// (Built once above the compaction gate; reused for compaction.)
 	// The learner's Reasoning preference (Preferences, default on) governs
 	// tutor turns only: off rebuilds this turn's engine at thinking "off".
-	// Compaction and extraction run with thinking off; job engines keep
+	// Compaction, extraction and the researcher run with thinking off; other jobs keep
 	// the configured default.
 	// A nudge answering a turn that thought until the output cap and showed
 	// nothing also runs with thinking off (owner, 2026-11-24).
