@@ -29,6 +29,22 @@ function publicAccount(account: StoredAccount): Account {
   return publicFields;
 }
 
+/** Server start only (instrumentation.ts): no account write can be in flight
+ *  before the server takes requests, so a lock file here was left by a
+ *  process that died mid-write and would otherwise block every login and
+ *  signup ("Account file is locked"). Returns whether one was removed. */
+export async function clearStaleAccountLock(root: string): Promise<boolean> {
+  const lockFile = path.join(root, ".accounts.lock");
+  try {
+    await fs.rm(lockFile);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+  console.warn(`[accounts] removed a stale account lock left by an earlier run: ${lockFile}`);
+  return true;
+}
+
 export function createAccountStore(root: string) {
   const file = path.join(root, "accounts.json");
   const lockFile = path.join(root, ".accounts.lock");

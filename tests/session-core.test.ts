@@ -1064,6 +1064,17 @@ describe("needsContinuation (the native lastAssistantMessageIsCompleteWithToolCa
 	it("an orphan result (no asking assistant) never continues", () => {
 		assert.equal(needsContinuation([userText("u1", "topic"), resultMsg("call-x")]), false);
 	});
+
+	it("a concluded probe_done never continues (the handoff wake starts the teacher)", () => {
+		const messages = [userText("u1", "topic"), assistantWithCall("a1", "call-pd", "probe_done"), resultMsg("call-pd", "probe_done")];
+		assert.equal(needsContinuation(messages), false);
+	});
+
+	it("a refused probe_done still continues (the prober fixes course)", () => {
+		const refused = { ...resultMsg("call-pd", "probe_done"), isError: true } as unknown as LhMessage;
+		const messages = [userText("u1", "topic"), assistantWithCall("a1", "call-pd", "probe_done"), refused];
+		assert.equal(needsContinuation(messages), true);
+	});
 });
 
 // ─── the dismissal pause (owner design 2026-10-03, "A2") ────────────────────

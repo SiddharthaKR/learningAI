@@ -867,6 +867,14 @@ export function needsContinuation(messages: readonly LhMessage[]): boolean {
 		(m) => m.toolName === PRACTICE_PROBLEM_TOOL && !m.isError && m.details == null,
 	);
 	if (posedProblem) return false;
+	// A SUCCESSFUL probe_done ends the prober's turn on purpose (terminate:
+	// true) and queues the probe-handoff, whose server wake starts the
+	// teacher's run. A client continuation here would race that wake and
+	// start a teacher turn without the handoff (seen 2026-11-24: two
+	// teacher turns, the second replacing the plan). A refusal (isError)
+	// still owes the prober its reaction.
+	const concludedProbe = results.some((m) => m.toolName === "probe_done" && !m.isError);
+	if (concludedProbe) return false;
 	const answered = new Set(results.map((m) => m.toolCallId));
 	const calls = (content as Array<{ type?: string; id?: string }>).filter(
 		(b) => b.type === "toolCall" && typeof b.id === "string",
