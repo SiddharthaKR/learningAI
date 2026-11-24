@@ -395,7 +395,12 @@ export function abortJob(jobId: string): AbortOutcome {
 /** Markers that must START a run rather than ride a live one: the probe
  *  handoff and the plan-retry nudge (owner, 2026-11-13). */
 function startsOwnRun(steer: SteerMessage): boolean {
-	return steer.customType === "probe-handoff" || steer.customType === "plan-retry" || steer.customType === "probe-nudge";
+	return (
+		steer.customType === "probe-handoff" ||
+		steer.customType === "plan-retry" ||
+		steer.customType === "probe-nudge" ||
+		steer.customType === "teach-nudge"
+	);
 }
 
 function chatIdOf(steer: SteerMessage): string {

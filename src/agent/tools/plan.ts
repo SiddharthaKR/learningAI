@@ -5,6 +5,7 @@ import type { PlanToolResult, PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
 import { createTree, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
+import { phaseAt3Lh } from "../../core/phases.ts";
 
 /** The binding-id reminder riding plan_init's slim content (owner,
  *  2026-10-09): plan_init is the exact moment the node ids become
@@ -60,6 +61,7 @@ const planInitInput = Type.Object({
 });
 
 export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> {
+	const execute = planInitExecute(ctx);
 	return {
 		plan_init: {
 			name: "plan_init",
@@ -71,40 +73,54 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				"`-->` edges meaning 'from must be understood before to' (chains fine). 5–15 nodes: a map, not a syllabus — one reasoning step per node, compress. " +
 				"Every check you fire names the node it assesses via `nodeId`; where the lesson stands derives from those tags.",
 			parameters: planInitInput,
-			execute: serverExecute("plan_init", planInitInput, async ({ mermaid }) => {
-				const { chatId, chatStore } = ctx;
-				const record = chatStore.getChat(chatId);
-				if (!record) return { ok: false, error: `Chat not found: ${chatId}` };
-
-				const parsed = parseMermaidPlan(mermaid);
-				if (!parsed.ok || !parsed.plan) {
-					// The parser collects every problem; the teacher fixes and retries.
-					// No tree echo — the model needs the problems, not a restatement of
-					// the map it is rewriting (owner, context diet 2026-10-09).
-					return { ok: false, error: parsed.problems.join("\n") };
-				}
-				try {
-					// createTree validates the structure (duplicate ids, missing
-					// edge endpoints, self-loops, cycles → PlanTreeError).
-					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
-					chatStore.saveTree(chatId, next);
-					// Context diet: content = the validated nodeIds + the reminder (the
-				// ids just became binding for every quiz/explain call); details =
-					// the full tree for the record/UI — the plan popup's latestTree
-					// seam, agent-invisible (the serializer sends content only).
-					return {
-						text: JSON.stringify({
-							ok: true,
-							nodeIds: next.nodes.map((n) => n.id),
-							reminder: PLAN_NODE_IDS_REMINDER,
-						}),
-						details: { ok: true, tree: next },
-					};
-				} catch (err) {
-					if (err instanceof PlanTreeError) return { ok: false, error: err.message };
-					throw err;
-				}
-			}),
+			// PRESENTING ENDS THE TURN (owner, 2026-11-24): while the plan is being
+			// presented (phase "plan": the probe concluded, teaching not begun) a
+			// successful plan_init ends the teacher's turn so the learner confirms
+			// the map first — Gemma 12B and E4B both kept teaching in the same turn.
+			// Mid-lesson rewrites (phase "teach") carry on; a refusal lets the
+			// teacher fix the map in the same turn.
+			execute: async (...args: Parameters<typeof execute>) => {
+				const presenting = phaseAt3Lh(ctx.chatStore.getChat(ctx.chatId)?.messages ?? []) === "plan";
+				const result = await execute(...args);
+				return presenting && (result.details as { ok?: boolean } | null)?.ok === true ? { ...result, terminate: true } : result;
+			},
 		},
 	};
+}
+
+function planInitExecute(ctx: PlanToolContext) {
+	return serverExecute("plan_init", planInitInput, async ({ mermaid }) => {
+		const { chatId, chatStore } = ctx;
+		const record = chatStore.getChat(chatId);
+		if (!record) return { ok: false, error: `Chat not found: ${chatId}` };
+
+		const parsed = parseMermaidPlan(mermaid);
+		if (!parsed.ok || !parsed.plan) {
+			// The parser collects every problem; the teacher fixes and retries.
+			// No tree echo — the model needs the problems, not a restatement of
+			// the map it is rewriting (owner, context diet 2026-10-09).
+			return { ok: false, error: parsed.problems.join("\n") };
+		}
+		try {
+			// createTree validates the structure (duplicate ids, missing
+			// edge endpoints, self-loops, cycles → PlanTreeError).
+			const next = createTree(parsed.plan.nodes, parsed.plan.edges);
+			chatStore.saveTree(chatId, next);
+			// Context diet: content = the validated nodeIds + the reminder (the
+		// ids just became binding for every quiz/explain call); details =
+			// the full tree for the record/UI — the plan popup's latestTree
+			// seam, agent-invisible (the serializer sends content only).
+			return {
+				text: JSON.stringify({
+					ok: true,
+					nodeIds: next.nodes.map((n) => n.id),
+					reminder: PLAN_NODE_IDS_REMINDER,
+				}),
+				details: { ok: true, tree: next },
+			};
+		} catch (err) {
+			if (err instanceof PlanTreeError) return { ok: false, error: err.message };
+			throw err;
+		}
+	});
 }

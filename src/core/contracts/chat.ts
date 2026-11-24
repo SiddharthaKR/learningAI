@@ -245,6 +245,13 @@ export const HANDOFF_TEXT =
 export const PROBE_QUESTION_NUDGE_TEXT =
 	"Your turn ended without a question. While probing, every turn ends with one question (the quiz tool or ask_user_question) or with probe_done. Ask your next question now.";
 
+/** The teach-nudge text (owner-approved wording, 2026-11-24): sent when a
+ *  teaching turn ends with no question tool call — Gemma 12B asked every
+ *  teaching question in prose (no answer box), E4B ended turns with
+ *  "let's test it" and no question. */
+export const TEACH_QUESTION_NUDGE_TEXT =
+	"Your turn ended without a question. While teaching, every turn ends with a question tool: the quiz tool (a prediction or a check) or ask_user_question. A question written in your message gets no answer box, so the learner cannot answer it. Ask your next question now with a tool. If the lesson is complete, ask with ask_user_question what the learner wants to do next.";
+
 /** The one plan-retry nudge (owner, 2026-11-13): fired once per session when
  *  a turn after the handoff settles with no successful plan_init. Carries
  *  the last rejection reason (null when plan_init was never called). */

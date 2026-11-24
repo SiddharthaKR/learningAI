@@ -1417,9 +1417,10 @@ export function Chat({
 														{copy.chat.retryingPlan}
 													</SystemLine>
 												);
+											case "data-teach-nudge":
 											case "data-probe-nudge":
-												// The model ended a probing turn without a question and was
-												// reminded (owner, 2026-11-19): shown as the usual retry line.
+												// The model ended a probing (2026-11-19) or teaching (2026-11-24)
+												// turn without a question and was reminded: the usual retry line.
 												return (
 													<SystemLine key={pi} testId="probe-nudge">
 														{copy.chat.retryingTool}

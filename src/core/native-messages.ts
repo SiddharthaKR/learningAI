@@ -42,6 +42,7 @@ import {
 	planRetryText,
 	PROBE_QUESTION_NUDGE_TEXT,
 	sessionControlsText,
+	TEACH_QUESTION_NUDGE_TEXT,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
@@ -74,6 +75,7 @@ export interface LhMarkerMessage {
 		| "probe-handoff"
 		| "plan-retry"
 		| "probe-nudge"
+		| "teach-nudge"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
@@ -289,6 +291,43 @@ export function probeNudgeOwed(messages: readonly LhMessage[]): boolean {
 	for (let i = messages.length - 2; i >= 0; i--) {
 		const m = messages[i] as { role?: string; customType?: string; toolName?: string };
 		if (m.role === "custom" && m.customType === "probe-nudge") return false;
+		if (m.role === "user") break;
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName ?? "")) break;
+	}
+	return true;
+}
+
+/** The teach-nudge (owner, 2026-11-24): one reminder when a TEACHING turn
+ *  ends with no tool call, so the learner always gets an answer box. Same
+ *  deterministic-id scheme as the probe-nudge. */
+export function newTeachNudgeMessage(chatId: string, position: number): LhMarkerMessage {
+	return {
+		id: `steer_teachnudge_${chatId}_${position}`,
+		role: "custom",
+		customType: "teach-nudge",
+		content: TEACH_QUESTION_NUDGE_TEXT,
+		display: true,
+		details: { chatId },
+		timestamp: Date.now(),
+	};
+}
+
+/** Should the teach-nudge fire now? Only once a plan exists (probe concluded
+ *  and a plan block written — the presenting turn ends on plan_init, a tool
+ *  call), only when the last message is a finished assistant reply with NO
+ *  tool call, and at most once per learner input. Unlike the probe-nudge it
+ *  also fires when the turn wrote text: a question in prose has no answer
+ *  box (Gemma 12B asked every teaching question that way, 2026-11-24). */
+export function teachNudgeOwed(messages: readonly LhMessage[]): boolean {
+	if (!hasProbeDone(messages)) return false;
+	if (!messages.some((m) => (m as { role?: string }).role === "custom" && (m as LhMarkerMessage).customType === "plan-block")) return false;
+	const last = messages.at(-1) as AssistantMessage | undefined;
+	if (!last || (last as { role?: string }).role !== "assistant") return false;
+	if (last.stopReason === "error" || last.stopReason === "aborted") return false;
+	if (last.content.some((block) => block.type === "toolCall")) return false;
+	for (let i = messages.length - 2; i >= 0; i--) {
+		const m = messages[i] as { role?: string; customType?: string; toolName?: string };
+		if (m.role === "custom" && m.customType === "teach-nudge") return false;
 		if (m.role === "user") break;
 		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName ?? "")) break;
 	}

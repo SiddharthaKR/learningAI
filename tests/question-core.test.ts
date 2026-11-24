@@ -297,6 +297,19 @@ describe("coerceCorrectAnswer", () => {
 		assert.deepEqual(coerceCorrectAnswer('["a", "b"]', values), ["a", "b"]);
 	});
 
+	it("resolves a key that differs from one option only by $ math markers (Gemma E4B slip)", () => {
+		const plain = ["Close to 1/2", "Close to 1/10", "Close to 1/9"];
+		assert.deepEqual(coerceCorrectAnswer("Close to $1/10$", plain), ["Close to 1/10"]);
+		const math = ["$V_1 = 2$ V", "$V_1 = 4$ V"];
+		assert.deepEqual(coerceCorrectAnswer("V_1 = 4 V", math), ["$V_1 = 4$ V"]);
+		assert.deepEqual(quizInputProblems({ options: plain.map((label) => ({ label })), correctAnswer: "Close to $1/10$" }), []);
+	});
+
+	it("never guesses when the math-insensitive match is ambiguous", () => {
+		const twins = ["$x$ + 1", "x + 1"];
+		assert.deepEqual(coerceCorrectAnswer("$x + 1$", twins), ["$x + 1$"]);
+	});
+
 	it("leaves a non-JSON bracketed string alone", () => {
 		assert.deepEqual(coerceCorrectAnswer("[not json", values), ["[not json"]);
 	});

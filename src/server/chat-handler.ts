@@ -52,7 +52,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, planRetryOwed, probeNudgeOwed } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, newTeachNudgeMessage, planRetryOwed, probeNudgeOwed, teachNudgeOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
@@ -659,6 +659,14 @@ export async function handleChatInput(
 					if (settled && probeNudgeOwed(settled.messages)) {
 						void deliverJobResult(newProbeNudgeMessage(chatId, settled.messages.length)).catch((err: unknown) => {
 							console.error(`[chat ${chatId}] probe nudge failed:`, err);
+						});
+					}
+					// THE TEACH-NUDGE (owner, 2026-11-24): a teaching turn that ended
+					// with no question tool left the learner no answer box — remind
+					// the model once (per learner input) to ask with a tool.
+					if (settled && teachNudgeOwed(settled.messages)) {
+						void deliverJobResult(newTeachNudgeMessage(chatId, settled.messages.length)).catch((err: unknown) => {
+							console.error(`[chat ${chatId}] teach nudge failed:`, err);
 						});
 					}
 				}

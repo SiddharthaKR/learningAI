@@ -404,6 +404,15 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "teach-nudge": {
+			// The teach-nudge (owner, 2026-11-24): the same quiet system line.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-teach-nudge", id: `tn_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "subagent-steer": {
 			const meta = marker.details as SubagentResultMeta;
 			const artifact = marker.details as {

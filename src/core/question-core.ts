@@ -680,6 +680,11 @@ export function shuffleOptions(options: QuizOption[], rand: () => number = Math.
 
 // ─── quiz grading ───────────────────────────────────────────────────────────
 
+/** An option key compared without `$` math delimiters or whitespace. */
+function mathInsensitiveKey(value: string): string {
+	return value.replace(/\$/g, "").replace(/\s+/g, "");
+}
+
 /** Preserve an exact option key before trying copy-syntax cleanup: a
  *  label's final period, quotes, or backticks can be CONTENT (calculus
  *  incident, 2026-10-12), not model debris. The actual option values are
@@ -693,7 +698,16 @@ export function coerceCorrectAnswer(
 ): string[] {
 	const clean = (value: string): string => {
 		const trimmed = value.trim();
-		return optionValues.includes(trimmed) ? trimmed : stripModelValueDebris(value);
+		if (optionValues.includes(trimmed)) return trimmed;
+		const stripped = stripModelValueDebris(value);
+		if (optionValues.includes(stripped)) return stripped;
+		// Math-delimiter slip (2026-11-24, Gemma E4B): the key written as
+		// "Close to $1/10$" for the option "Close to 1/10" (or the reverse).
+		// Resolve only when exactly one option matches ignoring `$` and
+		// spacing — anything ambiguous stays a hard error.
+		const key = mathInsensitiveKey(stripped);
+		const hits = optionValues.filter((option) => mathInsensitiveKey(option) === key);
+		return hits.length === 1 ? hits[0]! : stripped;
 	};
 	if (Array.isArray(correctAnswer)) return correctAnswer.map(clean);
 	const trimmed = correctAnswer.trim();
