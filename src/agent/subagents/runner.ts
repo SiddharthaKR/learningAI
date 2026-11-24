@@ -355,6 +355,9 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 
 		const prompt = [
 			`Write the final research brief in ${teachingLanguage}, the fixed teaching language for this session.`,
+			// Today's date (owner, 2026-11-25): without it a 2024 release
+			// read as "the latest" to the researcher.
+			`Today's date: ${researchDate()}.`,
 			`Research question: ${question}`,
 			context ? `Context (what this is needed for): ${context}` : null,
 			deps.webUserUrls ? `Learner-pasted links in this session:\n${deps.webUserUrls(job.chatId).join("\n") || "(none)"}` : null,
@@ -526,6 +529,12 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 }
 
 // ─── module-level pure helpers ──────────────────────────────────────────────
+
+/** Today's date for the research request, in the teacher's format
+ *  ("Wednesday, November 25, 2026"), UTC — jobs carry no learner time zone. */
+export function researchDate(now: Date = new Date()): string {
+	return new Intl.DateTimeFormat("en", { dateStyle: "full", timeZone: "UTC" }).format(now);
+}
 
 /** Failure shape (W6 brief): html === "" with "FAILED: …" notes. */
 function isDemoFailure(result: DemoResult): boolean {
