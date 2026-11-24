@@ -140,12 +140,28 @@ export async function awaitCompaction(chatId: string): Promise<void> {
 
 // ─── the effective threshold (owner ruling: min(setting, window − reserve)) ─
 
+/** The safety margin added to the output cap when the cap sets the
+ *  reserve (owner, 2026-11-24): the projection is a chars/4 estimate for
+ *  messages after the last provider-reported usage and can undercount. */
+export const COMPACTION_ESTIMATE_MARGIN_TOKENS = 4_096;
+
 /** Resolve the effective trigger. Unknown window → the setting alone
- *  (honest: no fake window — the catalog-index precedent). */
-export function effectiveThresholdTokens(settingTokens: number | undefined, contextWindowTokens: number | undefined): number {
+ *  (honest: no fake window — the catalog-index precedent). With a known
+ *  output cap the reserve is the cap + COMPACTION_ESTIMATE_MARGIN_TOKENS
+ *  (owner, 2026-11-24): the fixed 16,384 reserve started compaction at
+ *  about 48% of a 32k window, so a 12B lesson compacted every few turns
+ *  (about 2 minutes each). Without a cap the fixed reserve stays. */
+export function effectiveThresholdTokens(
+	settingTokens: number | undefined,
+	contextWindowTokens: number | undefined,
+	outputCapTokens?: number,
+): number {
 	const setting = settingTokens ?? 150_000;
 	if (contextWindowTokens === undefined) return setting;
-	return Math.min(setting, Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1));
+	const reserve = outputCapTokens !== undefined
+		? outputCapTokens + COMPACTION_ESTIMATE_MARGIN_TOKENS
+		: COMPACTION_RESERVE_TOKENS;
+	return Math.min(setting, Math.max(contextWindowTokens - reserve, 1));
 }
 
 // ─── the estimate over the ACTIVE projection ────────────────────────────────

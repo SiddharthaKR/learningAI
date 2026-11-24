@@ -22,6 +22,15 @@ describe("keptTailBudget", () => {
 		assert.ok(9_901 + tail < threshold);
 	});
 
+	it("with the output cap known, the reserve is cap + 4,096: a 32k window compacts at 75% (owner, 2026-11-24)", () => {
+		const threshold = effectiveThresholdTokens(undefined, 32_768, 4_096);
+		assert.equal(threshold, 24_576);
+		const tail = keptTailBudget(threshold, 9_901);
+		assert.equal(tail, 7_337);
+		assert.ok(9_901 + tail < threshold);
+		assert.equal(effectiveThresholdTokens(150_000, 200_000, 4_096), 150_000, "the setting still rules big windows");
+	});
+
 	it("never goes below one token", () => {
 		assert.equal(keptTailBudget(8_000, 12_000), 1);
 	});

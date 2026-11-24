@@ -37,7 +37,7 @@ import { requestWebApproval } from "./web-approvals.ts";
 import { validateRestrictedWebTarget } from "../agent/tools/restricted-web-fetch.ts";
 import { createAccountStore } from "./accounts.ts";
 import { PATHS } from "../../config.ts";
-import { fixedOfficeModelSpec } from "./office-config.ts";
+import { fixedOfficeModelSpec, officeConfig } from "./office-config.ts";
 import { answerKeyCheck } from "./answer-key-check.ts";
 import { describeAttachedImages } from "./chat-image-vision.ts";
 import { providerKeyPresent } from "./keys.ts";
@@ -306,6 +306,7 @@ export async function handleChatInput(
 			thresholdTokens: effectiveThresholdTokens(
 				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
+				officeConfig().llmMaxTokens,
 			),
 			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : record.kind === "chat" ? "chat" : "teacher").length / 4),
 		},
@@ -714,6 +715,7 @@ export async function handleChatInput(
 							thresholdTokens: effectiveThresholdTokens(
 								fresh.compaction?.thresholdTokens,
 								catalogContextLimits().get(kickModelId),
+								officeConfig().llmMaxTokens,
 							),
 							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher").length / 4),
 						};
