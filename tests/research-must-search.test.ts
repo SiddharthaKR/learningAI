@@ -14,7 +14,7 @@ const provider = { id: "fake", search: async () => [{ title: "Vivado 2026.1 rele
 function scripted(responses: Array<(context: { messages: Array<{ role: string; content: unknown }> }) => ReturnType<typeof fauxAssistantMessage>>) {
 	const faux = createFauxCore({});
 	const seen: string[] = [];
-	faux.setResponses(responses.map((r) => (context: never) => {
+	faux.setResponses(responses.map((r) => (context: unknown) => {
 		const ctx = context as { messages: Array<{ role: string; content: unknown }> };
 		const last = ctx.messages.at(-1);
 		seen.push(typeof last?.content === "string" ? last.content : JSON.stringify(last?.content));
