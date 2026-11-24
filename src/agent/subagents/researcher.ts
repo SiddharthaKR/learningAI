@@ -16,7 +16,7 @@ import { runSubagent } from "./pi-run.ts";
  * The engine is injectable so tests run the loop with a scripted faux engine.
  */
 
-const INSTRUCTIONS = `You are a research specialist for a teaching agent. Produce a focused,
+export const RESEARCHER_INSTRUCTIONS = `You are a research specialist for a teaching agent. Produce a focused,
 well-sourced brief that the teacher can use in a lesson.
 
 Read relevant public pages with web_fetch. Only links pasted by the learner or returned
@@ -26,7 +26,12 @@ If web_search is available, use it to find primary sources before fetching pages
 If web_search is unavailable, work only with learner-pasted links and state gaps honestly.
 
 Your final answer must have Summary, Findings with inline source citations, Sources,
-and Gaps sections. Distinguish source claims from your own background knowledge.`;
+and Gaps sections. Distinguish source claims from your own background knowledge.
+
+Your background knowledge has a cutoff and may be out of date. For questions about
+the latest or current version, release, price or news, rely on what your searches
+find, not on memory: check each source's date, prefer the newest, and if every
+source you found is old, say so in Gaps.`;
 
 export interface ResearcherRunOptions {
 	engine?: PiEngine;
@@ -59,7 +64,7 @@ export async function runResearcherAgent(prompt: string, opts: ResearcherRunOpti
 	const common = {
 		role: "researcher" as const,
 		engine: opts.engine,
-		systemPrompt: INSTRUCTIONS,
+		systemPrompt: RESEARCHER_INSTRUCTIONS,
 		abortSignal: opts.abortSignal,
 		onUsage: opts.onUsage,
 		onToolStart: opts.onToolStart,
