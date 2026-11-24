@@ -148,6 +148,15 @@ export function extractionEngine(role: ModelRole): PiEngine | undefined {
 	return resolveEngine(role, { thinking: false });
 }
 
+/** The compaction summary's engine (owner, 2026-11-24): the office model
+ *  with thinking off. The summary is a text job; thinking under the
+ *  output cap made it slow and could use the whole cap before any
+ *  summary was written. */
+export function compactionEngine(): PiEngine | undefined {
+	const spec = fixedOfficeModelSpec();
+	return spec ? piEngineForSpec({ ...spec, thinkingLevel: "off" }) : undefined;
+}
+
 function resolveEngine(_role: ModelRole, opts: { thinking?: boolean } = {}): PiEngine | undefined {
 	const spec = fixedOfficeModelSpec();
 	if (!spec) return undefined;
@@ -291,7 +300,7 @@ export async function handleChatInput(
 	await ensureCompacted(
 		{
 			chatStore: stores.chatStore,
-			engine: conversationEngine,
+			engine: compactionEngine() ?? conversationEngine,
 			modelId: modelIdForCompaction,
 			kind: record.kind === "practice" ? "practice" : record.kind === "chat" ? "chat" : hasProbeDone(record.messages) ? "teach" : "probe",
 			thresholdTokens: effectiveThresholdTokens(
@@ -424,7 +433,8 @@ export async function handleChatInput(
 	// (Built once above the compaction gate; reused for compaction.)
 	// The learner's Reasoning preference (Preferences, default on) governs
 	// tutor turns only: off rebuilds this turn's engine at thinking "off".
-	// Compaction, extraction and job engines keep the configured default.
+	// Compaction and extraction run with thinking off; job engines keep
+	// the configured default.
 	const account = await createAccountStore(PATHS.data).byId(currentUserId());
 	const engine = account?.reasoning === false
 		? piEngineForSpec({ ...conversation, thinkingLevel: "off" })
@@ -691,9 +701,8 @@ export async function handleChatInput(
 				if (process.env.NODE_ENV !== "test")
 					kickCompaction(() => {
 						const fresh = effectiveSettings();
-						const spec = fixedOfficeModelSpec();
-						if (!spec) return null;
-						const kickEngine = piEngineForSpec(spec);
+						const kickEngine = compactionEngine();
+						if (!kickEngine) return null;
 						const kickModelId = `${kickEngine.model.provider}:${kickEngine.model.id}`;
 						const freshRecord = stores.chatStore.getChat(chatId);
 						if (!freshRecord) return null;
