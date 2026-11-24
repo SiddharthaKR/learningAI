@@ -52,7 +52,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, newTeachNudgeMessage, planRetryOwed, probeNudgeOwed, teachNudgeOwed } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, newTeachNudgeMessage, nudgeAfterEmptyCapHit, planRetryOwed, probeNudgeOwed, teachNudgeOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
 import { loadKnowledgeParts, openKnowledgeSection } from "../knowledge/service.ts";
@@ -436,8 +436,10 @@ export async function handleChatInput(
 	// tutor turns only: off rebuilds this turn's engine at thinking "off".
 	// Compaction and extraction run with thinking off; job engines keep
 	// the configured default.
+	// A nudge answering a turn that thought until the output cap and showed
+	// nothing also runs with thinking off (owner, 2026-11-24).
 	const account = await createAccountStore(PATHS.data).byId(currentUserId());
-	const engine = account?.reasoning === false
+	const engine = account?.reasoning === false || nudgeAfterEmptyCapHit(agentMessages)
 		? piEngineForSpec({ ...conversation, thinkingLevel: "off" })
 		: conversationEngine;
 	// Provider-qualified stamp (model slots wave): matches the price table's

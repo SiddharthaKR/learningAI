@@ -297,6 +297,30 @@ export function probeNudgeOwed(messages: readonly LhMessage[]): boolean {
 	return true;
 }
 
+/** Is this run a probe- or teach-nudge answering a turn that hit the output
+ *  cap while showing nothing? (owner, 2026-11-24): the model thought until
+ *  the cap; a second run with thinking on would likely do the same, so the
+ *  nudge's run goes with thinking off. True when the record ends on a nudge
+ *  marker (other markers may follow it) and the message before the trailing
+ *  markers is an assistant reply that stopped on "length" with no visible
+ *  text and no tool call. */
+export function nudgeAfterEmptyCapHit(messages: readonly LhMessage[]): boolean {
+	let i = messages.length - 1;
+	let nudged = false;
+	for (; i >= 0; i--) {
+		const m = messages[i] as { role?: string; customType?: string };
+		if (m.role !== "custom") break;
+		if (m.customType === "probe-nudge" || m.customType === "teach-nudge") nudged = true;
+	}
+	if (!nudged || i < 0) return false;
+	const reply = messages[i] as AssistantMessage | { role?: string };
+	if (reply.role !== "assistant") return false;
+	const assistant = reply as AssistantMessage;
+	if (assistant.stopReason !== "length") return false;
+	return !assistant.content.some((block) =>
+		block.type === "toolCall" || (block.type === "text" && block.text.trim().length > 0));
+}
+
 /** The teach-nudge (owner, 2026-11-24): one reminder when a TEACHING turn
  *  ends with no tool call, so the learner always gets an answer box. Same
  *  deterministic-id scheme as the probe-nudge. */

@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { newTeachNudgeMessage, probeNudgeOwed, teachNudgeOwed, toLlmMessages } from "../src/core/native-messages.ts";
+import { newProbeNudgeMessage, newTeachNudgeMessage, nudgeAfterEmptyCapHit, probeNudgeOwed, teachNudgeOwed, toLlmMessages } from "../src/core/native-messages.ts";
 import { TEACH_QUESTION_NUDGE_TEXT } from "../src/core/contracts/chat.ts";
 import { projectView } from "../src/core/view.ts";
 
@@ -68,6 +68,21 @@ describe("teachNudgeOwed", () => {
 
 	it("never overlaps the probe-nudge", () => {
 		assert.equal(probeNudgeOwed([...planned, user(), prose("a9", "stop", " ")] as never), false);
+	});
+});
+
+describe("nudgeAfterEmptyCapHit (owner, 2026-11-24)", () => {
+	const capHit = prose("a9", "length", "");
+	it("is true when a nudge follows a turn that hit the cap showing nothing", () => {
+		assert.equal(nudgeAfterEmptyCapHit([...planned, user(), capHit, newTeachNudgeMessage(CHAT, 9)] as never), true);
+		assert.equal(nudgeAfterEmptyCapHit([user("u0"), capHit, newProbeNudgeMessage(CHAT, 2)] as never), true);
+	});
+
+	it("is false for an ordinary nudge, a cap hit that showed text, or no nudge", () => {
+		assert.equal(nudgeAfterEmptyCapHit([...planned, user(), prose(), newTeachNudgeMessage(CHAT, 9)] as never), false);
+		assert.equal(nudgeAfterEmptyCapHit([...planned, user(), prose("a9", "length"), newTeachNudgeMessage(CHAT, 9)] as never), false);
+		assert.equal(nudgeAfterEmptyCapHit([...planned, user(), capHit] as never), false);
+		assert.equal(nudgeAfterEmptyCapHit([...planned, user(), capHit, user("u2", "hello?")] as never), false);
 	});
 });
 
