@@ -60,6 +60,17 @@ function taggedNodeId(input: unknown): boolean {
 }
 
 /** The phase at `upToIndex` (inclusive; default: the last message). */
+/** Did this probe_done result conclude the probe? (2026-11-25) A REFUSED
+ *  probe_done (a question still open, already concluded) returns
+ *  `{ ok: false, error }` as a normal, non-error result, so `isError` alone
+ *  counted refusals as conclusions: routing built the teacher while no
+ *  handoff was queued, and every later probe_done was refused as "already
+ *  concluded". Explicit `ok: false` is a refusal; anything else (`ok: true`,
+ *  or older records without the flag) concluded. */
+export function probeDoneConcluded(details: unknown): boolean {
+	return (details as { ok?: unknown } | null | undefined)?.ok !== false;
+}
+
 export function phaseAt3(messages: readonly PhaseMessage[], upToIndex?: number): Phase3 {
 	let phase: Phase3 = "probe";
 	const last = Math.min(upToIndex ?? messages.length - 1, messages.length - 1);
@@ -80,7 +91,7 @@ function advance(
 		// plan → teach only via the first nodeId-tagged quiz CALL (the call,
 		// not its answer — an errored-and-retried call still proves teaching
 		// began, and the retry lands in the same group anyway).
-		if (phase === "probe" && part.type === "tool-probe_done" && part.state === "output-available") {
+		if (phase === "probe" && part.type === "tool-probe_done" && part.state === "output-available" && probeDoneConcluded(part.output)) {
 			phase = "plan";
 		}
 		// plan → teach via the first nodeId-tagged quizzing CALL — quiz OR
@@ -167,11 +178,12 @@ export function phaseAt3Lh(messages: readonly LhMessage[], upToIndex?: number): 
 		const m = messages[i]!;
 		const role = (m as { role?: string }).role;
 		if (role === "toolResult") {
-			const result = m as { toolName?: string; isError?: boolean };
+			const result = m as { toolName?: string; isError?: boolean; details?: unknown };
 			if (
 				phase === "probe" &&
 				result.toolName === "probe_done" &&
-				!result.isError
+				!result.isError &&
+				probeDoneConcluded(result.details)
 			) {
 				phase = "plan";
 			}

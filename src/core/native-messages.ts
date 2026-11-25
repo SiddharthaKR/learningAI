@@ -48,6 +48,7 @@ import {
 } from "./contracts/chat.ts";
 import type { SessionControlsChangedData } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
+import { probeDoneConcluded } from "./phases.ts";
 import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
 
 /** The hard-invariant wording for an aborted turn's unanswered calls —
@@ -846,13 +847,15 @@ export function danglingQuestionOf(
 	return null;
 }
 
-/** The probe→teach construction seam (chat-handler): a probe_done call in
- *  the transcript — any state — means the probe is concluded: teach. */
+/** The probe→teach construction seam (chat-handler): a probe_done call
+ *  whose result CONCLUDED the probe — not errored, not refused (2026-11-25:
+ *  "any state" counted a refused call, so routing built the teacher with no
+ *  handoff queued while the phase still read "probe"). Same rule as
+ *  phaseAt3Lh, via probeDoneConcluded. */
 export function hasProbeDone(messages: readonly LhMessage[]): boolean {
 	for (const m of messages) {
-		if ((m as { role?: string }).role !== "assistant") continue;
-		const assistant = m as AssistantMessage;
-		if (assistant.content.some((b) => b.type === "toolCall" && b.name === "probe_done")) return true;
+		const result = m as { role?: string; toolName?: string; isError?: boolean; details?: unknown };
+		if (result.role === "toolResult" && result.toolName === "probe_done" && !result.isError && probeDoneConcluded(result.details)) return true;
 	}
 	return false;
 }
