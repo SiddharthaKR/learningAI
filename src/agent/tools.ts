@@ -238,13 +238,15 @@ export const probeQuizTool: AgentTool<typeof probeQuizInputSchema> = probeQuizTo
  *  = no check. */
 export type AnswerKeyCheck = (input: Parameters<typeof answerKeyMismatch>[0], signal?: AbortSignal) => Promise<string | null>;
 
-/** Run the check fail-open: any error (timeout, model down) lets the quiz through. */
+/** Run the check fail-open: any error (timeout, model down) lets the quiz through.
+ *  Multi-select quizzes skip it (2026-11-25): answerKeyMismatch discards
+ *  their verdict, so the model call only added wait time. */
 async function runAnswerKeyCheck(
 	check: AnswerKeyCheck | undefined,
 	input: Parameters<typeof answerKeyMismatch>[0],
 	signal?: AbortSignal,
 ): Promise<string | null> {
-	if (!check) return null;
+	if (!check || input.multiSelect === true) return null;
 	try {
 		return await check(input, signal);
 	} catch {

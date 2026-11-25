@@ -93,6 +93,20 @@ describe("the quiz tools run the check", () => {
 		assert.notEqual((await probeQuizToolFor(broken).execute("t", wrong as never)).isError, true);
 	});
 
+	it("a multi-select quiz never calls the checker (its verdict would be discarded)", async () => {
+		let calls = 0;
+		const counting: AnswerKeyCheck = async () => { calls++; return null; };
+		const multi = {
+			...QUIZ,
+			multiSelect: true,
+			correctAnswer: [QUIZ.options[0]!.value!, QUIZ.options[1]!.value!],
+		};
+		await probeQuizToolFor(counting).execute("t", multi as never);
+		assert.equal(calls, 0);
+		await probeQuizToolFor(counting).execute("t", QUIZ as never);
+		assert.equal(calls, 1, "single-select quizzes are still checked");
+	});
+
 	it("the teaching quiz runs it too", async () => {
 		const tree = { nodes: [{ id: "flow", title: "Flow control" }], edges: [] };
 		const chatStore = { getChat: () => ({ messages: [], tree }), loadTree: () => tree, getTree: () => tree } as never;
