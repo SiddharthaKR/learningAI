@@ -41,6 +41,15 @@ describe("probingAnswers", () => {
 		assert.deepEqual(answers[2], { question: "Hotter wire: does resistance increase or decrease?", chosen: ["Increase"], correct: true });
 	});
 
+	it("takes the main question, not a parenthetical example line after it", () => {
+		const record = [
+			user("u0", "teach me ohms law"),
+			say("a1", "What is your primary goal for learning Ohm's Law?\n\n(For example: are you interested in the physics, or a circuit?)"),
+			user("u1", "physics behind it"),
+		];
+		assert.equal(probingAnswers(record as never)[0]!.question, "What is your primary goal for learning Ohm's Law?");
+	});
+
 	it("skips dismissed questions and is empty once the probe concluded", () => {
 		const dismissed = [...ohm.slice(0, 5), ask("q3"), answered("q3", { questionText: "Q", dismissed: true })];
 		assert.equal(probingAnswers(dismissed as never).length, 2);

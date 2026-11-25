@@ -49,7 +49,9 @@ function textOf(content: unknown): string {
 }
 
 /** The question a typed reply answers: the last line with a question mark
- *  in the preceding assistant text, else the end of that text. */
+ *  in the preceding assistant text that is not a parenthetical aside (12B
+ *  followed its question with "(For example: … ?)", 2026-11-25), else the
+ *  last question line, else the end of that text. */
 function questionBefore(messages: readonly LhMessage[], index: number): string {
 	for (let i = index - 1; i >= 0; i--) {
 		const m = messages[i] as { role?: string; content?: unknown };
@@ -57,7 +59,8 @@ function questionBefore(messages: readonly LhMessage[], index: number): string {
 		const text = textOf(m.content).trim();
 		if (!text) continue;
 		const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
-		const asked = [...lines].reverse().find((l) => /[?？]/.test(l));
+		const questions = [...lines].reverse().filter((l) => /[?？]/.test(l));
+		const asked = questions.find((l) => !/^[(（]/.test(l)) ?? questions[0];
 		const line = asked ?? lines[lines.length - 1] ?? "";
 		return line.length > 300 ? `${line.slice(0, 297)}...` : line;
 	}
