@@ -396,7 +396,8 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.match(prober, /Prefer a short set of meaningful multiple-choice options/);
 		assert.match(prober, /Use the logic of binary search/);
 		assert.match(prober, /a well-reasoned answer can justify a big jump in difficulty/i);
-		assert.match(prober, /Go deeper when the distinction would change the lesson/);
+		// Replaced 2026-11-25 (owner-approved): go deeper only when it changes where teaching starts.
+		assert.match(prober, /Ask one simpler question only if its answer could change where teaching starts/);
 		assert.match(prober, /Don't present an untested boundary as a finding/);
 		assert.doesNotMatch(prober, /Binary-search every strand|escalate until it does/);
 	});
