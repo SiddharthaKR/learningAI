@@ -76,6 +76,7 @@ export interface LhMarkerMessage {
 		| "probe-handoff"
 		| "plan-retry"
 		| "probe-nudge"
+		| "probe-wrapup"
 		| "teach-nudge"
 		| "subagent-steer"
 		| "subagent-abort"
@@ -762,6 +763,9 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			// UI-only markers: plan blocks, controls audits, and problem
 			// dismissals (the synthesized conclude pair carries the model's face).
 			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed") continue;
+			// The code-mode probe wrap-up line is UI-only (2026-11-25): the
+			// teacher reads the probe_done the app wrote, not a reminder.
+			if (marker.customType === "probe-wrapup" && (marker.details as { mode?: string } | undefined)?.mode === "code") continue;
 			// Switch notes reach the model (owner, 2026-11-19); ones saved
 			// before that carry no text and stay UI-only. A note flipped while
 			// a question card was waiting would land between the tool call and

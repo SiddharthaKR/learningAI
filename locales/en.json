@@ -175,6 +175,7 @@
     "compactionTokenCount": "{count}k tok",
     "retry": "Retry",
     "retryingTool": "Retrying…",
+    "wrappingUpProbe": "Wrapping up the questions…",
     "errorPrefix": "Something went wrong:"
   },
   "composer": {

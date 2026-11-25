@@ -1417,6 +1417,13 @@ export function Chat({
 														{copy.chat.retryingPlan}
 													</SystemLine>
 												);
+											case "data-probe-wrapup":
+												// Short probing ended the probe (owner, 2026-11-25).
+												return (
+													<SystemLine key={pi} testId="probe-wrapup">
+														{copy.chat.wrappingUpProbe}
+													</SystemLine>
+												);
 											case "data-teach-nudge":
 											case "data-probe-nudge":
 												// The model ended a probing (2026-11-19) or teaching (2026-11-24)

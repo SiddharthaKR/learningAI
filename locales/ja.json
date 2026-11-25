@@ -175,6 +175,7 @@
     "compactionTokenCount": "約{count}千トークン",
     "retry": "再試行",
     "retryingTool": "再試行中…",
+    "wrappingUpProbe": "事前チェックをまとめています…",
     "errorPrefix": "エラーが発生しました："
   },
   "composer": {

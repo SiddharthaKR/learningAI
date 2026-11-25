@@ -404,6 +404,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "probe-wrapup": {
+			// Short probing (owner, 2026-11-25): the quiet "Wrapping up the
+			// questions…" line, in both the reminder and the code mode.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-probe-wrapup", id: `pw_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "teach-nudge": {
 			// The teach-nudge (owner, 2026-11-24): the same quiet system line.
 			out.push({
