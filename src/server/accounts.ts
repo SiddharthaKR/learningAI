@@ -7,8 +7,9 @@ import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCallback);
 export type Language = "en" | "ja";
-/** reasoning: the tutor's model reasoning preference; absent means on (only false is stored). */
-export interface Account { id: string; username: string; uiLanguage: Language; teachingLanguage: Language; background?: string; reasoning?: boolean; createdAt: string; /** Read pictures in uploaded documents by default (the user's last choice; off when absent). */ readPictures?: boolean }
+/** reasoning: the tutor's model reasoning preference; absent means on (only false is stored).
+ *  probing: how long the probe runs (owner, 2026-11-25); absent means short (only "long" is stored). */
+export interface Account { id: string; username: string; uiLanguage: Language; teachingLanguage: Language; background?: string; reasoning?: boolean; probing?: "long"; createdAt: string; /** Read pictures in uploaded documents by default (the user's last choice; off when absent). */ readPictures?: boolean }
 interface StoredAccount extends Account { passwordSalt: string; passwordHash: string }
 interface AccountFile { version: 1; accounts: StoredAccount[] }
 
@@ -126,7 +127,7 @@ export function createAccountStore(root: string) {
         return publicAccount(found);
       });
     },
-    async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string; reasoning?: boolean; readPictures?: boolean }): Promise<Account> {
+    async updatePreferences(id: string, changes: { uiLanguage?: Language; teachingLanguage?: Language; background?: string; reasoning?: boolean; probing?: "short" | "long"; readPictures?: boolean }): Promise<Account> {
       if (changes.readPictures !== undefined && typeof changes.readPictures !== "boolean") throw new Error("readPictures must be true or false");
       for (const language of [changes.uiLanguage, changes.teachingLanguage]) {
         if (language !== undefined && language !== "en" && language !== "ja") throw new Error("Unsupported language");
@@ -135,6 +136,7 @@ export function createAccountStore(root: string) {
         throw new Error("Background must be at most 2000 characters");
       }
       if (changes.reasoning !== undefined && typeof changes.reasoning !== "boolean") throw new Error("Reasoning must be on or off");
+      if (changes.probing !== undefined && changes.probing !== "short" && changes.probing !== "long") throw new Error("Probing must be short or long");
       return locked(async () => {
         const data = await read();
         const account = data.accounts.find((item) => item.id === id);
@@ -144,6 +146,8 @@ export function createAccountStore(root: string) {
         if (changes.background !== undefined) account.background = changes.background.trim() || undefined;
         if (changes.reasoning === true) delete account.reasoning;
         else if (changes.reasoning === false) account.reasoning = false;
+        if (changes.probing === "short") delete account.probing;
+        else if (changes.probing === "long") account.probing = "long";
         if (changes.readPictures !== undefined) account.readPictures = changes.readPictures;
         await write(data);
         return publicAccount(account);

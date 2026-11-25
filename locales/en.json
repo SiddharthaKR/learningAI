@@ -124,7 +124,11 @@
     "saved": "Saved",
     "saveError": "Could not save preferences",
     "reasoning": "Reasoning",
-    "reasoningHint": "Slower, more careful answers. Applies to tutor replies from the next turn."
+    "reasoningHint": "Slower, more careful answers. Applies to tutor replies from the next turn.",
+    "probing": "Probing",
+    "probingShort": "Short",
+    "probingLong": "Long",
+    "probingHint": "Short: up to 3 answers, then the lesson plan. Long: the tutor probes until it decides it knows enough."
   },
   "newSession": {
     "title": "New session",

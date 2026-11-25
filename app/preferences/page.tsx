@@ -9,6 +9,6 @@ export default async function PreferencesPage() {
   return withOfficePageUser(async () => {
     const account = await createAccountStore(PATHS.data).byId(currentUserId());
     if (!account) return null;
-    return <PreferencesForm initial={{ uiLanguage: account.uiLanguage, teachingLanguage: account.teachingLanguage, background: account.background ?? "", reasoning: account.reasoning !== false }} />;
+    return <PreferencesForm initial={{ uiLanguage: account.uiLanguage, teachingLanguage: account.teachingLanguage, background: account.background ?? "", reasoning: account.reasoning !== false, probing: account.probing ?? "short" }} />;
   });
 }

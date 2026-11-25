@@ -5,18 +5,19 @@ import { SidebarToggle } from "@/components/sidebar";
 import { catalogFor, type UiLanguage } from "@/src/core";
 
 type Language = UiLanguage;
-export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; teachingLanguage: Language; background: string; reasoning: boolean } }) {
+export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; teachingLanguage: Language; background: string; reasoning: boolean; probing: "short" | "long" } }) {
   const [uiLanguage, setUiLanguage] = useState(initial.uiLanguage);
   const [teachingLanguage, setTeachingLanguage] = useState(initial.teachingLanguage);
   const [background, setBackground] = useState(initial.background);
   const [reasoning, setReasoning] = useState(initial.reasoning);
+  const [probing, setProbing] = useState(initial.probing);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const copy = catalogFor(uiLanguage);
   async function save() {
     setSaving(true); setMessage("");
     try {
-      const response = await fetch("/api/preferences", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ uiLanguage, teachingLanguage, background, reasoning }) });
+      const response = await fetch("/api/preferences", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ uiLanguage, teachingLanguage, background, reasoning, probing }) });
       if (!response.ok) throw new Error((await response.json()).error ?? copy.preferences.saveError);
       setMessage(copy.preferences.saved);
       document.documentElement.lang = uiLanguage;
@@ -45,6 +46,14 @@ export function PreferencesForm({ initial }: { initial: { uiLanguage: Language; 
       <input type="checkbox" checked={reasoning} onChange={(event) => setReasoning(event.target.checked)} className="mt-1" />
       <span className="flex flex-col">{copy.preferences.reasoning}<span className="text-sm text-muted-foreground">{copy.preferences.reasoningHint}</span></span>
     </label>
+    <fieldset className="flex flex-col gap-1">
+      <legend>{copy.preferences.probing}</legend>
+      <div className="flex gap-4">
+        <label className="flex items-center gap-2"><input type="radio" name="probing" value="short" checked={probing === "short"} onChange={() => setProbing("short")} />{copy.preferences.probingShort}</label>
+        <label className="flex items-center gap-2"><input type="radio" name="probing" value="long" checked={probing === "long"} onChange={() => setProbing("long")} />{copy.preferences.probingLong}</label>
+      </div>
+      <span className="text-sm text-muted-foreground">{copy.preferences.probingHint}</span>
+    </fieldset>
     <button type="button" onClick={() => void save()} disabled={saving} className="self-start rounded bg-accent px-4 py-2 disabled:opacity-50">{copy.preferences.save}</button>
     {message && <p role="status">{message}</p>}
     </div>
