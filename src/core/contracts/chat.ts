@@ -245,13 +245,6 @@ export const HANDOFF_TEXT =
 export const PROBE_QUESTION_NUDGE_TEXT =
 	"Your turn ended without a question. While probing, every turn ends with one question (the quiz tool or ask_user_question) or with probe_done. Ask your next question now.";
 
-/** The Short-probing wrap-up (owner-approved wording, 2026-11-25): rides
- *  with the learner's 3rd probing answer when the Probing preference is
- *  Short. Gemma 12B never called probe_done in a 10-turn Ohm's law probe
- *  and started teaching after the learner's first "don't know". */
-export const PROBE_WRAPUP_TEXT =
-	"That was the learner's last probing answer: probing is set to Short. Do not ask another question and do not teach. Conclude now with probe_done, reporting what the answers so far show; mark anything untested as still to check.";
-
 /** The teach-nudge text (owner-approved wording, 2026-11-24): sent when a
  *  teaching turn ends with no question tool call — Gemma 12B asked every
  *  teaching question in prose (no answer box), E4B ended turns with

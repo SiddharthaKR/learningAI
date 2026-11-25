@@ -13,7 +13,6 @@ import {
 } from "../src/core/probe-length.ts";
 import { hasProbeDone, toLlmMessages } from "../src/core/native-messages.ts";
 import { phaseAt3Lh } from "../src/core/phases.ts";
-import { PROBE_WRAPUP_TEXT } from "../src/core/contracts/chat.ts";
 import { projectView } from "../src/core/view.ts";
 
 const CHAT = "chat_p";
@@ -62,23 +61,11 @@ describe("shortProbeLimitReached", () => {
 	it("fires at the 3rd answer, once per session", () => {
 		assert.equal(shortProbeLimitReached(ohm.slice(0, 5) as never), false, "2 answers");
 		assert.equal(shortProbeLimitReached(ohm as never), true, "3 answers");
-		assert.equal(shortProbeLimitReached([...ohm, newProbeWrapupMessage(CHAT, "reminder")] as never), false, "already sent");
+		assert.equal(shortProbeLimitReached([...ohm, newProbeWrapupMessage(CHAT)] as never), false, "already sent");
 	});
 });
 
-describe("the reminder mode", () => {
-	it("sends the approved note to the model and shows the quiet line", () => {
-		const record = [...ohm, newProbeWrapupMessage(CHAT, "reminder")];
-		assert.ok(JSON.stringify(toLlmMessages(record as never)).includes(PROBE_WRAPUP_TEXT.slice(0, 60)));
-		assert.ok(projectView(record as never).some((m) => m.parts.some((p) => p.type === "data-probe-wrapup")));
-		assert.equal(
-			PROBE_WRAPUP_TEXT,
-			"That was the learner's last probing answer: probing is set to Short. Do not ask another question and do not teach. Conclude now with probe_done, reporting what the answers so far show; mark anything untested as still to check.",
-		);
-	});
-});
-
-describe("the code mode", () => {
+describe("the code hand-off", () => {
 	it("writes a concluded probe_done from the answers and hands off to the teacher", () => {
 		const added = codeProbeHandoff(ohm as never, CHAT, "en");
 		const record = [...ohm, ...added];
@@ -95,7 +82,7 @@ describe("the code mode", () => {
 	it("keeps its wrap-up line out of the teacher's context", () => {
 		const record = [...ohm, ...codeProbeHandoff(ohm as never, CHAT, "en")];
 		assert.ok(!JSON.stringify(toLlmMessages(record as never)).includes("Wrapping up"));
-		assert.ok(!JSON.stringify(toLlmMessages(record as never)).includes(PROBE_WRAPUP_TEXT.slice(0, 40)));
+		assert.ok(!JSON.stringify(toLlmMessages(record as never)).includes("steer_probewrapup"));
 		assert.ok(projectView(record as never).some((m) => m.parts.some((p) => p.type === "data-probe-wrapup")));
 	});
 

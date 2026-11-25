@@ -5,12 +5,11 @@
  * probed an Ohm's law session for 10 turns with no tool call, never called
  * probe_done, and started teaching after the learner's first "don't know".
  *
- * Two ways to end it, both built here and compared in live tests:
- *   - "reminder": a hidden note rides with the 3rd answer, so the prober's
- *     very next reply concludes with its own probe_done (no extra turn).
- *   - "code": the app writes the probe_done itself from the actual answers
- *     and queues the handoff, so the teacher plans straight away (no prober
- *     turn at all).
+ * The app writes the probe_done itself from the actual answers and queues
+ * the handoff, so the teacher plans straight away (no prober turn at all).
+ * Chosen over a reminder to the prober after a live 12B comparison
+ * (2026-11-25): 3rd answer to plan took 1 min 32 s versus 2 min 54 s, and
+ * it does not depend on the model obeying.
  *
  * Counted answers: results of the probing question tools (not dismissals)
  * and typed learner messages after the first one (the topic request).
@@ -19,13 +18,10 @@
 
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import { PROBE_DONE_ACK_TEXT } from "./contracts/probe.ts";
-import { PROBE_WRAPUP_TEXT } from "./contracts/chat.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import { hasProbeDone, newHandoffMessage, newMessageId, type LhMarkerMessage, type LhMessage } from "./native-messages.ts";
 
 export const PROBE_SHORT_ANSWER_LIMIT = 3;
-
-export type ProbeWrapupMode = "reminder" | "code";
 
 /** One learner answer during probing, in the shape the code hand-off needs. */
 export interface ProbingAnswer {
@@ -114,17 +110,16 @@ export function shortProbeLimitReached(messages: readonly LhMessage[]): boolean 
 	return !wrapupSent(messages) && probingAnswers(messages).length >= PROBE_SHORT_ANSWER_LIMIT;
 }
 
-/** The wrap-up marker: the quiet "Wrapping up the questions…" line. In
- *  reminder mode the model reads PROBE_WRAPUP_TEXT; in code mode it is
- *  UI-only (toLlmMessages skips it — the teacher must not read it). */
-export function newProbeWrapupMessage(chatId: string, mode: ProbeWrapupMode): LhMarkerMessage {
+/** The wrap-up marker: the quiet "Wrapping up the questions…" line.
+ *  UI-only (toLlmMessages skips it). */
+export function newProbeWrapupMessage(chatId: string): LhMarkerMessage {
 	return {
 		id: `steer_probewrapup_${chatId}`,
 		role: "custom",
 		customType: "probe-wrapup",
-		content: mode === "reminder" ? PROBE_WRAPUP_TEXT : "",
+		content: "",
 		display: true,
-		details: { chatId, mode },
+		details: { chatId },
 		timestamp: Date.now(),
 	};
 }
@@ -194,5 +189,5 @@ export function codeProbeHandoff(
 		isError: false,
 		timestamp: now,
 	} as LhMessage & ToolResultMessage;
-	return [newProbeWrapupMessage(chatId, "code"), call, result, newHandoffMessage(chatId)];
+	return [newProbeWrapupMessage(chatId), call, result, newHandoffMessage(chatId)];
 }

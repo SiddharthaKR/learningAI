@@ -52,7 +52,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { codeProbeHandoff, newProbeWrapupMessage, shortProbeLimitReached } from "../core/probe-length.ts";
+import { codeProbeHandoff, shortProbeLimitReached } from "../core/probe-length.ts";
 import { hasProbeDone, danglingQuestionOf, newPlanRetryMessage, newProbeNudgeMessage, newTeachNudgeMessage, nudgeAfterEmptyCapHit, planRetryOwed, probeNudgeOwed, teachNudgeOwed } from "../core/native-messages.ts";
 import { bm25Ranker } from "../knowledge/bm25.ts";
 import { KnowledgeSearch } from "../knowledge/search.ts";
@@ -390,11 +390,9 @@ export async function handleChatInput(
 	}
 
 	// SHORT PROBING (owner, 2026-11-25): with the Probing preference Short
-	// (the default), the learner's 3rd probing answer ends the probe. Mode
-	// "reminder" sends the prober the wrap-up note with this answer; mode
-	// "code" writes probe_done from the answers and hands off to the teacher
-	// in this same turn. PROBE_SHORT_STRATEGY picks the mode while both are
-	// compared in live tests.
+	// (the default), the learner's 3rd probing answer ends the probe: the app
+	// writes probe_done from the answers and hands off to the teacher in this
+	// same turn (chosen over a reminder to the prober after a live test).
 	const account = await createAccountStore(PATHS.data).byId(currentUserId());
 	if (
 		record.kind !== "practice" && record.kind !== "chat" &&
@@ -402,14 +400,8 @@ export async function handleChatInput(
 		account?.probing !== "long" &&
 		shortProbeLimitReached([...record.messages, ...(appends as LhMessage[])])
 	) {
-		const mode = process.env.PROBE_SHORT_STRATEGY === "code" ? "code" : "reminder";
 		const soFar = [...record.messages, ...(appends as LhMessage[])];
-		appends = [
-			...(appends as LhMessage[]),
-			...(mode === "code"
-				? codeProbeHandoff(soFar, chatId, record.teachingLanguage === "ja" ? "ja" : "en")
-				: [newProbeWrapupMessage(chatId, "reminder")]),
-		];
+		appends = [...(appends as LhMessage[]), ...codeProbeHandoff(soFar, chatId, record.teachingLanguage === "ja" ? "ja" : "en")];
 	}
 
 	// Write-ahead persistence: the input's native appends go on disk BEFORE
