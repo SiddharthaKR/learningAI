@@ -74,6 +74,38 @@ export function withOfficeThinking(payload: unknown): unknown {
 	};
 }
 
+/** gpt-oss is detected from the model name (owner, 2026-11-27). */
+export function isGptOssModel(modelId: string): boolean {
+	return /gpt-oss/iu.test(modelId);
+}
+
+/** Owner-approved filler for an earlier tool call with no thinking to send. */
+export const GPT_OSS_TOOL_CALL_FILLER = "Proceeding with the next tool call.";
+
+/** gpt-oss on LM Studio (2026-11-27): its chat template renders an earlier
+ * assistant tool call's analysis only from `content`; `reasoning` and
+ * `reasoning_content` are ignored. With no analysis before the calls, the
+ * model writes output llama.cpp's peg-native parser rejects ("does not match
+ * the expected peg-native format", llama.cpp #32964): 4/4 on a captured
+ * probing request, 0/5 once each call carried its own thinking as content.
+ * So each earlier tool call with empty content sends its thinking there (or
+ * the filler) and drops the reasoning fields. Pure: returns a new payload. */
+export function withGptOssToolCallAnalysis(payload: unknown): unknown {
+	if (typeof payload !== "object" || payload === null) return payload;
+	const params = payload as Record<string, unknown>;
+	if (!Array.isArray(params.messages)) return payload;
+	const messages = params.messages.map((message: unknown) => {
+		if (typeof message !== "object" || message === null) return message;
+		const m = message as Record<string, unknown>;
+		if (m.role !== "assistant" || !Array.isArray(m.tool_calls) || m.tool_calls.length === 0) return m;
+		if (typeof m.content === "string" && m.content.trim() !== "") return m;
+		const { reasoning, reasoning_content, reasoning_text, ...rest } = m;
+		const thinking = [reasoning, reasoning_content, reasoning_text].find((v): v is string => typeof v === "string" && v.trim() !== "");
+		return { ...rest, content: thinking ?? GPT_OSS_TOOL_CALL_FILLER };
+	});
+	return { ...params, messages };
+}
+
 let collection: ReturnType<typeof createModels> | undefined;
 let limitLlmStream: ReturnType<typeof createLlmLimiter> | undefined;
 
@@ -83,13 +115,18 @@ function officeStreams(): ProviderStreams {
 		const config = officeConfig();
 		const upstreamFetch = options?.fetch ?? globalThis.fetch;
 		const upstreamPayload = options?.onPayload;
+		const gptOss = isGptOssModel(config.llmModel);
 		return {
 			...options,
-			// Reasoning-capable office models carry both thinking signals.
-			...(config.llmReasoning ? {
+			// Reasoning-capable office models carry both thinking signals;
+			// gpt-oss also gets its earlier tool calls' analysis as content.
+			...(config.llmReasoning || gptOss ? {
 				onPayload: async (payload: unknown, model: Model<Api>) => {
 					const next = upstreamPayload ? await upstreamPayload(payload, model) : undefined;
-					return withOfficeThinking(next ?? payload);
+					let out = next ?? payload;
+					if (config.llmReasoning) out = withOfficeThinking(out);
+					if (gptOss) out = withGptOssToolCallAnalysis(out);
+					return out;
 				},
 			} : {}),
 			apiKey: config.llmApiKey ?? "office-no-key-placeholder",
