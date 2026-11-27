@@ -9,12 +9,14 @@ import { createContext, useContext, type ReactNode } from "react";
  */
 interface ServerCapabilities {
 	webSearch: boolean;
+	/** The configured office models' names, model 1 first (model selection, 2026-11-27). */
+	models: string[];
 }
 
-const ServerCapabilitiesContext = createContext<ServerCapabilities>({ webSearch: false });
+const ServerCapabilitiesContext = createContext<ServerCapabilities>({ webSearch: false, models: [] });
 
-export function ServerCapabilitiesProvider({ webSearch = false, children }: { webSearch?: boolean; children: ReactNode }) {
-	return <ServerCapabilitiesContext.Provider value={{ webSearch }}>{children}</ServerCapabilitiesContext.Provider>;
+export function ServerCapabilitiesProvider({ webSearch = false, models = [], children }: { webSearch?: boolean; models?: string[]; children: ReactNode }) {
+	return <ServerCapabilitiesContext.Provider value={{ webSearch, models }}>{children}</ServerCapabilitiesContext.Provider>;
 }
 
 export function useServerCapabilities(): ServerCapabilities {

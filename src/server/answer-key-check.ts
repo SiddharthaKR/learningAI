@@ -16,10 +16,10 @@ export const ANSWER_KEY_CHECK_MAX_TOKENS = 1024;
  * default). Fail-open: a timeout, an error or an unclear reply lets the quiz
  * through, so the check can never stall a lesson.
  */
-export function answerKeyCheck(): AnswerKeyCheck | undefined {
+export function answerKeyCheck(spec: { provider: string; id: string } = fixedOfficeModelSpec()): AnswerKeyCheck | undefined {
 	if (!officeConfig().quizAnswerCheck) return undefined;
 	return async (input, signal) => {
-		const engine = piEngineForSpec({ ...fixedOfficeModelSpec(), thinkingLevel: "off" });
+		const engine = piEngineForSpec({ ...spec, thinkingLevel: "off" });
 		const timeout = AbortSignal.timeout(ANSWER_KEY_CHECK_TIMEOUT_MS);
 		const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
 		const stream = engine.streamFn(

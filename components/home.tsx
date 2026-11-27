@@ -10,6 +10,7 @@ import { joinDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
+import { useServerCapabilities } from "@/components/server-capabilities";
 import type { TurnUsage } from "@/src/core";
 import { useI18n } from "@/components/i18n-provider";
 
@@ -49,6 +50,9 @@ export function Home({
 		},
 	});
 	const [busy, setBusy] = useState(false);
+	// Model selection (owner, 2026-11-27): model 1 unless the learner picks another.
+	const { models } = useServerCapabilities();
+	const [model, setModel] = useState(models[0] ?? "");
 	/* Run end focuses the topic input (owner, 2026-10-01): the hands are on
 	 * the keyboard from the stop. Falling edge only; this surface's only
 	 * dictation target IS this textarea, so no case-split is needed. */
@@ -111,6 +115,7 @@ export function Home({
 				body: JSON.stringify({
 					title: t,
 					...(practiceProps.length > 0 ? { graphContext: { propositions: practiceProps } } : {}),
+					...(models.length > 0 ? { model: models.includes(model) ? model : models[0] } : {}),
 				}),
 			});
 			const { id } = (await res.json()) as { id: string };
@@ -245,6 +250,7 @@ export function Home({
 					    pills write /api/settings/models). */}
 					<StatsBar
 						turns={[] as TurnUsage[]}
+						draftModel={{ value: model, onChange: setModel }}
 					/>
 				</div>
 			</div>

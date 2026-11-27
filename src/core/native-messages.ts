@@ -77,6 +77,7 @@ export interface LhMarkerMessage {
 		| "plan-retry"
 		| "probe-nudge"
 		| "probe-wrapup"
+		| "model-switched"
 		| "teach-nudge"
 		| "subagent-steer"
 		| "subagent-abort"
@@ -766,6 +767,8 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			// The Short-probing wrap-up line is UI-only (2026-11-25): the
 			// teacher reads the probe_done the app wrote.
 			if (marker.customType === "probe-wrapup") continue;
+			// The model-switched line is UI-only too (model selection, 2026-11-27).
+			if (marker.customType === "model-switched") continue;
 			// Switch notes reach the model (owner, 2026-11-19); ones saved
 			// before that carry no text and stay UI-only. A note flipped while
 			// a question card was waiting would land between the tool call and

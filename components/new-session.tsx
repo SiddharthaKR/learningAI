@@ -10,6 +10,7 @@ import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar, type SourceField } from "@/components/stats-bar";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
+import { useServerCapabilities } from "@/components/server-capabilities";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
 import type { ChatSettings, GraphSnapshot, KnowledgeSearchScope } from "@/src/core";
 import { catalogFor, type UiLanguage } from "@/src/core";
@@ -65,6 +66,7 @@ export async function startDraftSession(
 	mode?: "practice" | "chat",
 	picks?: readonly DraftPick[],
 	teachingLanguage?: "en" | "ja",
+	model?: string,
 ): Promise<string | null> {
 	const t = text.trim();
 	if (!t) return null;
@@ -77,10 +79,10 @@ export async function startDraftSession(
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(
 			mode === "practice"
-				? { title: t, kind: "practice", ...(picks && picks.length > 0 ? { graphContext: { propositions: picks } } : {}), ...(teachingLanguage ? { teachingLanguage } : {}) }
+				? { title: t, kind: "practice", ...(picks && picks.length > 0 ? { graphContext: { propositions: picks } } : {}), ...(teachingLanguage ? { teachingLanguage } : {}), ...(model ? { model } : {}) }
 				: mode === "chat"
-				? { title: t, kind: "chat", ...(teachingLanguage ? { teachingLanguage } : {}) }
-				: { title: t, ...(teachingLanguage ? { teachingLanguage } : {}) },
+				? { title: t, kind: "chat", ...(teachingLanguage ? { teachingLanguage } : {}), ...(model ? { model } : {}) }
+				: { title: t, ...(teachingLanguage ? { teachingLanguage } : {}), ...(model ? { model } : {}) },
 		),
 	});
 	if (!res.ok) throw new Error("Unable to create the session.");
@@ -112,6 +114,8 @@ export function DraftShell({
 	attachments,
 	sources,
 	onSourcesChange,
+	model,
+	onModelChange,
 }: {
 	busy: boolean;
 	text: string;
@@ -121,6 +125,9 @@ export function DraftShell({
 	uiLanguage?: UiLanguage;
 	teachingLanguage?: "en" | "ja";
 	onTeachingLanguageChange?: (value: "en" | "ja") => void;
+	/** The model dropdown (model selection, owner 2026-11-27). */
+	model?: string;
+	onModelChange?: (model: string) => void;
 	/** The practice draft (owner, 2026-10-04): ?mode=practice — the
 	 *  created session carries kind:"practice" and the copy changes
 	 *  (the practice agent opens; no probing). */
@@ -251,6 +258,7 @@ export function DraftShell({
 								<StatsBar
 									turns={[]}
 									{...(sources && onSourcesChange ? { draftSources: { settings: sources, onChange: onSourcesChange } } : {})}
+									{...(model !== undefined && onModelChange ? { draftModel: { value: model, onChange: onModelChange } } : {})}
 								/>
 							</div>
 						</div>
@@ -273,6 +281,9 @@ export function DraftShell({
 export function NewSession({ initialConfigured, mode = "teach", initialLanguage = "en", uiLanguage = "en" }: { initialConfigured: boolean; mode?: "teach" | "practice" | "chat"; initialLanguage?: "en" | "ja"; uiLanguage?: UiLanguage }) {
 	const router = useRouter();
 	const [teachingLanguage, setTeachingLanguage] = useState<"en" | "ja">(initialLanguage);
+	// Model selection (owner, 2026-11-27): model 1 unless the learner picks another.
+	const { models } = useServerCapabilities();
+	const [model, setModel] = useState(models[0] ?? "");
 	const [text, setText] = useState("");
 	/* The draft MIRROR ("nothing gets lost" round, 2026-10-01): the shell's
 	 * finish-first send calls THIS send after the dictation flush — which
@@ -327,7 +338,7 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 		setUploadError(undefined);
 		try {
 			const { text: prompt, imageIssues } = await prepareAttachments(draft, documents);
-			const target = await startDraftSession(draft, fetch, mode === "practice" ? "practice" : mode === "chat" ? "chat" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage);
+			const target = await startDraftSession(draft, fetch, mode === "practice" ? "practice" : mode === "chat" ? "chat" : undefined, mode === "practice" ? picksRef.current : undefined, teachingLanguage, models.includes(model) ? model : models[0]);
 			if (!target) throw new Error("Unable to create the session.");
 			const pathname = target.split("?")[0]!;
 			const chatId = pathname.slice("/chat/".length);
@@ -346,7 +357,7 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 			setBusy(false);
 			setUploadError((error as Error).message);
 		}
-	}, [documents, images, router, mode, teachingLanguage, sources]);
+	}, [documents, images, router, mode, teachingLanguage, sources, model, models]);
 
 	return (
 		<>
@@ -361,6 +372,8 @@ export function NewSession({ initialConfigured, mode = "teach", initialLanguage 
 				attachments={{ images, onImagesChange: setImages, documents, onDocumentsChange: setDocuments, uploading: busy && documents.length > 0, uploadError }}
 				sources={sources}
 				onSourcesChange={changeSource}
+				model={model}
+				onModelChange={setModel}
 				mode={mode}
 				picks={picks}
 				onOpenPicker={openPicker}

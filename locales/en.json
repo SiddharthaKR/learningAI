@@ -176,6 +176,7 @@
     "retry": "Retry",
     "retryingTool": "Retrying…",
     "wrappingUpProbe": "Wrapping up the questions…",
+    "modelSwitched": "{old} is no longer available. Continuing with {new}.",
     "errorPrefix": "Something went wrong:"
   },
   "composer": {

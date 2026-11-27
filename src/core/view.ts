@@ -414,6 +414,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "model-switched": {
+			// Model selection (owner, 2026-11-27): the session's model was gone,
+			// so it moved to model 1 — one line naming both.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-model-switched", id: `ms_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "teach-nudge": {
 			// The teach-nudge (owner, 2026-11-24): the same quiet system line.
 			out.push({

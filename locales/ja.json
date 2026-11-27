@@ -176,6 +176,7 @@
     "retry": "再試行",
     "retryingTool": "再試行中…",
     "wrappingUpProbe": "事前チェックをまとめています…",
+    "modelSwitched": "{old} は利用できなくなりました。{new} で続けます。",
     "errorPrefix": "エラーが発生しました："
   },
   "composer": {

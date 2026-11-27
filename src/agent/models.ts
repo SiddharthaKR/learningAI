@@ -18,7 +18,7 @@ import { type ModelRole } from "../../config.ts";
 import { DEFAULT_THINKING_ORDER, type UserSettings } from "../core/settings.ts";
 import type { LocalProviderSnapshot } from "./local-providers.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
-import { officeConfig } from "../core/office-config.ts";
+import { officeConfig, officeModel, officeModels, type OfficeModelConfig } from "../core/office-config.ts";
 import { createLlmLimiter } from "./llm-concurrency.ts";
 import { promptToolStream } from "./prompt-tool-stream.ts";
 import { toolSalvageStream } from "./tool-salvage-stream.ts";
@@ -111,26 +111,29 @@ let limitLlmStream: ReturnType<typeof createLlmLimiter> | undefined;
 
 function officeStreams(): ProviderStreams {
 	const upstream = openAICompletionsApi();
-	const optionsFor = <T extends StreamOptions | SimpleStreamOptions>(options: T | undefined): T => {
-		const config = officeConfig();
+	// Each request uses ITS model's settings (model selection, 2026-11-27):
+	// key, reasoning switch and gpt-oss handling come from that model's
+	// LLM_<n>_* block; an unknown id falls back to model 1's.
+	const optionsFor = <T extends StreamOptions | SimpleStreamOptions>(modelId: string, options: T | undefined): T => {
+		const config = officeModel(modelId) ?? officeModels()[0]!;
 		const upstreamFetch = options?.fetch ?? globalThis.fetch;
 		const upstreamPayload = options?.onPayload;
-		const gptOss = isGptOssModel(config.llmModel);
+		const gptOss = isGptOssModel(config.model);
 		return {
 			...options,
 			// Reasoning-capable office models carry both thinking signals;
 			// gpt-oss also gets its earlier tool calls' analysis as content.
-			...(config.llmReasoning || gptOss ? {
+			...(config.reasoning || gptOss ? {
 				onPayload: async (payload: unknown, model: Model<Api>) => {
 					const next = upstreamPayload ? await upstreamPayload(payload, model) : undefined;
 					let out = next ?? payload;
-					if (config.llmReasoning) out = withOfficeThinking(out);
+					if (config.reasoning) out = withOfficeThinking(out);
 					if (gptOss) out = withGptOssToolCallAnalysis(out);
 					return out;
 				},
 			} : {}),
-			apiKey: config.llmApiKey ?? "office-no-key-placeholder",
-			...(config.llmApiKey ? {} : {
+			apiKey: config.apiKey ?? "office-no-key-placeholder",
+			...(config.apiKey ? {} : {
 				fetch: (input: RequestInfo | URL, init?: RequestInit) => {
 					const headers = new Headers(init?.headers);
 					headers.delete("authorization");
@@ -144,43 +147,20 @@ function officeStreams(): ProviderStreams {
 	// tool-salvage-stream.ts. Prompt mode has its own text-call parser.
 	return {
 		stream: (model, context, options) => officeConfig().llmToolMode === "prompt"
-			? promptToolStream((m, c, o) => upstream.stream(m, c, optionsFor(o)))(model, context, options)
-			: toolSalvageStream((m, c, o) => upstream.stream(m, c, optionsFor(o)))(model, context, options),
+			? promptToolStream((m, c, o) => upstream.stream(m, c, optionsFor(m.id, o)))(model, context, options)
+			: toolSalvageStream((m, c, o) => upstream.stream(m, c, optionsFor(m.id, o)))(model, context, options),
 		streamSimple: (model, context, options) => officeConfig().llmToolMode === "prompt"
-			? promptToolStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(o)))(model, context, options)
-			: toolSalvageStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(o)))(model, context, options),
+			? promptToolStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(m.id, o)))(model, context, options)
+			: toolSalvageStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(m.id, o)))(model, context, options),
 	};
 }
 
-/** Exactly one server-owned OpenAI-compatible provider and model. */
+/** One server-owned OpenAI-compatible provider holding every configured
+ *  office model; each model carries its own server URL. */
 export function piModels() {
 	if (!collection) {
 		const config = officeConfig();
-		const model: Model<"openai-completions"> = {
-			id: config.llmModel,
-			name: config.llmModel,
-			provider: "office",
-			api: "openai-completions",
-			baseUrl: config.llmBaseUrl,
-			input: config.llmVision ? ["text", "image"] : ["text"],
-			reasoning: config.llmReasoning,
-			...(config.llmReasoning ? {
-				// Exactly two levels: off (the Preferences switch) and medium.
-				// null marks a level unsupported in pi-ai, so off stays unset —
-				// a null off clamped "off" up to "minimal" and thinking ran on.
-				// Off/on reach the wire through withOfficeThinking (onPayload).
-				thinkingLevelMap: { minimal: null, low: null, medium: "medium", high: null },
-			} : {}),
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: config.llmContextWindow,
-			maxTokens: config.llmMaxTokens,
-			// LLM_MAX_TOKENS goes out as `max_tokens` (2026-11-24): pi-ai's
-			// default for a custom endpoint is `max_completion_tokens`, which
-			// Ollama ignores — a local 12B turn thought for 19k tokens (13 min)
-			// past the 4,096 cap. Ollama, LM Studio and the Gemma 4 proxy all
-			// read `max_tokens`.
-			compat: { maxTokensField: "max_tokens" },
-		};
+		const models = officeModels().map((m) => officePiModel(m));
 		collection = createModels({ identity: APP_IDENTITY });
 		collection.setProvider(createProvider({
 			id: "office",
@@ -190,11 +170,39 @@ export function piModels() {
 				auth: { apiKey: config.llmApiKey ?? "office-no-key-placeholder" },
 				source: "server environment",
 			}) } },
-			models: [model],
+			models,
 			api: officeStreams(),
 		}));
 	}
 	return collection;
+}
+
+function officePiModel(config: OfficeModelConfig): Model<"openai-completions"> {
+	return {
+		id: config.model,
+		name: config.model,
+		provider: "office",
+		api: "openai-completions",
+		baseUrl: config.baseUrl,
+		input: config.vision ? ["text", "image"] : ["text"],
+		reasoning: config.reasoning,
+		...(config.reasoning ? {
+			// Exactly two levels: off (the Preferences switch) and medium.
+			// null marks a level unsupported in pi-ai, so off stays unset —
+			// a null off clamped "off" up to "minimal" and thinking ran on.
+			// Off/on reach the wire through withOfficeThinking (onPayload).
+			thinkingLevelMap: { minimal: null, low: null, medium: "medium", high: null },
+		} : {}),
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: config.contextWindow,
+		maxTokens: config.maxTokens,
+		// LLM_MAX_TOKENS goes out as `max_tokens` (2026-11-24): pi-ai's
+		// default for a custom endpoint is `max_completion_tokens`, which
+		// Ollama ignores — a local 12B turn thought for 19k tokens (13 min)
+		// past the 4,096 cap. Ollama, LM Studio and the Gemma 4 proxy all
+		// read `max_tokens`.
+		compat: { maxTokensField: "max_tokens" },
+	};
 }
 
 /** Legacy discovery hook kept for callers; user endpoints are disabled. */

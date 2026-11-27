@@ -724,7 +724,8 @@ export interface ExtractionModels {
 	 *  stages lands). BYOK (owner, 2026-09-22): the chain (role override →
 	 *  slot → NOTHING) may end EMPTY → undefined; the front doors refuse
 	 *  with ModelsNotConfiguredError before any stage runs. */
-	engineFor?: (role: ModelRole) => PiEngine | undefined;
+	/** sourceId: the chat id for chat runs (its session's model), the src id for notes. */
+	engineFor?: (role: ModelRole, sourceId?: string) => PiEngine | undefined;
 	/** Key-presence gate (provider-key interlude, 2026-09-25): given a
 	 *  stage engine's provider + the role's slot tier, the injected check
 	 *  returns the refusal envelope when the provider's key is missing
@@ -802,8 +803,8 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 	// stage call server-side) — the job runner's exact treatment. undefined
 	// = the BYOK chain came up empty; the front-door guards turn that into
 	// an honest refusal.
-	const stageEngine = (role: ModelRole, override?: PiEngine): PiEngine | undefined =>
-		override ?? deps.engineFor?.(role);
+	const stageEngine = (role: ModelRole, override?: PiEngine, sourceId?: string): PiEngine | undefined =>
+		override ?? deps.engineFor?.(role, sourceId);
 	/** The per-need refusal guard: which slot tiers the pipeline's stages
 	 *  found unset (test values count as configured — they ARE engines),
 	 *  and whether a configured stage's provider key is gone (provider-key
@@ -943,7 +944,7 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 		const t0 = performance.now();
 
 		const findings = await runExtractor(
-			stageEngine("extractor", deps.extractor),
+			stageEngine("extractor", deps.extractor, sourceId),
 			sourceId,
 			prompt,
 			new Set(graph.nodes.map((n) => n.id)),
@@ -975,7 +976,7 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 		// IDENTITY-only and never sees the passages, so anchors are useless
 		// to it — they add cognitive load, not signal.
 		const auditResult = await runAuditor(
-			stageEngine("auditor", deps.auditor),
+			stageEngine("auditor", deps.auditor, sourceId),
 			sourceId,
 			`Proposed findings from the extractor (the source itself is not available to you — the extractor is fully trusted; the propositions only — the reasoning chains are the merger's business, owner 2026-09-30):\n\n` +
 				`${JSON.stringify(
@@ -1295,7 +1296,7 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 		);
 		const t0 = performance.now();
 		const findings = await runNotesExtractor(
-			stageEngine("extractor", deps.extractor),
+			stageEngine("extractor", deps.extractor, input.id),
 			input.id,
 			prompt,
 			new Set(graph.nodes.map((n) => n.id)),

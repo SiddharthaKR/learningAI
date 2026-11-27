@@ -1424,6 +1424,15 @@ export function Chat({
 														{copy.chat.wrappingUpProbe}
 													</SystemLine>
 												);
+											case "data-model-switched": {
+												// Model selection (owner, 2026-11-27): the session's model was gone.
+												const d = (part as { data?: { from?: string; to?: string } }).data ?? {};
+												return (
+													<SystemLine key={pi} testId="model-switched">
+														{copy.chat.modelSwitched.replace("{old}", d.from ?? "").replace("{new}", d.to ?? "")}
+													</SystemLine>
+												);
+											}
 											case "data-teach-nudge":
 											case "data-probe-nudge":
 												// The model ended a probing (2026-11-19) or teaching (2026-11-24)

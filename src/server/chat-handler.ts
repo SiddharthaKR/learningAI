@@ -37,7 +37,8 @@ import { requestWebApproval } from "./web-approvals.ts";
 import { validateRestrictedWebTarget } from "../agent/tools/restricted-web-fetch.ts";
 import { createAccountStore } from "./accounts.ts";
 import { PATHS } from "../../config.ts";
-import { fixedOfficeModelSpec, officeConfig } from "./office-config.ts";
+import { fixedOfficeModelSpec, officeConfig, officeModel, officeModelSpecFor } from "./office-config.ts";
+import { newModelSwitchedMessage } from "../core/model-switch.ts";
 import { answerKeyCheck } from "./answer-key-check.ts";
 import { describeAttachedImages } from "./chat-image-vision.ts";
 import { providerKeyPresent } from "./keys.ts";
@@ -110,7 +111,7 @@ export function extractionForOwner(ownerId: string): ReturnType<typeof createExt
 	// spent the whole 4,096-token cap thinking and never submitted its
 	// findings (every batch failed, ~200 s each). Extraction runs like the
 	// picture-reading jobs: no thinking, done sooner, model freed for turns.
-	engineFor: extractionEngine,
+	engineFor: (role, sourceId) => extractionEngine(role, sourceId, checkedStoresForUser(ownerId).chatStore),
 	// Key-presence gate (provider-key interlude, 2026-09-25): same check
 	// the job runner gets — a stage engine whose provider key is gone
 	// refuses BEFORE any batch runs (the typed throw), never mid-run.
@@ -145,29 +146,39 @@ setTurnRunner(async (chatId, input) => {
  *  flows through to the per-need refusal gates (runner/extraction), read
  *  FRESH so a settings PUT between dispatch and spawn lands. */
 /** The extraction stages' engine: the office model with thinking off. */
-export function extractionEngine(role: ModelRole): PiEngine | undefined {
-	return resolveEngine(role, { thinking: false });
+export function extractionEngine(role: ModelRole, chatId?: string, chatStore: ChatModelLookup = stores.chatStore): PiEngine | undefined {
+	return resolveEngine(role, { thinking: false, chatId, chatStore });
 }
 
 /** The compaction summary's engine (owner, 2026-11-24): the office model
  *  with thinking off. The summary is a text job; thinking under the
  *  output cap made it slow and could use the whole cap before any
  *  summary was written. */
-export function compactionEngine(): PiEngine | undefined {
-	const spec = fixedOfficeModelSpec();
-	return spec ? piEngineForSpec({ ...spec, thinkingLevel: "off" }) : undefined;
+export function compactionEngine(chatId?: string, chatStore: ChatModelLookup = stores.chatStore): PiEngine | undefined {
+	return piEngineForSpec({ ...sessionModelSpec(chatId, chatStore), thinkingLevel: "off" });
+}
+
+/** What the engine helpers read from a chat store: the session's stored model. */
+type ChatModelLookup = { getChat(id: string): { settings?: { model?: { provider?: string; id?: string } } } | null | undefined };
+
+/** A session's model (model selection, owner 2026-11-27): the model stored on
+ *  the session when it is still configured, else model 1. No chat (notes
+ *  extraction, picture reading) means model 1. */
+export function sessionModelSpec(chatId: string | undefined, chatStore: ChatModelLookup = stores.chatStore): { provider: "office"; id: string } {
+	if (!chatId) return fixedOfficeModelSpec();
+	const stored = chatStore.getChat(chatId)?.settings?.model;
+	return officeModelSpecFor(stored?.provider === "office" ? stored.id : undefined);
 }
 
 /** A background job's engine: the researcher runs with thinking off (owner,
  *  2026-11-25 — it thought on each of up to 12 search/fetch steps and
  *  research took minutes); the other jobs keep the configured default. */
-export function jobEngine(role: ModelRole): PiEngine | undefined {
-	return resolveEngine(role, role === "researcher" ? { thinking: false } : {});
+export function jobEngine(role: ModelRole, chatId?: string, chatStore: ChatModelLookup = stores.chatStore): PiEngine | undefined {
+	return resolveEngine(role, { ...(role === "researcher" ? { thinking: false } : {}), chatId, chatStore });
 }
 
-function resolveEngine(_role: ModelRole, opts: { thinking?: boolean } = {}): PiEngine | undefined {
-	const spec = fixedOfficeModelSpec();
-	if (!spec) return undefined;
+function resolveEngine(_role: ModelRole, opts: { thinking?: boolean; chatId?: string; chatStore?: ChatModelLookup } = {}): PiEngine | undefined {
+	const spec = sessionModelSpec(opts.chatId, opts.chatStore);
 	return piEngineForSpec(opts.thinking === false ? { ...spec, thinkingLevel: "off" } : spec);
 }
 
@@ -180,7 +191,7 @@ function spawnOfficeJob(jobId: string, ownerId: string | undefined, input?: unkn
 			chatStore: owned.chatStore,
 			jobStore: owned.jobStore,
 			deliver: deliverJobResult,
-			engineFor: jobEngine,
+			engineFor: (role, chatId) => jobEngine(role, chatId, owned.chatStore),
 			searchProvider,
 			webEnabled: researchAvailable,
 			webAllowedUrl: (chatId, url) => userMessageUrls(owned.chatStore.getChat(chatId)?.messages ?? []).has(url),
@@ -272,7 +283,15 @@ export async function handleChatInput(
 	// write-ahead persist (nothing durable changes), and every downstream
 	// resolution (jobs/extraction gate per-need on their own tiers).
 	const effective = effectiveSettings();
-	const conversation = fixedOfficeModelSpec();
+	// MODEL SELECTION (owner, 2026-11-27): the session's own model; a model
+	// no longer configured moves the session to model 1 with one chat line.
+	// Only office models count: a stored pin from another provider (sessions
+	// from before the office edition) quietly runs on model 1, as before.
+	const storedModel = record.settings?.model?.provider === "office" ? record.settings.model.id : undefined;
+	const conversation = officeModelSpecFor(storedModel);
+	const modelSwitch = storedModel !== undefined && storedModel !== conversation.id
+		? { from: storedModel, to: conversation.id }
+		: undefined;
 	if (!conversation) {
 		const envelope = modelsNotConfigured(["strong"]);
 		console.info(`[chat ${chatId}] turn refused — ${JSON.stringify(envelope)}`);
@@ -308,13 +327,13 @@ export async function handleChatInput(
 	await ensureCompacted(
 		{
 			chatStore: stores.chatStore,
-			engine: compactionEngine() ?? conversationEngine,
+			engine: compactionEngine(chatId) ?? conversationEngine,
 			modelId: modelIdForCompaction,
 			kind: record.kind === "practice" ? "practice" : record.kind === "chat" ? "chat" : hasProbeDone(record.messages) ? "teach" : "probe",
 			thresholdTokens: effectiveThresholdTokens(
 				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
-				officeConfig().llmMaxTokens,
+				officeModel(conversation.id)?.maxTokens ?? officeConfig().llmMaxTokens,
 			),
 			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : record.kind === "chat" ? "chat" : "teacher").length / 4),
 		},
@@ -387,6 +406,14 @@ export async function handleChatInput(
 	// descriptions. Never throws (an unreadable picture is recorded as such).
 	if (input.type === "text" && input.images?.length) {
 		appends = await describeAttachedImages(appends as LhMessage[]);
+	}
+
+	// The session's model was gone (MODEL SELECTION above): it moves to
+	// model 1 for good, and the chat shows one line naming both.
+	if (modelSwitch) {
+		const current = stores.chatStore.getChat(chatId)?.settings ?? record.settings ?? {};
+		stores.chatStore.saveSettings(chatId, { ...current, model: conversation });
+		appends = [newModelSwitchedMessage(chatId, modelSwitch.from, modelSwitch.to), ...(appends as LhMessage[])];
 	}
 
 	// SHORT PROBING (owner, 2026-11-25): with the Probing preference Short
@@ -562,7 +589,7 @@ export async function handleChatInput(
 						searchAvailable: () => researchAvailable(chatId),
 						knowledge: knowledgeCtx,
 						// The quiz answer-key check (QUIZ_ANSWER_CHECK, owner 2026-11-19).
-						checkAnswerKey: answerKeyCheck(),
+						checkAnswerKey: answerKeyCheck(conversation),
 					},
 					agentOpts,
 				)
@@ -582,7 +609,7 @@ export async function handleChatInput(
 						// graph master switch AND the agent.graphTools toggle.
 						...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
 						knowledge: knowledgeCtx,
-						checkAnswerKey: answerKeyCheck(),
+						checkAnswerKey: answerKeyCheck(conversation),
 					},
 					agentOpts,
 				);
@@ -726,7 +753,7 @@ export async function handleChatInput(
 				if (process.env.NODE_ENV !== "test")
 					kickCompaction(() => {
 						const fresh = effectiveSettings();
-						const kickEngine = compactionEngine();
+						const kickEngine = compactionEngine(chatId);
 						if (!kickEngine) return null;
 						const kickModelId = `${kickEngine.model.provider}:${kickEngine.model.id}`;
 						const freshRecord = stores.chatStore.getChat(chatId);
@@ -739,7 +766,7 @@ export async function handleChatInput(
 							thresholdTokens: effectiveThresholdTokens(
 								fresh.compaction?.thresholdTokens,
 								catalogContextLimits().get(kickModelId),
-								officeConfig().llmMaxTokens,
+								officeModel(kickEngine.model.id)?.maxTokens ?? officeConfig().llmMaxTokens,
 							),
 							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher").length / 4),
 						};

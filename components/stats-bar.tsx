@@ -53,6 +53,25 @@ export function KnowledgeScopeSelect({ settings, disabled, onChange }: {
  );
 }
 
+/** The new-session screen's model dropdown (model selection, owner 2026-11-27):
+ *  the configured models by name, always shown — even with only one. */
+export function ModelSelect({ value, onChange }: { value: string; onChange: (model: string) => void }) {
+ const copy = useI18n().activityUi;
+ const { models } = useServerCapabilities();
+ if (models.length === 0) return null;
+ return (
+  <select
+   aria-label={copy.model}
+   value={models.includes(value) ? value : models[0]}
+   onChange={(event) => onChange(event.target.value)}
+   className="pointer-events-auto cursor-pointer rounded border border-border bg-background px-1 py-0.5 text-inherit"
+   data-testid="model-select"
+  >
+   {models.map((m) => <option key={m} value={m}>{m}</option>)}
+  </select>
+ );
+}
+
 /** A session's web/knowledge switch (or the knowledge scope). */
 export type SourceField = "webResearchEnabled" | "officeKnowledgeEnabled" | "knowledgeScope";
 
@@ -63,6 +82,7 @@ export function StatsBar({
 	leadingSlot,
 	webMode: webModeProp,
 	draftSources,
+	draftModel,
 }: {
 	turns: TurnUsage[];
 	/** The bound session (per-session models, owner 2026-09-28): present
@@ -84,6 +104,8 @@ export function StatsBar({
 	/** The new-session screen's web/knowledge switches: held locally until the session
 	 *  exists, then saved to it before its first reply (no chatId yet). */
 	draftSources?: { settings: ChatSettings; onChange: (field: SourceField, value: boolean | KnowledgeSearchScope) => void };
+	/** The new-session screen's model choice, sent when the session is created. */
+	draftModel?: { value: string; onChange: (model: string) => void };
 }) {
 	const copy = useI18n().activityUi;
 	// The web switch says "Enable web search" when the server has a search provider,
@@ -272,6 +294,7 @@ export function StatsBar({
 				<div className="flex min-w-0 flex-1 items-center justify-center">{dictationSlot}</div>
 			)}
 
+   {draftModel && !chatId && <ModelSelect value={draftModel.value} onChange={draftModel.onChange} />}
    {(chatId || draftSources) && (() => {
     // A running session saves each change to its record; the new-session screen
     // holds them until the session exists (draftSources).

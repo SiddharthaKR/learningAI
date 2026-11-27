@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
-import { authenticatedAccount, knowledgeVision, searchStatus } from "@/src/server";
+import { authenticatedAccount, knowledgeVision, officeModels, searchStatus } from "@/src/server";
 import { ServerCapabilitiesProvider } from "@/components/server-capabilities";
 import { PictureReadingProvider } from "@/components/picture-reading";
 import "katex/dist/katex.min.css";
@@ -24,6 +24,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	const account = await authenticatedAccount(new Request("http://office.local/", { headers: incoming }));
 	const accepted = incoming.get("accept-language")?.split(",")[0]?.trim().toLowerCase() ?? "";
 	const language = account?.uiLanguage ?? (accepted.startsWith("ja") ? "ja" : "en");
+	// The new-session model dropdown's names (model selection, 2026-11-27); signed-in only.
+	let models: string[] = [];
+	try {
+		if (account) models = officeModels().map((m) => m.model);
+	} catch {
+		// A broken .env surfaces on the first model call with its real error.
+	}
 	return (
 		<html lang={language} className={inter.variable} suppressHydrationWarning>
 			<head>
@@ -31,7 +38,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 			</head>
 			<body className="min-h-dvh antialiased">
 			<I18nProvider language={language}>
-			<ServerCapabilitiesProvider webSearch={searchStatus().available}>
+			<ServerCapabilitiesProvider webSearch={searchStatus().available} models={models}>
 			<PictureReadingProvider available={Boolean(account && knowledgeVision())} initialEnabled={account?.readPictures ?? false}>
 			{/* The notification channel rides OUTSIDE everything: sidebar, dock,
 				 and pages all subscribe as the polls retire (push S3, 2026-10-02). */}
