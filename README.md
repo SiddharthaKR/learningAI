@@ -52,7 +52,7 @@ Any OpenAI-compatible Chat Completions server works (`/v1/chat/completions`). Te
 | gpt-oss (20B tested) | LM Studio | The app applies LM Studio's gpt-oss tool-call fix automatically (by model name). |
 | Qwen 3.5 (9B tested) | LM Studio | Works as is. Often asks in plain text, so the app adds one reminder call to get an answer box. |
 
-Other families (GLM, …) should work through the same API but have not been tested end to end yet.
+**Not supported:** GLM-4.6V-Flash on LM Studio. LM Studio lets it repeat a tool call, or a field inside one, until the output limit (minutes per turn). The app stops a reply at the first identical repeated tool call for every model, but cannot repair the repeated fields. Larger GLM models have not been tested.
 
 ## Setup
 
