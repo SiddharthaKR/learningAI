@@ -50,8 +50,9 @@ Any OpenAI-compatible Chat Completions server works (`/v1/chat/completions`). Te
 |---|---|---|
 | Gemma 4 (E4B, 12B, 26B-A4B) | Ollama; LM Studio behind `deploy/gemma4-proxy` | The proxy fixes Gemma's thinking and tool-call quirks. |
 | gpt-oss (20B tested) | LM Studio | The app applies LM Studio's gpt-oss tool-call fix automatically (by model name). |
+| Qwen 3.5 (9B tested) | LM Studio | Works as is. Often asks in plain text, so the app adds one reminder call to get an answer box. |
 
-Other families (Qwen, GLM, …) should work through the same API but have not been tested end to end yet.
+Other families (GLM, …) should work through the same API but have not been tested end to end yet.
 
 ## Setup
 
