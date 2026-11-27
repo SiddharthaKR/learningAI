@@ -6,76 +6,102 @@
   </picture>
 </p>
 
-<p align="center"><strong>An agent harness for learning.</strong></p>
+<p align="center"><strong>An AI tutor for the office that runs on your own models.</strong></p>
 
 <p align="center">
-  <a href="#office-deployment">Office deployment</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="docs/development.md">Documentation</a> ·
-  <a href="https://github.com/amosblomqvist/learnharness/issues">Issues</a>
+  <a href="#how-a-session-works">How it works</a> ·
+  <a href="#models">Models</a> ·
+  <a href="#setup">Setup</a> ·
+  <a href="DEPLOY.md">Deployment guide</a>
 </p>
 
-LearnHarness uses AI agents to plan and teach lessons from your current understanding to your goal. It builds a detailed picture of what you understand and how you reason. That picture is updated as you learn.
+LearnHarness Office is a web app that teaches. Tell it what you want to learn. It first checks what you already know, then plans a path to your goal and teaches it one step at a time with questions you answer in the app. Everything runs inside the office: the models are your own (LM Studio, Ollama, or any OpenAI-compatible server), and chats, documents and the knowledge graph stay on the office server.
 
-Instead of just giving you an explanation, it uses your answers and thinking to decide what you need next. Teaching builds understanding one reasoning step at a time. Practice makes it usable. A persistent knowledge graph carries it across sessions.
+## How a session works
 
-![LearnHarness teaching session](docs/assets/teaching-session.png)
+![Probing: the tutor asks diagnostic questions with answer options](docs/assets/probing.png)
 
-## How it works
+1. **Probe.** The tutor asks a few diagnostic questions — options to click, or a box to type in — to find where your understanding ends. It does not explain while probing. With **Short** probing (the default) it moves on after your 3rd answer; with **Long** it keeps asking until it decides it knows enough. You choose in Preferences.
+2. **Plan.** It draws a dependency map from what you know to your goal and shows it to you. Say "let's start" (or steer it) to begin.
+3. **Teach.** Each step builds on the last: an explanation, then a check question. Wrong answers get feedback before the lesson moves on. You can type your thinking next to each answer, so the tutor sees how you reason, not just right or wrong.
 
-1. **Measure.** Before teaching, the agent finds where your understanding ends on each part the lesson depends on. Your answers, confidence, and thinking show it where to start.
-2. **Plan.** It works out a dependency map from that starting point to your goal. You can see the plan, and the lesson adapts when your understanding turns out different.
-3. **Teach.** Each step builds on something you already understand. You predict, get an explanation, and check your understanding. Confusions are repaired before anything is built on them. The aim is for the goal to feel obviously true, not merely familiar.
-4. **Practice.** Separate sessions pose varied problems that require the right knowledge to come to mind without being named first. Problems and hints adapt to your reasoning.
+![The plan: a dependency map from the learner's starting point to Ohm's law](docs/assets/plan.png)
 
-**Think out loud.** The thinking fields let you explain your reasoning, uncertainties, and reactions in your own words. This is how the agent gets a detailed picture rather than just a record of right and wrong answers. You can type or use dictation.
+Besides **Teaching**, there are **Practice** sessions (problems that draw on what you learned) and **Chat** sessions (plain questions and answers).
 
-The agent can also research questions in the background, create visual explanations, and build interactive demonstrations.
+## What else it does
 
-## Knowledge that carries forward
+- **Web search** — with SearXNG configured, the tutor can search the web in the background and fold what it finds into the lesson (switch it on per session).
+- **Office knowledge** — upload PDF, PPTX, DOCX, Markdown or text files to a Personal or a Shared library; sessions can search them.
+- **Knowledge graph** — what you are taught is stored as propositions and reasoning chains, so later sessions can build on it.
+- **English and Japanese** — interface and teaching language are set per user.
+- **Preferences** — Reasoning on/off (slower, more careful answers) and Short/Long probing.
+- **Admin** — the account named in `LH_ADMIN_USERNAME` manages users and the shared library at `/admin`.
 
-What you are taught accumulates as propositions and reasoning chains: individual claims and the premises that lead to them. The graph shows this structure, with links back to the source sessions. You can also import notes.
+## Models
 
-Future teaching sessions can read the graph instead of starting from scratch. Practice sessions can draw their material from it. It stores the ideas and their connections, not ratings of your ability.
+![The new-session screen with the model dropdown](docs/assets/new-session.png)
 
-![LearnHarness knowledge graph](docs/assets/knowledge-graph.png)
+You can configure several models, each on its own server. Learners pick one by name on the new-session screen; the session keeps that model for probing, planning, teaching, research and background work.
 
-## Office deployment
+Any OpenAI-compatible Chat Completions server works (`/v1/chat/completions`). Tested so far:
 
-LearnHarness runs as a Node.js web application for an office. Copy `.env.example` to `.env` and set the internal OpenAI-compatible LLM URL, model, optional API key, session secret, admin username (`LH_ADMIN_USERNAME`), and knowledge directory. The LLM URL must end in `/v1`. Set `NO_PROXY` to include the internal LLM host.
+| Model | Server | Notes |
+|---|---|---|
+| Gemma 4 (E4B, 12B, 26B-A4B) | Ollama; LM Studio behind `deploy/gemma4-proxy` | The proxy fixes Gemma's thinking and tool-call quirks. |
+| gpt-oss (20B tested) | LM Studio | The app applies LM Studio's gpt-oss tool-call fix automatically (by model name). |
 
-`npm run smoke:llm` checks that the configured model answers a plain chat request and emits a tool call. Environment variables override values in `.env`, so you can test a local Ollama endpoint with `LLM_BASE_URL=http://localhost:11434/v1` and `LLM_MODEL=gemma4:e4b`.
+Other families (Qwen, GLM, …) should work through the same API but have not been tested end to end yet.
 
-`npm run build` creates the production build; `npm run start` serves it. Put the Node server behind your office's HTTPS reverse proxy.
+## Setup
 
-### Current status
-
-The office v1 pilot (Tasks 1–8) is feature-complete for single-user local use. See [office-v1-progress.md](docs/office-v1-progress.md) for detailed status. Remaining gaps before full deployment:
-
-- **Web search**: the AI can fetch URLs but cannot search the web (`SEARCH_PROVIDER` not configured).
-- **`/source` route**: AGPL compliance archive download — not yet implemented.
-- **Concurrency**: `MAX_CONCURRENT_LLM=2` is set but untested with multiple simultaneous users.
-- **Shared knowledge**: users upload to a Shared pool from the Knowledge page (stored in `data/shared/`, every add/delete logged). An admin-built folder index (`KNOWLEDGE_SHARED_DIR` + `KNOWLEDGE_INDEX_FILE`) is optional.
-- **Admin**: the account named by `LH_ADMIN_USERNAME` gets `/admin` (users, password reset, delete) and `/admin/knowledge` (library stats). Forgotten passwords are reset by the admin. See [DEPLOY.md](DEPLOY.md).
-
-## Your keys, your data
-
-The server keeps chats, graph data, and configuration in the office deployment. Model requests go to the configured internal LLM endpoint. Restrict access to the app and storage according to your office's deployment policy.
-
-## Development and support
+Requirements: Node.js 20+ and npm, an OpenAI-compatible model server, and optionally Docker for SearXNG.
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
-npm test           # deterministic, no LLM, no network
+cp .env.example .env     # then fill it in (see below)
+npm run build
+npm run start            # serves on PORT (default 3000)
 ```
 
-See the [development guide](docs/development.md) and [architecture](docs/architecture.md).
+The main settings in `.env`:
 
-Questions, bug reports, and feature requests: [GitHub Issues](https://github.com/amosblomqvist/learnharness/issues).
+```env
+# Model 1 (the default)
+LLM_BASE_URL=http://172.20.1.126:8088/v1     # must end in /v1
+LLM_MODEL=<model id, as the server lists it>
+LLM_CONTEXT_WINDOW=32768                     # the context the server actually loaded
+LLM_MAX_TOKENS=4096
+LLM_VISION=false
+LLM_REASONING=true
+
+# Model 2, 3, … (optional) — same six settings with a number
+LLM_2_BASE_URL=http://<mac-ip>:1234/v1
+LLM_2_MODEL=openai/gpt-oss-20b
+LLM_2_CONTEXT_WINDOW=32768
+LLM_2_MAX_TOKENS=4096
+LLM_2_VISION=false
+LLM_2_REASONING=true
+
+NO_PROXY=localhost,127.0.0.1,172.20.1.126,<mac-ip>   # every model host
+SESSION_SECRET=<at least 32 random characters>
+LH_ADMIN_USERNAME=<your admin username>
+SEARCH_PROVIDER=searxng
+SEARXNG_URL=http://127.0.0.1:8080
+```
+
+`npm run smoke:llm` checks that model 1 answers and can call a tool. [DEPLOY.md](DEPLOY.md) covers the server install, SearXNG, the systemd service, picture reading and upgrades.
+
+## Development
+
+```bash
+npm run dev        # http://localhost:3000
+npm test           # deterministic: no model, no network
+npm run typecheck
+```
+
+See [docs/development.md](docs/development.md) and [docs/architecture.md](docs/architecture.md).
 
 ## License
 
-[AGPL-3.0](LICENSE)
-
-The app is free and open forever. If we ever charge for anything, it will be for convenience — managed keys, hosting — never for features you can run locally.
+[AGPL-3.0](LICENSE). Based on [LearnHarness](https://github.com/amosblomqvist/learnharness) by Amos Blomqvist.
