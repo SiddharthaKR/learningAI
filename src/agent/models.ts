@@ -22,6 +22,7 @@ import { officeConfig, officeModel, officeModels, type OfficeModelConfig } from 
 import { createLlmLimiter } from "./llm-concurrency.ts";
 import { promptToolStream } from "./prompt-tool-stream.ts";
 import { toolSalvageStream } from "./tool-salvage-stream.ts";
+import { repeatGuardStream } from "./repeat-guard-stream.ts";
 
 /** App identity is immutable and shared by Models and every native Agent.
  * Agent's default Pi attribution otherwise overrides the Models identity. */
@@ -147,11 +148,11 @@ function officeStreams(): ProviderStreams {
 	// tool-salvage-stream.ts. Prompt mode has its own text-call parser.
 	return {
 		stream: (model, context, options) => officeConfig().llmToolMode === "prompt"
-			? promptToolStream((m, c, o) => upstream.stream(m, c, optionsFor(m.id, o)))(model, context, options)
-			: toolSalvageStream((m, c, o) => upstream.stream(m, c, optionsFor(m.id, o)))(model, context, options),
+			? promptToolStream(repeatGuardStream((m, c, o) => upstream.stream(m, c, optionsFor(m.id, o))))(model, context, options)
+			: toolSalvageStream(repeatGuardStream((m, c, o) => upstream.stream(m, c, optionsFor(m.id, o))))(model, context, options),
 		streamSimple: (model, context, options) => officeConfig().llmToolMode === "prompt"
-			? promptToolStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(m.id, o)))(model, context, options)
-			: toolSalvageStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(m.id, o)))(model, context, options),
+			? promptToolStream(repeatGuardStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(m.id, o))))(model, context, options)
+			: toolSalvageStream(repeatGuardStream((m, c, o) => upstream.streamSimple(m, c, optionsFor(m.id, o))))(model, context, options),
 	};
 }
 
